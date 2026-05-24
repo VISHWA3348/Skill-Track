@@ -74,7 +74,7 @@ export async function analyzeStudentGap(studentId: string) {
     path.certifications.forEach(c => {
       if (studentCertNames.some(sc => sc.includes(c.toLowerCase()))) score += 5;
     });
-    
+
     if (score > maxScore) {
       maxScore = score;
       bestPath = path;
@@ -82,21 +82,21 @@ export async function analyzeStudentGap(studentId: string) {
   });
 
   // 3. Gap Analysis
-  const missingSkills = bestPath.skills.filter(s => 
+  const missingSkills = bestPath.skills.filter(s =>
     !studentSkills.some(ss => ss.toLowerCase().includes(s.toLowerCase()))
   ).slice(0, 5);
 
-  const suggestedCerts = bestPath.certifications.filter(c => 
+  const suggestedCerts = bestPath.certifications.filter(c =>
     !studentCertNames.some(sc => sc.includes(c.toLowerCase()))
   ).slice(0, 3);
 
-  const suggestedInternships = bestPath.internships.filter(i => 
+  const suggestedInternships = bestPath.internships.filter(i =>
     !studentActivityTypes.some(sa => sa.includes(i.toLowerCase()))
   ).slice(0, 2);
 
   // 4. Placement Readiness Scoring
   let readinessScore = 0;
-  
+
   // Academic (max 25)
   if (academic) {
     const cgpa = academic.cgpa || 0;
@@ -196,15 +196,15 @@ export async function analyzeStudentGap(studentId: string) {
   return {
     placement_readiness_score: readinessScore,
     career_path: bestPath.name,
-    missing_skills,
-    suggested_certs,
+    missingSkills,
+    suggestedCerts,
     alerts
   };
 }
 
 export async function aggregateDepartmentAnalytics(departmentId: string) {
   const students = db.prepare("SELECT uid FROM users WHERE role = 'student' AND department_id = ?").all(departmentId) as any[];
-  
+
   if (students.length === 0) return null;
 
   const insights = students.map(s => {
@@ -230,7 +230,7 @@ export async function aggregateDepartmentAnalytics(departmentId: string) {
   // Readiness stats
   const scores = insights.map(i => i.placement_readiness_score);
   const avgReadiness = scores.reduce((a, b) => a + b, 0) / scores.length;
-  
+
   const stats = {
     avg_readiness: avgReadiness,
     top_performers: insights.filter(i => i.placement_readiness_score > 80).length,

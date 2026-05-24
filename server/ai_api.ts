@@ -55,12 +55,12 @@ export function setupAiApi(app: Express) {
     try {
       const { deptId } = req.params;
       
-      let analytics = db.prepare('SELECT * FROM ai_analytics_summary WHERE scope_type = "department" AND scope_id = ?').get(deptId) as any;
+      let analytics = db.prepare("SELECT * FROM ai_analytics_summary WHERE scope_type = 'department' AND scope_id = ?").get(deptId) as any;
       
       if (!analytics || req.query.refresh === 'true') {
         const result = await aggregateDepartmentAnalytics(deptId);
         if (!result) return res.status(404).json({ success: false, error: "No data for department" });
-        analytics = db.prepare('SELECT * FROM ai_analytics_summary WHERE scope_type = "department" AND scope_id = ?').get(deptId) as any;
+        analytics = db.prepare("SELECT * FROM ai_analytics_summary WHERE scope_type = 'department' AND scope_id = ?").get(deptId) as any;
       }
 
       res.json({ 
@@ -85,7 +85,7 @@ export function setupAiApi(app: Express) {
       const depts = db.prepare('SELECT id FROM departments WHERE college_id = ?').all() as any[];
       
       const deptAnalytics = depts.map(d => {
-        const a = db.prepare('SELECT * FROM ai_analytics_summary WHERE scope_type = "department" AND scope_id = ?').get(d.id) as any;
+        const a = db.prepare("SELECT * FROM ai_analytics_summary WHERE scope_type = 'department' AND scope_id = ?").get(d.id) as any;
         if (!a) return null;
         return {
           deptId: d.id,

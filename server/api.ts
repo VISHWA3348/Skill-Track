@@ -496,10 +496,12 @@ export function setupApi(app: express.Express) {
       let skipped = 0;
       
       for (const u of seedUsers) {
-        const existing = db.prepare('SELECT uid FROM users WHERE email = ?').get(u.email);
+        const existing = db.prepare('SELECT uid FROM users WHERE email = ?').get(u.email) as any;
         if (existing) {
-          skipped++;
-          continue;
+          db.prepare('DELETE FROM users WHERE uid = ?').run(existing.uid);
+          db.prepare('DELETE FROM students WHERE user_id = ?').run(existing.uid);
+          db.prepare('DELETE FROM student_academic_profile WHERE student_id = ?').run(existing.uid);
+          db.prepare('DELETE FROM ai_career_insights WHERE student_id = ?').run(existing.uid);
         }
 
         // We skip strict password validation for seed users since test passwords (like Hod@123) might not meet the strict length requirements
@@ -517,6 +519,28 @@ export function setupApi(app: express.Express) {
             INSERT INTO students (user_id, roll_no, class, year, department_id, college_id)
             VALUES (?, ?, ?, ?, ?, ?)
           `).run(uid, u.rollNo, u.class, u.year, u.departmentId, u.collegeId);
+
+          // Seed default academic profile
+          db.prepare(`
+            INSERT INTO student_academic_profile (id, student_id, student_name, roll_no, department_id, class, year, college_id, cgpa, arrears, attendance_percentage, placement_readiness_score)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).run('ap_' + uid, uid, u.name, u.rollNo, u.departmentId, u.class, u.year, u.collegeId, 8.5, 0, 90.0, 75.0);
+
+          // Seed default AI career insights
+          db.prepare(`
+            INSERT INTO ai_career_insights (id, student_id, placement_readiness_score, recommended_skills, missing_skills, suggested_certifications, suggested_internships, career_path_suggestions, course_recommendations, smart_alerts, analysis_summary)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            'ci_' + uid, uid, 75.0,
+            JSON.stringify(['React', 'Node.js', 'SQL']),
+            JSON.stringify(['TypeScript', 'AWS']),
+            JSON.stringify(['AWS Developer Associate']),
+            JSON.stringify(['Software Engineering Intern']),
+            JSON.stringify(['Full Stack Developer']),
+            JSON.stringify(['Complete TypeScript Masterclass']),
+            JSON.stringify(['Add internships to boost profile']),
+            'Seeded default career path profile.'
+          );
         }
 
         inserted++;

@@ -776,6 +776,26 @@ export function initDb() {
     db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_colleges_college_id ON colleges(college_id);");
     db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_departments_department_id ON departments(department_id);");
 
+    // Enhance student_academic_profile
+    const profileCols = db.prepare("PRAGMA table_info(student_academic_profile)").all() as any[];
+    if (!profileCols.find(c => c.name === 'department')) db.exec("ALTER TABLE student_academic_profile ADD COLUMN department TEXT;");
+    if (!profileCols.find(c => c.name === 'department_id')) db.exec("ALTER TABLE student_academic_profile ADD COLUMN department_id TEXT;");
+    if (!profileCols.find(c => c.name === 'college_id')) db.exec("ALTER TABLE student_academic_profile ADD COLUMN college_id TEXT;");
+    if (!profileCols.find(c => c.name === 'college_name')) db.exec("ALTER TABLE student_academic_profile ADD COLUMN college_name TEXT;");
+    if (!profileCols.find(c => c.name === 'placement_readiness_score')) db.exec("ALTER TABLE student_academic_profile ADD COLUMN placement_readiness_score REAL DEFAULT 0;");
+    if (!profileCols.find(c => c.name === 'attendance_percentage')) db.exec("ALTER TABLE student_academic_profile ADD COLUMN attendance_percentage REAL DEFAULT 0;");
+    if (!profileCols.find(c => c.name === 'cgpa')) db.exec("ALTER TABLE student_academic_profile ADD COLUMN cgpa REAL DEFAULT 0;");
+    if (!profileCols.find(c => c.name === 'arrears')) db.exec("ALTER TABLE student_academic_profile ADD COLUMN arrears INTEGER DEFAULT 0;");
+    if (!profileCols.find(c => c.name === 'internship_count')) db.exec("ALTER TABLE student_academic_profile ADD COLUMN internship_count INTEGER DEFAULT 0;");
+    if (!profileCols.find(c => c.name === 'workshop_count')) db.exec("ALTER TABLE student_academic_profile ADD COLUMN workshop_count INTEGER DEFAULT 0;");
+    if (!profileCols.find(c => c.name === 'seminar_count')) db.exec("ALTER TABLE student_academic_profile ADD COLUMN seminar_count INTEGER DEFAULT 0;");
+    if (!profileCols.find(c => c.name === 'certification_count')) db.exec("ALTER TABLE student_academic_profile ADD COLUMN certification_count INTEGER DEFAULT 0;");
+    if (!profileCols.find(c => c.name === 'github_url')) db.exec("ALTER TABLE student_academic_profile ADD COLUMN github_url TEXT;");
+    if (!profileCols.find(c => c.name === 'linkedin_url')) db.exec("ALTER TABLE student_academic_profile ADD COLUMN linkedin_url TEXT;");
+    if (!profileCols.find(c => c.name === 'portfolio_url')) db.exec("ALTER TABLE student_academic_profile ADD COLUMN portfolio_url TEXT;");
+    if (!profileCols.find(c => c.name === 'resume_url')) db.exec("ALTER TABLE student_academic_profile ADD COLUMN resume_url TEXT;");
+
+
   } catch (err) {
     console.error("Schema enhancement failed:", err);
   }
@@ -1062,7 +1082,21 @@ export function setDocument(collectionName: string, id: string, data: any) {
         type=excluded.type, organization=excluded.organization, duration=excluded.duration,
         details=excluded.details, status=excluded.status, is_deleted=excluded.is_deleted,
         updated_at=CURRENT_TIMESTAMP
-    `).run(id, data.user_id || data.userId, data.student_id || data.studentId, data.college_id || data.collegeId, data.department_id || data.departmentId, data.type, data.organization, data.duration, data.details, data.status || 'pending', data.is_deleted ? 1 : 0, data.created_at || data.createdAt || new Date().toISOString(), new Date().toISOString());
+    `).run(
+      id, 
+      (data.user_id || data.userId) ?? null, 
+      (data.student_id || data.studentId) ?? null, 
+      (data.college_id || data.collegeId) ?? null, 
+      (data.department_id || data.departmentId) ?? null, 
+      data.type ?? null, 
+      data.organization ?? null, 
+      data.duration ?? null, 
+      data.details ?? null, 
+      data.status || 'pending', 
+      data.is_deleted ? 1 : 0, 
+      (data.created_at || data.createdAt || new Date().toISOString()) ?? null, 
+      new Date().toISOString()
+    );
   } else if (tableName === 'colleges') {
     db.prepare(`
       INSERT INTO colleges (id, college_id, name, type, location, city, state, country, pincode, lat, lng, created_at)

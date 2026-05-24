@@ -133,7 +133,7 @@ export function setupAcademicFeatures(app: express.Express) {
 
   app.get("/api/student/academic/performance", authenticate, (req: any, res) => {
     try {
-      const studentId = req.userData.uid;
+      const studentId = req.user.uid;
 
       // 1. Semester Summaries
       const semesters = db.prepare("SELECT * FROM student_semester_summary WHERE student_id = ? ORDER BY semester ASC").all(studentId);

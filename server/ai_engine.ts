@@ -203,7 +203,7 @@ export async function analyzeStudentGap(studentId: string) {
 }
 
 export async function aggregateDepartmentAnalytics(departmentId: string) {
-  const students = db.prepare('SELECT uid FROM users WHERE role = "student" AND department_id = ?').all() as any[];
+  const students = db.prepare("SELECT uid FROM users WHERE role = 'student' AND department_id = ?").all(departmentId) as any[];
   
   if (students.length === 0) return null;
 
@@ -242,7 +242,7 @@ export async function aggregateDepartmentAnalytics(departmentId: string) {
   db.prepare(`
     INSERT INTO ai_analytics_summary (id, scope_type, scope_id, skill_gaps, readiness_stats, updated_at)
     VALUES (?, 'department', ?, ?, ?, CURRENT_TIMESTAMP)
-    ON CONFLICT(scope_id) DO UPDATE SET
+    ON CONFLICT(scope_type, scope_id) DO UPDATE SET
       skill_gaps = excluded.skill_gaps,
       readiness_stats = excluded.readiness_stats,
       updated_at = CURRENT_TIMESTAMP

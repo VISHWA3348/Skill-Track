@@ -1,0 +1,169 @@
+{
+  "entities": {
+    "colleges": {
+      "title": "College",
+      "description": "Educational institutions in the system",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "location": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name"]
+    },
+    "departments": {
+      "title": "Department",
+      "description": "Departments within a college",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "collegeId": { "type": "string" },
+        "name": { "type": "string" }
+      },
+      "required": ["id", "collegeId", "name"]
+    },
+    "users": {
+      "title": "User",
+      "description": "System users with specific roles",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["super_admin", "admin", "hod", "staff", "student"] },
+        "collegeId": { "type": "string", "description": "Mandatory for all except super_admin" },
+        "departmentId": { "type": "string", "description": "Mandatory for HOD, Staff, Student" },
+        "rollNo": { "type": "string", "description": "Only for students" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "role", "email"]
+    },
+    "certificates": {
+      "title": "Certificate",
+      "description": "Student uploaded certificates for verification",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "collegeId": { "type": "string" },
+        "departmentId": { "type": "string" },
+        "eventName": { "type": "string" },
+        "eventCollegeName": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "type": { "type": "string", "enum": ["participation", "winner", "runner-up", "organizer"] },
+        "fileUrl": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "gps": {
+          "type": "object",
+          "properties": {
+            "lat": { "type": "number" },
+            "lng": { "type": "number" }
+          }
+        },
+        "prizePosition": { "type": "string" },
+        "customPrizePosition": { "type": "string" },
+        "prizeType": { "type": "string" },
+        "cashPrizeAmount": { "type": "number" },
+        "prizeDescription": { "type": "string" },
+        "gpsPhotoUrl": { "type": "string" },
+        "gpsPhotoLat": { "type": "number" },
+        "gpsPhotoLng": { "type": "number" },
+        "gpsPhotoTimestamp": { "type": "string" },
+        "gpsVerified": { "type": "boolean" },
+        "fraudFlag": { "type": "boolean" },
+        "fraudReason": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "staff_reviewed", "hod_approved", "verified", "rejected"] },
+        "remarks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "userId": { "type": "string" },
+              "role": { "type": "string" },
+              "comment": { "type": "string" },
+              "timestamp": { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "collegeId", "departmentId", "eventName", "eventCollegeName", "type", "status"]
+    },
+    "auditLogs": {
+      "title": "Audit Log",
+      "description": "System activity logs",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "action": { "type": "string" },
+        "details": { "type": "string" },
+        "collegeId": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "action", "timestamp"]
+    },
+    "careerActivities": {
+      "title": "Career Activity",
+      "description": "Student uploaded career activities for verification",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "studentId": { "type": "string" },
+        "collegeId": { "type": "string" },
+        "departmentId": { "type": "string" },
+        "type": { "type": "string", "enum": ["Internship", "Workshop", "Online Course", "Project"] },
+        "organization": { "type": "string" },
+        "duration": { "type": "string" },
+        "details": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "staff_reviewed", "approved", "rejected"] },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "studentId", "collegeId", "departmentId", "type", "organization", "status"]
+    },
+    "notifications": {
+      "title": "Notification",
+      "description": "System notifications for users",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string", "enum": ["info", "success", "warning", "error"] },
+        "read": { "type": "boolean" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "message", "type", "read", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/colleges/{collegeId}": {
+      "schema": "colleges",
+      "description": "Colleges list"
+    },
+    "/departments/{deptId}": {
+      "schema": "departments",
+      "description": "Departments list"
+    },
+    "/users/{uid}": {
+      "schema": "users",
+      "description": "User profiles"
+    },
+    "/certificates/{certId}": {
+      "schema": "certificates",
+      "description": "Certificate submissions"
+    },
+    "/auditLogs/{logId}": {
+      "schema": "auditLogs",
+      "description": "Audit trail"
+    },
+    "/careerActivities/{activityId}": {
+      "schema": "careerActivities",
+      "description": "Career activity submissions"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "notifications",
+      "description": "User notifications"
+    }
+  }
+}

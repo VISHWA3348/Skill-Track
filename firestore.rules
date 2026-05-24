@@ -1,0 +1,236 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: colleges
+    // Fields: id, name, location, createdAt
+    //
+    // Collection: departments
+    // Fields: id, collegeId, name
+    //
+    // Collection: users
+    // Fields: uid, name, email, role, collegeId, departmentId, rollNo, createdAt
+    //
+    // Collection: certificates
+    // Fields: userId, studentName, collegeId, departmentId, eventName, eventCollegeName, date, type, fileUrl, photoUrl, gps, status, remarks, createdAt
+    //
+    // Collection: auditLogs
+    // Fields: userId, action, details, collegeId, timestamp
+    //
+    // ===============================================================
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isSuperAdmin() {
+      return isAuthenticated() && 
+        (
+          request.auth.uid == "NFUPPkAxI3PcafnsUsiKOjvEAFC2" ||
+          request.auth.token.email == "vigneshvignesh94856@gmail.com" ||
+          request.auth.token.email == "superadmin@certtrack.com" ||
+          request.auth.token.email == "thevishwaofficial@gmail.com" ||
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'super_admin')
+        );
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (isSuperAdmin() || 
+         (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "vigneshvignesh94856@gmail.com" && request.auth.token.email_verified == true))); // Default admin
+    }
+
+    function isCollegeAdmin(collegeId) {
+      return isAuthenticated() && 
+        (isSuperAdmin() || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == 'admin' && getUserData().collegeId == collegeId));
+    }
+
+    function isHOD(collegeId, departmentId) {
+      return isAuthenticated() && 
+        (isCollegeAdmin(collegeId) || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == 'hod' && getUserData().collegeId == collegeId && getUserData().departmentId == departmentId));
+    }
+
+    function isStaff(collegeId, departmentId) {
+      return isAuthenticated() && 
+        (isHOD(collegeId, departmentId) || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == 'staff' && getUserData().collegeId == collegeId && getUserData().departmentId == departmentId));
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    // Domain Validators
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'role', 'email']) &&
+             data.role in ['super_admin', 'admin', 'hod', 'staff', 'student'] &&
+             isValidEmail(data.email) &&
+             data.uid is string && data.uid.size() > 0 &&
+             (!('name' in data) || (data.name is string && data.name.size() < 100)) &&
+             (!('collegeId' in data) || (data.collegeId is string)) &&
+             (!('departmentId' in data) || (data.departmentId is string)) &&
+             (!('year' in data) || (data.year is string && data.year.size() < 20));
+    }
+
+    function isValidCertificate(data) {
+      return data.keys().hasAll(['userId', 'collegeId', 'departmentId', 'eventName', 'eventCollegeName', 'type', 'status']) &&
+             data.status in ['pending', 'staff_reviewed', 'hod_approved', 'verified', 'rejected'] &&
+             data.type in ['participation', 'winner', 'runner-up', 'organizer'] &&
+             data.eventName is string && data.eventName.size() > 0 && data.eventName.size() < 200 &&
+             data.eventCollegeName is string && data.eventCollegeName.size() > 0 && data.eventCollegeName.size() < 200 &&
+             data.userId is string &&
+             (!('remarks' in data) || (data.remarks is string && data.remarks.size() < 500));
+    }
+
+    // Rules
+    match /colleges/{collegeId} {
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin();
+    }
+
+    match /departments/{deptId} {
+      allow read: if isAuthenticated();
+      allow write: if isCollegeAdmin(request.resource.data.collegeId || resource.data.collegeId);
+    }
+
+    match /users/{uid} {
+      // PII Protection: Only owner, college admin (same college), or super admin can read
+      allow read: if isAuthenticated() && (
+        isOwner(uid) || 
+        isSuperAdmin() || 
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == 'admin' && getUserData().collegeId == resource.data.collegeId)
+      );
+      
+      // Super admin can create/update anyone. 
+      // College admin can create/update users in their college (but not super_admin).
+      // Users can create/update their own profile.
+      allow create: if isAuthenticated() && (
+        isSuperAdmin() || 
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == 'admin' && request.resource.data.collegeId == getUserData().collegeId && request.resource.data.role != 'super_admin') ||
+        isOwner(uid)
+      ) && isValidUser(request.resource.data);
+      
+      allow update: if isAuthenticated() && (
+        isSuperAdmin() || 
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == 'admin' && resource.data.collegeId == getUserData().collegeId && request.resource.data.role != 'super_admin') ||
+        (isOwner(uid) && request.resource.data.role == resource.data.role)
+      ) && isValidUser(request.resource.data);
+    }
+
+    match /certificates/{certId} {
+      allow read: if (resource != null && resource.data.status == 'verified') || (isAuthenticated() && (
+        isSuperAdmin() || 
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == 'admin' && getUserData().collegeId == resource.data.collegeId) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == 'hod' && getUserData().collegeId == resource.data.collegeId && getUserData().departmentId == resource.data.departmentId) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == 'staff' && getUserData().collegeId == resource.data.collegeId && getUserData().departmentId == resource.data.departmentId) ||
+        isOwner(resource.data.userId)
+      ));
+
+      allow create: if isAuthenticated() && (
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == 'student' && 
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.status == 'pending') ||
+        isCollegeAdmin(request.resource.data.collegeId)
+      ) && isValidCertificate(request.resource.data);
+
+      allow update: if isAuthenticated() && (
+        // Student can update if pending
+        (isOwner(resource.data.userId) && resource.data.status == 'pending' && isValidCertificate(request.resource.data)) ||
+        // Staff can add remarks
+        (isStaff(resource.data.collegeId, resource.data.departmentId) && 
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['remarks', 'status']) &&
+         (request.resource.data.status == 'staff_reviewed' || request.resource.data.status == 'rejected')) ||
+        // HOD can approve
+        (isHOD(resource.data.collegeId, resource.data.departmentId) && 
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['remarks', 'status']) &&
+         (request.resource.data.status == 'hod_approved' || request.resource.data.status == 'rejected')) ||
+        // Admin can verify or update anything
+        (isCollegeAdmin(resource.data.collegeId) && isValidCertificate(request.resource.data))
+      );
+
+      allow delete: if isAuthenticated() && (
+        (isOwner(resource.data.userId) && resource.data.status == 'pending') ||
+        isCollegeAdmin(resource.data.collegeId)
+      );
+    }
+
+    match /careerActivities/{activityId} {
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() || 
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == 'admin' && getUserData().collegeId == resource.data.collegeId) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == 'hod' && getUserData().collegeId == resource.data.collegeId && getUserData().departmentId == resource.data.departmentId) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == 'staff' && getUserData().collegeId == resource.data.collegeId && getUserData().departmentId == resource.data.departmentId) ||
+        isOwner(resource.data.userId)
+      );
+
+      allow create: if isAuthenticated() && (
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == 'student' && 
+        request.resource.data.userId == request.auth.uid) ||
+        isCollegeAdmin(request.resource.data.collegeId)
+      );
+
+      allow update: if isAuthenticated() && (
+        isOwner(resource.data.userId) ||
+        isCollegeAdmin(resource.data.collegeId) ||
+        isHOD(resource.data.collegeId, resource.data.departmentId) ||
+        isStaff(resource.data.collegeId, resource.data.departmentId)
+      );
+
+      allow delete: if isAuthenticated() && (
+        isOwner(resource.data.userId) ||
+        isCollegeAdmin(resource.data.collegeId)
+      );
+    }
+
+    match /students/{studentId} {
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() || 
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == 'admin' && getUserData().collegeId == resource.data.collegeId) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == 'hod' && getUserData().collegeId == resource.data.collegeId && getUserData().departmentId == resource.data.department) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == 'staff' && getUserData().collegeId == resource.data.collegeId && getUserData().departmentId == resource.data.department)
+      );
+
+      allow create: if isAuthenticated() && (
+        isSuperAdmin() ||
+        isCollegeAdmin(request.resource.data.collegeId) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == 'hod' && getUserData().collegeId == request.resource.data.collegeId && getUserData().departmentId == request.resource.data.department) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == 'staff' && getUserData().collegeId == request.resource.data.collegeId && getUserData().departmentId == request.resource.data.department)
+      );
+
+      allow update: if isAuthenticated() && (
+        isSuperAdmin() ||
+        isCollegeAdmin(resource.data.collegeId) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == 'hod' && getUserData().collegeId == resource.data.collegeId && getUserData().departmentId == resource.data.department) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == 'staff' && getUserData().collegeId == resource.data.collegeId && getUserData().departmentId == resource.data.department)
+      );
+
+      allow delete: if isAuthenticated() && (
+        isSuperAdmin() ||
+        isCollegeAdmin(resource.data.collegeId) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == 'hod' && getUserData().collegeId == resource.data.collegeId && getUserData().departmentId == resource.data.department)
+      );
+    }
+
+    match /auditLogs/{logId} {
+      allow read: if isSuperAdmin() || (isAuthenticated() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == 'admin' && getUserData().collegeId == resource.data.collegeId);
+      allow create: if isAuthenticated();
+    }
+  }
+}

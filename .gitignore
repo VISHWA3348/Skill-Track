@@ -1,0 +1,46 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+
+# Database and SQLite
+data/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.sqbpro
+
+# Uploads and temporary directories
+uploads/
+scratch/
+tmp/
+temp/
+
+# Build and debug logs/errors
+build_full_error.txt
+build_log.txt
+build_log_v2.txt
+build_log_v3.txt
+
+# Local temporary test scripts
+dummy_cert.pdf
+dummy_photo.jpg
+final_system_test.js
+repro_save_error.ts
+test.ts
+test_fix.ts
+test_flow.js
+test_flow.ts
+test_student_crud.ts
+verify_db.ts
+verify_db_seed.ts
+verify_permissions_test.js
+verify_permissions_test.ts
+tmp_*

@@ -1,0 +1,5 @@
+{
+  "name": "Student Certificate Tracking & Verification System",
+  "description": "A secure digital proof system for students to store and verify symposium/workshop certificates with GPS tracking and admin approval.",
+  "requestFramePermissions": ["geolocation"]
+}

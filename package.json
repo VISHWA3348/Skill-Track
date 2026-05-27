@@ -10,9 +10,11 @@
     "start": "node --import tsx server.ts",
     "preview": "vite preview",
     "clean": "rm -rf dist",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "migrate": "ts-node scripts/migrate_sqlite_to_postgres.ts"
   },
   "dependencies": {
+    "pg": "^8.11.0",
     "@google/genai": "^1.29.0",
     "@tailwindcss/vite": "^4.1.14",
     "@types/exceljs": "^0.5.3",

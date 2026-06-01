@@ -10,6 +10,7 @@ export interface UserProfile {
   phone?: string;
   profilePhoto?: string;
   collegeId?: string;
+  college_id?: string;
   departmentId?: string;
   preferences?: {
     emailNotifications?: boolean;

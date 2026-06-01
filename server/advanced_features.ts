@@ -5,6 +5,7 @@ import PDFDocument from 'pdfkit';
 import ExcelJS from 'exceljs';
 import * as xlsx from 'xlsx';
 import QRCode from 'qrcode';
+import { queueService } from './queue';
 
 export function setupAdvancedFeatures(app: express.Express) {
 
@@ -391,39 +392,49 @@ export function setupAdvancedFeatures(app: express.Express) {
   // 9. EXPORT REPORTS (PDF / EXCEL)
   // ============================================
 
+  // Register Excel export background task handler
+  queueService.registerHandler('export-excel', async (jobData: any) => {
+    const { userData } = jobData;
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Student Achievements');
+    
+    sheet.columns = [
+      { header: 'Student Name', key: 'name', width: 20 },
+      { header: 'Roll No', key: 'roll_no', width: 15 },
+      { header: 'Event', key: 'event', width: 25 },
+      { header: 'Type', key: 'type', width: 15 },
+      { header: 'Status', key: 'status', width: 15 },
+      { header: 'Date', key: 'date', width: 15 },
+    ];
+
+    const certs = queryDocuments('certifications', getDataIsolationFilters('certifications', userData));
+    
+    certs.forEach((c: any) => {
+      sheet.addRow({
+        name: c.student_name,
+        roll_no: c.roll_no,
+        event: c.event_name,
+        type: c.type,
+        status: c.status,
+        date: c.date
+      });
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    return Buffer.from(buffer).toString('base64');
+  });
+
   app.get("/api/reports/export/excel", authenticate, checkRole(['super_admin', 'admin', 'hod']), async (req: any, res) => {
     try {
-      const workbook = new ExcelJS.Workbook();
-      const sheet = workbook.addWorksheet('Student Achievements');
-      
-      sheet.columns = [
-        { header: 'Student Name', key: 'name', width: 20 },
-        { header: 'Roll No', key: 'roll_no', width: 15 },
-        { header: 'Event', key: 'event', width: 25 },
-        { header: 'Type', key: 'type', width: 15 },
-        { header: 'Status', key: 'status', width: 15 },
-        { header: 'Date', key: 'date', width: 15 },
-      ];
-
-      const certs = queryDocuments('certifications', getDataIsolationFilters('certifications', req.userData));
-      
-      certs.forEach((c: any) => {
-        sheet.addRow({
-          name: c.student_name,
-          roll_no: c.roll_no,
-          event: c.event_name,
-          type: c.type,
-          status: c.status,
-          date: c.date
-        });
-      });
+      const jobId = await queueService.addJob('export-excel', { userData: req.userData });
+      const base64Data = await queueService.waitForJobResult(jobId);
+      const buffer = Buffer.from(base64Data, 'base64');
 
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', 'attachment; filename=Achievements.xlsx');
-      
-      await workbook.xlsx.write(res);
-      res.end();
+      res.send(buffer);
     } catch (error) {
+      console.error("Export Excel queue job error:", error);
       res.status(500).json({ error: "Failed to export Excel" });
     }
   });

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useVirtual } from '../hooks/useVirtual';
 import { useAuth } from '../context/AuthContext';
 import { db, auth, handleApiError, OperationType, collection, query, where, onSnapshot, getDocs } from '../api/localApi';
 import { UserProfile, UserRole } from '../types';
@@ -111,7 +112,7 @@ const Users: React.FC = () => {
   useEffect(() => {
     if (!profile) return;
     fetchUsers();
-    const interval = setInterval(fetchUsers, 5000);
+    const interval = setInterval(fetchUsers, 300000);
     return () => clearInterval(interval);
   }, [profile]);
 
@@ -412,6 +413,13 @@ const Users: React.FC = () => {
     return matchesSearch && matchesRole;
   });
 
+  const tbodyRef = useRef<HTMLTableSectionElement>(null);
+  const { startIndex, endIndex, topPadding, bottomPadding } = useVirtual({
+    itemCount: filteredUsers.length,
+    rowHeight: 70,
+    containerRef: tbodyRef,
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -452,6 +460,15 @@ const Users: React.FC = () => {
               <span>Bulk Import</span>
             </button>
           )}
+          <button
+            onClick={() => fetchUsers()}
+            className="flex items-center justify-center p-2 border border-gray-300 rounded-md text-gray-600 hover:bg-gray-50 hover:text-indigo-600 transition-colors"
+            title="Refresh Users List"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 7.89M21 21v-5h-.581m0 0a8.003 8.003 0 01-15.357-2" />
+            </svg>
+          </button>
           <button 
             onClick={() => handleOpenModal()}
             className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
@@ -479,8 +496,13 @@ const Users: React.FC = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredUsers.map((u) => (
+            <tbody ref={tbodyRef} className="bg-white divide-y divide-gray-200">
+              {topPadding > 0 && (
+                <tr>
+                  <td colSpan={5} style={{ height: `${topPadding}px`, border: 'none' }} />
+                </tr>
+              )}
+              {filteredUsers.slice(startIndex, endIndex).map((u) => (
                 <tr key={u.uid}>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center space-x-2">
@@ -532,6 +554,11 @@ const Users: React.FC = () => {
                   </td>
                 </tr>
               ))}
+              {bottomPadding > 0 && (
+                <tr>
+                  <td colSpan={5} style={{ height: `${bottomPadding}px`, border: 'none' }} />
+                </tr>
+              )}
             </tbody>
             </table>
           </div>

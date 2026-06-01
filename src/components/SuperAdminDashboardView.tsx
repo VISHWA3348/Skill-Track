@@ -120,7 +120,7 @@ export default function SuperAdminDashboardView() {
     };
 
     fetchData();
-    const interval = setInterval(fetchData, 5000);
+    const interval = setInterval(fetchData, 300000);
     return () => clearInterval(interval);
   }, [profile]);
 

@@ -1,0 +1,612 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  uid String? @id
+  name String
+  email String @unique
+  password_hash String?
+  role String? @default('student')
+  college_id String?
+  department_id String?
+  roll_no String?
+  class String?
+  year String?
+  section String?
+  city String?
+  phone_number String?
+  photo_url String?
+  college_name String?
+  is_active Int? @default(1)
+  status String? @default('active')
+  login_attempts Int? @default(0)
+  last_login DateTime?
+  created_at DateTime? @default(now())
+  score Float? @default(0)
+  otp String?
+  otp_expiry DateTime?
+  preferences String? @default('{}')
+  social_links String? @default('{}')
+  skills String?
+  bio String?
+  profile_photo String?
+  @@map("users")
+}
+
+model Student {
+  user_id String? @id
+  roll_no String? @unique
+  class String?
+  year String?
+  section String?
+  department_id String?
+  college_id String?
+  enrollment_date DateTime? @default(now())
+  @@map("students")
+}
+
+model College {
+  id String? @id
+  name String
+  location String?
+  lat Float?
+  lng Float?
+  created_at DateTime? @default(now())
+  college_id String? @unique
+  city String?
+  state String?
+  country String?
+  pincode String?
+  type String?
+  @@map("colleges")
+}
+
+model Department {
+  id String? @id
+  college_id String?
+  name String
+  department_id String? @unique
+  @@map("departments")
+}
+
+model Certification {
+  id String? @id
+  user_id String?
+  student_name String?
+  roll_no String?
+  class String?
+  year String?
+  phone_number String?
+  city String?
+  college_name String?
+  college_id String?
+  department_id String?
+  event_name String?
+  event_college_name String?
+  event_location String?
+  date DateTime?
+  type String?
+  file_url String?
+  photo_url String?
+  gps_lat Float?
+  gps_lng Float?
+  prize_position String?
+  custom_prize_position String?
+  prize_type String?
+  cash_prize_amount Float?
+  prize_description String?
+  gps_photo_url String?
+  gps_photo_lat Float?
+  gps_photo_lng Float?
+  gps_photo_timestamp DateTime?
+  gps_verified Int? @default(0)
+  fraud_flag Int? @default(0)
+  fraud_reason String?
+  file_hash String?
+  status String? @default('pending')
+  remarks String?
+  is_deleted Int? @default(0)
+  created_at DateTime? @default(now())
+  updated_at DateTime? @default(now())
+  verification_slug String?
+  @@map("certifications")
+}
+
+model CareerActivities {
+  id String? @id
+  student_id String?
+  user_id String?
+  college_id String?
+  department_id String?
+  type String?
+  organization String?
+  duration String?
+  details String?
+  status String? @default('pending')
+  is_deleted Int? @default(0)
+  created_at DateTime? @default(now())
+  updated_at DateTime? @default(now())
+  @@map("career_activities")
+}
+
+model AuditLogs {
+  id String? @id
+  user_id String?
+  action String?
+  details String?
+  college_id String?
+  timestamp DateTime? @default(now())
+  @@map("audit_logs")
+}
+
+model Notifications {
+  id String? @id
+  user_id String?
+  title String?
+  message String?
+  type String? @default('info')
+  read Int? @default(0)
+  timestamp DateTime? @default(now())
+  @@map("notifications")
+}
+
+model SettingsModel {
+  key String? @id
+  value String?
+  category String?
+  description String?
+  @@map("settings")
+}
+
+model Permission {
+  id String? @id
+  role String?
+  module String?
+  action String?
+  allowed Int? @default(1)
+  @@map("permissions")
+}
+
+model Company {
+  id String? @id
+  name String
+  industry String?
+  website String?
+  description String?
+  created_at DateTime? @default(now())
+  @@map("companies")
+}
+
+model JobPosts {
+  id String? @id
+  company_id String?
+  title String
+  description String?
+  requirements String?
+  min_score Float? @default(0)
+  salary_range String?
+  status String? @default('open')
+  created_at DateTime? @default(now())
+  @@map("job_posts")
+}
+
+model Announcements {
+  id String? @id
+  title String
+  message String
+  target_role String? @default('all')
+  created_at DateTime? @default(now())
+  @@map("announcements")
+}
+
+model AlumniModel {
+  id String? @id
+  user_id String?
+  company String?
+  role String?
+  salary String?
+  graduation_year Int?
+  created_at DateTime? @default(now())
+  @@map("alumni")
+}
+
+model Opportunities {
+  id String? @id
+  title String
+  company_name String
+  type String
+  required_skills String?
+  location String?
+  description String?
+  external_link String?
+  deadline DateTime?
+  status String? @default('open')
+  created_at DateTime? @default(now())
+  updated_at DateTime? @default(now())
+  @@map("opportunities")
+}
+
+model Documents {
+  collectionName String?
+  id String?
+  data String
+  createdAt DateTime? @default(now())
+  updatedAt DateTime? @default(now())
+  @@id([collectionName, id])
+  @@map("documents")
+}
+
+model StudentAcademicProfile {
+  id String? @id
+  student_id String
+  student_name String?
+  roll_no String?
+  register_no String?
+  department String?
+  department_id String?
+  class String?
+  section String?
+  year String?
+  semester String?
+  college_id String?
+  college_name String?
+  cgpa Float? @default(0)
+  percentage Float? @default(0)
+  total_subjects Int? @default(0)
+  arrears Int? @default(0)
+  attendance_percentage Float? @default(0)
+  placement_readiness_score Float? @default(0)
+  internship_count Int? @default(0)
+  workshop_count Int? @default(0)
+  seminar_count Int? @default(0)
+  certification_count Int? @default(0)
+  github_url String?
+  linkedin_url String?
+  portfolio_url String?
+  resume_url String?
+  created_at DateTime? @default(now())
+  updated_at DateTime? @default(now())
+  @@map("student_academic_profile")
+}
+
+model StudentSkills {
+  id String? @id
+  student_id String
+  skill_name String
+  skill_level String?
+  category String?
+  created_at DateTime? @default(now())
+  @@map("student_skills")
+}
+
+model StudentGoals {
+  id String? @id
+  student_id String
+  goal_title String
+  goal_description String?
+  target_date DateTime?
+  status String? @default('pending')
+  created_at DateTime? @default(now())
+  @@map("student_goals")
+}
+
+model StudentNotifications {
+  id String? @id
+  student_id String
+  title String
+  message String
+  type String? @default('info')
+  is_read Int? @default(0)
+  created_at DateTime? @default(now())
+  @@map("student_notifications")
+}
+
+model StudentResumeData {
+  id String? @id
+  student_id String
+  objective String?
+  projects String?
+  achievements String?
+  certifications String?
+  experience String?
+  languages String?
+  created_at DateTime? @default(now())
+  @@map("student_resume_data")
+}
+
+model StaffStudentRemarks {
+  id String? @id
+  student_id String
+  staff_id String
+  remark_type String
+  remark String
+  created_at DateTime? @default(now())
+  @@map("staff_student_remarks")
+}
+
+model StudentAttendance {
+  id String? @id
+  student_id String
+  department_id String?
+  class String?
+  semester String?
+  attendance_percentage Float? @default(0)
+  month String?
+  created_at DateTime? @default(now())
+  @@map("student_attendance")
+}
+
+model StudentPerformanceLogs {
+  id String? @id
+  student_id String
+  cgpa Float?
+  arrears Int?
+  placement_score Float?
+  updated_by String?
+  created_at DateTime? @default(now())
+  @@map("student_performance_logs")
+}
+
+model HodDepartmentAnnouncements {
+  id String? @id
+  hod_id String
+  department_id String
+  title String
+  message String
+  target_year String?
+  target_section String?
+  created_at DateTime? @default(now())
+  @@map("hod_department_announcements")
+}
+
+model HodStudentFlags {
+  id String? @id
+  student_id String
+  flagged_by String
+  flag_type String
+  reason String?
+  severity String? @default('medium')
+  created_at DateTime? @default(now())
+  @@map("hod_student_flags")
+}
+
+model DepartmentMonthlyReports {
+  id String? @id
+  department_id String
+  month String
+  avg_cgpa Float? @default(0)
+  placement_score Float? @default(0)
+  certificate_count Int? @default(0)
+  activity_count Int? @default(0)
+  arrear_count Int? @default(0)
+  attendance_avg Float? @default(0)
+  created_at DateTime? @default(now())
+  @@map("department_monthly_reports")
+}
+
+model CollegeAnnouncements {
+  id String? @id
+  college_id String
+  admin_id String
+  title String
+  message String
+  target_role String? @default('all')
+  target_department String?
+  target_year String?
+  created_at DateTime? @default(now())
+  @@map("college_announcements")
+}
+
+model CollegeReports {
+  id String? @id
+  college_id String
+  report_type String
+  generated_by String
+  report_data String?
+  created_at DateTime? @default(now())
+  @@map("college_reports")
+}
+
+model DepartmentPerformance {
+  id String? @id
+  college_id String
+  department_id String
+  avg_cgpa Float? @default(0)
+  total_certificates Int? @default(0)
+  total_activities Int? @default(0)
+  placement_score Float? @default(0)
+  arrear_count Int? @default(0)
+  attendance_avg Float? @default(0)
+  created_at DateTime? @default(now())
+  @@map("department_performance")
+}
+
+model SystemHealthLogs {
+  id String? @id
+  cpu_usage Float?
+  ram_usage Float?
+  storage_usage Float?
+  active_sessions Int?
+  db_size Float?
+  api_status String?
+  created_at DateTime? @default(now())
+  @@map("system_health_logs")
+}
+
+model SecurityEvents {
+  id String? @id
+  event_type String?
+  user_id String?
+  ip_address String?
+  description String?
+  severity String?
+  created_at DateTime? @default(now())
+  @@map("security_events")
+}
+
+model PlatformBackups {
+  id String? @id
+  backup_name String?
+  backup_size Int?
+  backup_path String?
+  created_by String?
+  created_at DateTime? @default(now())
+  @@map("platform_backups")
+}
+
+model FraudDetectionLogs {
+  id String? @id
+  certificate_id String?
+  student_id String?
+  fraud_type String?
+  confidence_score Float?
+  status String? @default('flagged')
+  created_at DateTime? @default(now())
+  @@map("fraud_detection_logs")
+}
+
+model AcademicSubjects {
+  id String? @id
+  college_id String?
+  department_id String?
+  semester Int?
+  subject_code String?
+  subject_name String?
+  credits Int?
+  created_at DateTime? @default(now())
+  @@map("academic_subjects")
+}
+
+model StudentAcademicRecords {
+  id String? @id
+  student_id String?
+  subject_id String?
+  semester Int?
+  internal_marks Float?
+  attendance_percentage Float?
+  grade String?
+  grade_point Int?
+  result_status String?
+  created_at DateTime? @default(now())
+  @@map("student_academic_records")
+}
+
+model StudentSemesterSummary {
+  id String? @id
+  student_id String?
+  semester Int?
+  semester_gpa Float?
+  attendance_avg Float?
+  arrear_count Int?
+  created_at DateTime? @default(now())
+  @@map("student_semester_summary")
+}
+
+model StudentCgpaSummary {
+  id String? @id
+  student_id String? @unique
+  cgpa Float? @default(0)
+  total_arrears Int? @default(0)
+  total_semesters Int? @default(0)
+  updated_at DateTime? @default(now())
+  @@map("student_cgpa_summary")
+}
+
+model AiCareerInsights {
+  id String? @id
+  student_id String
+  placement_readiness_score Float? @default(0)
+  recommended_skills String?
+  missing_skills String?
+  suggested_certifications String?
+  suggested_internships String?
+  career_path_suggestions String?
+  course_recommendations String?
+  smart_alerts String?
+  analysis_summary String?
+  updated_at DateTime? @default(now())
+  @@map("ai_career_insights")
+}
+
+model AiAnalyticsSummary {
+  id String? @id
+  scope_type String
+  scope_id String
+  skill_gaps String?
+  top_skills String?
+  readiness_stats String?
+  updated_at DateTime? @default(now())
+  @@map("ai_analytics_summary")
+}
+
+model ResumeProfiles {
+  id String? @id
+  student_id String
+  headline String?
+  summary String?
+  linkedin_url String?
+  github_url String?
+  portfolio_url String?
+  languages String?
+  interests String?
+  template_name String? @default('modern')
+  public_visibility Int? @default(1)
+  created_at DateTime? @default(now())
+  @@map("resume_profiles")
+}
+
+model ResumeProjects {
+  id String? @id
+  student_id String
+  project_name String
+  description String?
+  technologies String?
+  github_url String?
+  live_url String?
+  created_at DateTime? @default(now())
+  @@map("resume_projects")
+}
+
+model ResumeExperience {
+  id String? @id
+  student_id String
+  company_name String
+  role String
+  duration String?
+  description String?
+  created_at DateTime? @default(now())
+  @@map("resume_experience")
+}
+
+model ResumeSkills {
+  id String? @id
+  student_id String
+  skill_name String
+  skill_level String?
+  auto_detected Int? @default(0)
+  created_at DateTime? @default(now())
+  @@map("resume_skills")
+}
+
+model SignupCodes {
+  id String? @id
+  code String @unique
+  college_id String
+  department_id String
+  batch_year String?
+  usage_limit Int? @default(1)
+  usage_count Int? @default(0)
+  expiry_date DateTime?
+  is_active Int? @default(1)
+  role String? @default('student')
+  created_by String?
+  created_at DateTime? @default(now())
+  @@map("signup_codes")
+}
+

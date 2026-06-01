@@ -1,50 +1,107 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, memo, Suspense } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Users, GraduationCap, Award, Activity, ShieldCheck, Database, Server, Clock } from 'lucide-react';
+import { Users, GraduationCap, Award, Activity, ShieldCheck, Database, Server, Clock, RefreshCw } from 'lucide-react';
 import { db, auth, handleApiError, OperationType } from '../api/localApi';
 import { collection, query, orderBy, limit, onSnapshot, where } from '../api/localApi';
 import { AuditLog } from '../types';
-import StudentDashboardView from '../components/StudentDashboardView';
-import SuperAdminDashboardView from '../components/SuperAdminDashboardView';
-import StaffDashboardView from '../components/StaffDashboardView';
-import HODDashboardView from '../components/HODDashboardView';
-import CollegeAdminDashboardView from '../components/CollegeAdminDashboardView';
+
+// Phase 10: Lazy-load heavy dashboard views (user only sees ONE of these)
+const StudentDashboardView     = React.lazy(() => import('../components/StudentDashboardView'));
+const SuperAdminDashboardView  = React.lazy(() => import('../components/SuperAdminDashboardView'));
+const StaffDashboardView       = React.lazy(() => import('../components/StaffDashboardView'));
+const HODDashboardView         = React.lazy(() => import('../components/HODDashboardView'));
+const CollegeAdminDashboardView = React.lazy(() => import('../components/CollegeAdminDashboardView'));
+
+// Phase 8: AnnouncementBanner extracted OUTSIDE Dashboard component to prevent re-creation on renders
+const AnnouncementBanner: React.FC = memo(() => {
+  const [announcements, setAnnouncements] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchAnnouncements = async () => {
+      try {
+        const response = await fetch('/api/announcements', {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+        if (response.ok) {
+          const result = await response.json();
+          setAnnouncements(result.success ? result.data : result);
+        }
+      } catch (e) {}
+    };
+    fetchAnnouncements();
+    // Announcements rarely change — refresh every 5 minutes instead of constantly
+    const interval = setInterval(fetchAnnouncements, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (announcements.length === 0) return null;
+
+  return (
+    <div className="mb-6 space-y-4">
+      {(announcements || []).map((a: any) => (
+        <div key={a.id} className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg shadow-sm">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <ShieldCheck className="h-5 w-5 text-blue-500 mr-3" />
+              <div>
+                <h3 className="text-sm font-bold text-blue-800 uppercase tracking-wider">{a.title}</h3>
+                <p className="text-sm text-blue-700 mt-1">{a.message}</p>
+              </div>
+            </div>
+            <span className="text-xs text-blue-400">{new Date(a.created_at).toLocaleDateString()}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+});
+
+// Small dashboard spinner for Suspense fallback
+const DashboardViewLoader: React.FC = () => (
+  <div className="flex justify-center py-12">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
+  </div>
+);
 
 const Dashboard: React.FC = () => {
   const { profile } = useAuth();
   const [stats, setStats] = useState<any>({});
   const [loading, setLoading] = useState(true);
   const [recentLogs, setRecentLogs] = useState<AuditLog[]>([]);
+  const [lastFetched, setLastFetched] = useState<Date | null>(null);
+
+  // Phase 8: Removed 5-second polling. Stats are fetched once and refreshed manually.
+  const fetchStats = useCallback(async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/admin/stats', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (response.ok) {
+        const result = await response.json();
+        const data = result.success ? result.data : result;
+        setStats(data || {});
+        if (data && data.recentLogs) {
+          setRecentLogs(data.recentLogs);
+        }
+        setLastFetched(new Date());
+      }
+    } catch (error) {
+      console.error("Failed to fetch stats", error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const response = await fetch('/api/admin/stats', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        if (response.ok) {
-          const result = await response.json();
-          const data = result.success ? result.data : result;
-          setStats(data || {});
-          if (data && data.recentLogs) {
-            setRecentLogs(data.recentLogs);
-          }
-        }
-      } catch (error) {
-        console.error("Failed to fetch stats", error);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchStats();
-    
-    // Polling every 5 seconds
-    const interval = setInterval(fetchStats, 5000);
+    // Auto-refresh every 5 minutes (not 5 seconds) — stats change infrequently
+    const interval = setInterval(fetchStats, 5 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [profile]);
+  }, [profile, fetchStats]);
 
   const renderAdminDashboard = () => (
     <div className="space-y-6">
@@ -119,7 +176,7 @@ const Dashboard: React.FC = () => {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>
+        <DashboardViewLoader />
       ) : (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -245,7 +302,7 @@ const Dashboard: React.FC = () => {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>
+        <DashboardViewLoader />
       ) : (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -332,46 +389,6 @@ const Dashboard: React.FC = () => {
     </div>
   );
 
-  const AnnouncementBanner = () => {
-    const [announcements, setAnnouncements] = useState<any[]>([]);
-
-    useEffect(() => {
-      const fetchAnnouncements = async () => {
-        try {
-          const response = await fetch('/api/announcements', {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-          });
-          if (response.ok) {
-            const result = await response.json();
-            setAnnouncements(result.success ? result.data : result);
-          }
-        } catch (e) {}
-      };
-      fetchAnnouncements();
-    }, []);
-
-    if (announcements.length === 0) return null;
-
-    return (
-      <div className="mb-6 space-y-4">
-        {(announcements || []).map((a: any) => (
-          <div key={a.id} className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg shadow-sm">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <ShieldCheck className="h-5 w-5 text-blue-500 mr-3" />
-                <div>
-                  <h3 className="text-sm font-bold text-blue-800 uppercase tracking-wider">{a.title}</h3>
-                  <p className="text-sm text-blue-700 mt-1">{a.message}</p>
-                </div>
-              </div>
-              <span className="text-xs text-blue-400">{new Date(a.created_at).toLocaleDateString()}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  };
-
   const renderStudentDashboard = () => (
     <StudentDashboardView />
   );
@@ -379,11 +396,25 @@ const Dashboard: React.FC = () => {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <AnnouncementBanner />
-      {profile?.role === 'super_admin' && <SuperAdminDashboardView />}
-      {profile?.role === 'admin' && <CollegeAdminDashboardView />}
-      {profile?.role === 'hod' && <HODDashboardView />}
-      {profile?.role === 'staff' && <StaffDashboardView />}
-      {profile?.role === 'student' && renderStudentDashboard()}
+      {/* Manual refresh button with last-fetched indicator */}
+      <div className="flex justify-end mb-2">
+        <button
+          onClick={fetchStats}
+          disabled={loading}
+          className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
+          title="Refresh dashboard data"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          {lastFetched ? `Updated ${lastFetched.toLocaleTimeString()}` : 'Refresh'}
+        </button>
+      </div>
+      <Suspense fallback={<DashboardViewLoader />}>
+        {profile?.role === 'super_admin' && <SuperAdminDashboardView />}
+        {profile?.role === 'admin' && <CollegeAdminDashboardView />}
+        {profile?.role === 'hod' && <HODDashboardView />}
+        {profile?.role === 'staff' && <StaffDashboardView />}
+        {profile?.role === 'student' && renderStudentDashboard()}
+      </Suspense>
     </div>
   );
 };

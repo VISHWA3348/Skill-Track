@@ -54,10 +54,12 @@ const Login: React.FC = () => {
   const [skills, setSkills] = useState('');
   const [bio, setBio] = useState('');
 
-  // Signup Code State
+  // Invite Code State (new CAMP-DEPT-XXXXXX system + legacy signupCode compat)
   const [signupCode, setSignupCode] = useState('');
   const [isCodeVerified, setIsCodeVerified] = useState(false);
   const [verifyingCode, setVerifyingCode] = useState(false);
+  const [verifiedCollegeName, setVerifiedCollegeName] = useState('');
+  const [verifiedDeptName, setVerifiedDeptName] = useState('');
 
   // Dropdown data
   const [colleges, setColleges] = React.useState<any[]>([]);
@@ -167,10 +169,11 @@ const Login: React.FC = () => {
     setVerifyingCode(true);
     setError('');
     try {
-      const response = await fetch('/api/auth/verify-signup-code', {
+      // Try the new invite-code validation endpoint first (supports both CAMP-* and legacy)
+      const response = await fetch('/api/invite-codes/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: signupCode })
+        body: JSON.stringify({ code: signupCode.trim().toUpperCase() })
       });
       const result = await response.json();
       if (result.success) {
@@ -178,15 +181,18 @@ const Login: React.FC = () => {
         setCollegeId(result.data.collegeId);
         setCollegeName(result.data.collegeName);
         setDeptId(result.data.departmentId);
+        setVerifiedCollegeName(result.data.collegeName || result.data.collegeId);
+        setVerifiedDeptName(result.data.departmentName || result.data.departmentId);
         if (result.data.batchYear) setYear(result.data.batchYear);
         if (result.data.role) setRole(result.data.role as UserRole);
-        toast.success("Signup code verified successfully!");
+        toast.success(`✅ Invite code verified! ${result.data.collegeName} — ${result.data.departmentName}`);
       } else {
-        setError(result.error || "Invalid signup code");
-        toast.error(result.error || "Invalid signup code");
+        const errMsg = result.message || result.error || 'Invalid or expired invite code';
+        setError(errMsg);
+        toast.error(errMsg);
       }
     } catch (err) {
-      setError("Failed to verify code");
+      setError('Failed to verify invite code. Please check your connection.');
     } finally {
       setVerifyingCode(false);
     }
@@ -195,12 +201,13 @@ const Login: React.FC = () => {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isCodeVerified) {
-      setError("Please verify your signup code first");
+      setError('Please verify your Department Invite Code first');
       return;
     }
     setError('');
     setIsSubmitting(true);
     try {
+      const upperCode = signupCode.trim().toUpperCase();
       await createUserWithEmailAndPassword(auth, email.trim(), password.trim(), {
         name,
         role,
@@ -215,9 +222,11 @@ const Login: React.FC = () => {
         collegeName,
         skills,
         bio,
-        signupCode // [NEW]
+        // Send both field names: new system prefers inviteCode, legacy falls back to signupCode
+        inviteCode: upperCode,
+        signupCode: upperCode
       });
-      toast.success("Sign up successful! Please log in.");
+      toast.success('Sign up successful! Please log in.');
       setIsSignup(false);
     } catch (err: any) {
       setError(err.message || 'Failed to sign up.');
@@ -284,7 +293,7 @@ const Login: React.FC = () => {
                     <div className="md:col-span-2 space-y-2">
                       <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1 flex items-center gap-2">
                         <ShieldCheck className="w-3.5 h-3.5 text-blue-500" />
-                        Secure Signup Code
+                        Department Invite Code
                       </label>
                       <div className="flex gap-2">
                         <div className="relative flex-1">
@@ -294,11 +303,19 @@ const Login: React.FC = () => {
                           <input
                             type="text"
                             required
+                            id="dept-invite-code"
                             disabled={isCodeVerified}
-                            className={`appearance-none rounded-md relative block w-full px-3 py-2 pl-10 border ${isCodeVerified ? 'border-emerald-200 bg-emerald-50 text-emerald-700 font-bold' : 'border-gray-300'} placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm uppercase font-mono`}
-                            placeholder="SSR-CSE-2026-XXXXX"
+                            className={`appearance-none rounded-md relative block w-full px-3 py-2 pl-10 border ${isCodeVerified ? 'border-emerald-200 bg-emerald-50 text-emerald-700 font-bold' : 'border-blue-200 bg-blue-50'} placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm uppercase font-mono tracking-widest`}
+                            placeholder="CAMP-CSE-XXXXXX"
                             value={signupCode}
-                            onChange={(e) => setSignupCode(e.target.value.toUpperCase())}
+                            onChange={(e) => {
+                              setSignupCode(e.target.value.toUpperCase());
+                              if (isCodeVerified) {
+                                setIsCodeVerified(false);
+                                setVerifiedCollegeName('');
+                                setVerifiedDeptName('');
+                              }
+                            }}
                           />
                         </div>
                         {!isCodeVerified ? (
@@ -306,9 +323,9 @@ const Login: React.FC = () => {
                             type="button"
                             disabled={!signupCode || verifyingCode}
                             onClick={handleVerifyCode}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-md text-xs font-bold hover:bg-blue-700 transition-all disabled:bg-blue-300 flex items-center gap-2"
+                            className="px-4 py-2 bg-blue-600 text-white rounded-md text-xs font-bold hover:bg-blue-700 transition-all disabled:bg-blue-300 flex items-center gap-2 whitespace-nowrap"
                           >
-                            {verifyingCode ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Verify'}
+                            {verifyingCode ? <Loader2 className="w-3 h-3 animate-spin" /> : '✓ Verify'}
                           </button>
                         ) : (
                           <button
@@ -316,6 +333,8 @@ const Login: React.FC = () => {
                             onClick={() => {
                               setIsCodeVerified(false);
                               setSignupCode('');
+                              setVerifiedCollegeName('');
+                              setVerifiedDeptName('');
                             }}
                             className="px-4 py-2 bg-slate-100 text-slate-600 rounded-md text-xs font-bold hover:bg-slate-200 transition-all"
                           >
@@ -323,11 +342,22 @@ const Login: React.FC = () => {
                           </button>
                         )}
                       </div>
-                      {isCodeVerified && (
-                        <p className="text-[10px] text-emerald-600 font-bold ml-1 flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3" />
-                          Code verified! College & Department auto-detected.
+                      {!isCodeVerified && (
+                        <p className="text-[10px] text-blue-500 ml-1">
+                          Enter the invite code provided by your institution (format: CAMP-DEPT-XXXXXX)
                         </p>
+                      )}
+                      {isCodeVerified && (
+                        <div className="flex items-start gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <p className="text-xs font-bold text-emerald-700">Invite code verified!</p>
+                            <p className="text-[11px] text-emerald-600">
+                              🏛️ <strong>{verifiedCollegeName}</strong> &nbsp;•&nbsp; 📚 <strong>{verifiedDeptName}</strong>
+                            </p>
+                            <p className="text-[10px] text-emerald-500">College &amp; Department have been auto-assigned. Fields below are locked.</p>
+                          </div>
+                        </div>
                       )}
                     </div>
                     <div className="relative">

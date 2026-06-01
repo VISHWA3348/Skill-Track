@@ -1,7 +1,18 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import { logger } from './logger';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-jwt-key-change-in-production';
+let JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+  if (process.env.NODE_ENV === 'production') {
+    logger.error('CRITICAL_BOOT_FAILURE', 'JWT_SECRET environment variable is not defined in production. System is shutting down for security.');
+    process.exit(1);
+  } else {
+    logger.warn('INSECURE_CONFIGURATION', 'JWT_SECRET is missing. Falling back to development key.');
+    JWT_SECRET = 'super-secret-jwt-key-change-in-production';
+  }
+}
 
 export const hashPassword = async (password: string): Promise<string> => {
   return await bcrypt.hash(password, 10);
@@ -12,19 +23,21 @@ export const comparePassword = async (password: string, hash: string): Promise<b
 };
 
 export const generateToken = (payload: any): string => {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '1d' });
+  // Enforce standard secure HS256 algorithm for signing
+  return jwt.sign(payload, JWT_SECRET as string, { algorithm: 'HS256', expiresIn: '1d' });
 };
 
 export const validatePassword = (password: string): { valid: boolean; message?: string } => {
   if (password.length < 8) return { valid: false, message: 'Password must be at least 8 characters long' };
-  // Relaxing for development/seeding compatibility
   return { valid: true };
 };
 
 export const verifyToken = (token: string): any => {
   try {
-    return jwt.verify(token, JWT_SECRET);
-  } catch (e) {
+    // Explicitly enforce HS256 to reject any 'none' algorithm or signature tampering bypasses
+    return jwt.verify(token, JWT_SECRET as string, { algorithms: ['HS256'] });
+  } catch (e: any) {
+    logger.warn('JWT_VERIFICATION_FAILED', `Failed to verify token: ${e.message}`);
     return null;
   }
 };

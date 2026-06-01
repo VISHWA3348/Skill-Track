@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useMemo, useCallback } from 'react';
 import { auth, getUserProfile, onAuthStateChanged, db, getDoc, doc } from '../api/localApi';
 import { UserProfile, UserRole, PERMISSIONS } from '../types';
 
@@ -64,22 +64,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribe();
   }, []);
 
-  const getPermissions = (): string[] => {
+  // Phase 13: useMemo — permissions array only recomputed when profile/customPermissions changes
+  const permissions = useMemo((): string[] => {
     if (!profile) return [];
     if (profile.role === 'super_admin') return ['*']; 
-    
     const builtInPermissions = (PERMISSIONS as any)[profile.role] || [];
     return [...builtInPermissions, ...customPermissions];
-  };
+  }, [profile, customPermissions]);
 
-  const permissions = getPermissions();
-
-  const hasPermission = (permission: string) => {
+  // Phase 13: useCallback — stable reference prevents unnecessary child re-renders
+  const hasPermission = useCallback((permission: string): boolean => {
     if (permissions.includes('*')) return true;
     return permissions.includes(permission);
-  };
+  }, [permissions]);
 
-  const value = {
+  const value = useMemo(() => ({
     user,
     profile,
     loading,
@@ -91,10 +90,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     permissions,
     hasPermission,
     logout: () => auth.signOut(),
-  };
+  }), [user, profile, loading, permissions, hasPermission]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = () => useContext(AuthContext);
-

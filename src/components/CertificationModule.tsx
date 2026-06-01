@@ -114,7 +114,7 @@ export default function CertificationModule() {
     fetchStudents();
     const interval = setInterval(() => {
       fetchCerts();
-    }, 5000);
+    }, 300000);
     return () => {
       clearInterval(interval);
       stopCamera();

@@ -66,7 +66,7 @@ export default function StaffDashboardView() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 30000); // Update every 30s
+    const interval = setInterval(fetchData, 300000); // Update every 5m
     return () => clearInterval(interval);
   }, []);
 

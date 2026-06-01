@@ -8,7 +8,7 @@ export default function SystemHealthMonitor() {
 
   useEffect(() => {
     fetchHealth();
-    const interval = setInterval(fetchHealth, 10000);
+    const interval = setInterval(fetchHealth, 300000);
     return () => clearInterval(interval);
   }, []);
 

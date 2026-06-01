@@ -1,819 +1,139 @@
-import { DatabaseSync } from 'node:sqlite';
-import fs from 'fs';
+import { Worker } from 'worker_threads';
 import path from 'path';
 
-// Ensure DB directory exists
-const dbDir = path.join(process.cwd(), 'data');
-if (!fs.existsSync(dbDir)) {
-  fs.mkdirSync(dbDir, { recursive: true });
+// Initialize worker thread with SharedArrayBuffer for synchronous query execution
+const sharedBuffer = new SharedArrayBuffer(1024 * 1024 * 16); // 16MB result buffer
+const int32Array = new Int32Array(sharedBuffer);
+
+const workerPath = path.resolve(process.cwd(), 'server', 'db_worker.ts');
+const worker = new Worker(workerPath, {
+  workerData: { sharedBuffer },
+  execArgv: ['--import', 'tsx']
+});
+
+function sendQueryToWorker(action: string, sql: string, params: any[]): any {
+  worker.postMessage({ action, sql, params });
+  Atomics.wait(int32Array, 0, 0);
+
+  const length = int32Array[1];
+  const decoder = new TextDecoder();
+  const bytes = new Uint8Array(sharedBuffer, 8, length);
+  const jsonStr = decoder.decode(bytes);
+
+  int32Array[0] = 0;
+
+  const res = JSON.parse(jsonStr);
+  if (res.error) {
+    throw new Error(res.error);
+  }
+  return res.result;
 }
 
-export const db = new DatabaseSync(path.join(dbDir, 'certtrack.db'));
+export const db = {
+  prepare(sql: string) {
+    return {
+      all(...params: any[]) {
+        return sendQueryToWorker('all', sql, params);
+      },
+      get(...params: any[]) {
+        return sendQueryToWorker('get', sql, params);
+      },
+      run(...params: any[]) {
+        return sendQueryToWorker('run', sql, params);
+      }
+    };
+  },
+  exec(sql: string) {
+    return sendQueryToWorker('exec', sql, []);
+  }
+};
 
 export function initDb() {
-  // Enable Foreign Keys and WAL Mode
-  db.exec('PRAGMA foreign_keys = ON;');
-  db.exec('PRAGMA journal_mode = WAL;');
-  db.exec('PRAGMA busy_timeout = 5000;');
-
-  // 1. Users Table
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS users (
-      uid TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      email TEXT UNIQUE NOT NULL,
-      password_hash TEXT,
-      role TEXT DEFAULT 'student',
-      college_id TEXT,
-      department_id TEXT,
-      roll_no TEXT,
-      class TEXT,
-      year TEXT,
-      section TEXT,
-      city TEXT,
-      phone_number TEXT,
-      profile_photo TEXT,
-      college_name TEXT,
-      skills TEXT,
-      bio TEXT,
-      is_active INTEGER DEFAULT 1,
-      status TEXT DEFAULT 'active',
-      login_attempts INTEGER DEFAULT 0,
-      last_login DATETIME,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
-
-  // 1.1 Students Table (Extended profile for students)
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS students (
-      user_id TEXT PRIMARY KEY,
-      roll_no TEXT UNIQUE,
-      class TEXT,
-      year TEXT,
-      section TEXT,
-      department_id TEXT,
-      college_id TEXT,
-      enrollment_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (user_id) REFERENCES users(uid) ON DELETE CASCADE
-    );
-  `);
-
-  // 2. Colleges Table
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS colleges (
-      id TEXT PRIMARY KEY,
-      college_id TEXT UNIQUE,
-      name TEXT NOT NULL,
-      type TEXT,
-      location TEXT,
-      city TEXT,
-      state TEXT,
-      country TEXT,
-      pincode TEXT,
-      lat REAL,
-      lng REAL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
-
-  // 3. Departments Table
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS departments (
-      id TEXT PRIMARY KEY,
-      department_id TEXT UNIQUE,
-      college_id TEXT,
-      name TEXT NOT NULL,
-      FOREIGN KEY (college_id) REFERENCES colleges(id) ON DELETE CASCADE
-    );
-  `);
-
-  // 4. Certifications Table
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS certifications (
-      id TEXT PRIMARY KEY,
-      user_id TEXT,
-      student_name TEXT,
-      roll_no TEXT,
-      class TEXT,
-      year TEXT,
-      phone_number TEXT,
-      city TEXT,
-      college_name TEXT,
-      college_id TEXT,
-      department_id TEXT,
-      event_name TEXT,
-      event_college_name TEXT,
-      event_location TEXT,
-      date DATETIME,
-      type TEXT,
-      file_url TEXT,
-      photo_url TEXT,
-      gps_lat REAL,
-      gps_lng REAL,
-      prize_position TEXT,
-      custom_prize_position TEXT,
-      prize_type TEXT,
-      cash_prize_amount REAL,
-      prize_description TEXT,
-      gps_photo_url TEXT,
-      gps_photo_lat REAL,
-      gps_photo_lng REAL,
-      gps_photo_timestamp DATETIME,
-      gps_verified INTEGER DEFAULT 0,
-      fraud_flag INTEGER DEFAULT 0,
-      fraud_reason TEXT,
-      file_hash TEXT,
-      status TEXT DEFAULT 'pending',
-      remarks TEXT, -- JSON array
-      is_deleted INTEGER DEFAULT 0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (user_id) REFERENCES users(uid) ON DELETE SET NULL
-    );
-  `);
-
-  // 5. Career Activities Table
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS career_activities (
-      id TEXT PRIMARY KEY,
-      student_id TEXT,
-      user_id TEXT,
-      college_id TEXT,
-      department_id TEXT,
-      type TEXT,
-      organization TEXT,
-      duration TEXT,
-      details TEXT,
-      status TEXT DEFAULT 'pending',
-      is_deleted INTEGER DEFAULT 0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (user_id) REFERENCES users(uid) ON DELETE CASCADE
-    );
-  `);
-
-  // 6. Audit Logs Table
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS audit_logs (
-      id TEXT PRIMARY KEY,
-      user_id TEXT,
-      action TEXT,
-      details TEXT,
-      college_id TEXT,
-      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
-
-  // 7. Notifications Table
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS notifications (
-      id TEXT PRIMARY KEY,
-      user_id TEXT,
-      title TEXT,
-      message TEXT,
-      type TEXT DEFAULT 'info',
-      read INTEGER DEFAULT 0,
-      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (user_id) REFERENCES users(uid) ON DELETE CASCADE
-    );
-  `);
-
-  // 8. Settings Table
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS settings (
-      key TEXT PRIMARY KEY,
-      value TEXT, -- JSON
-      category TEXT,
-      description TEXT
-    );
-  `);
-
-  // 9. Permissions Table
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS permissions (
-      id TEXT PRIMARY KEY,
-      role TEXT,
-      module TEXT,
-      action TEXT,
-      allowed INTEGER DEFAULT 1
-    );
-  `);
-
-  // 10. Companies Table [NEW]
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS companies (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      industry TEXT,
-      website TEXT,
-      description TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
-
-  // 11. Job Posts Table [NEW]
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS job_posts (
-      id TEXT PRIMARY KEY,
-      company_id TEXT,
-      title TEXT NOT NULL,
-      description TEXT,
-      requirements TEXT,
-      min_score REAL DEFAULT 0,
-      salary_range TEXT,
-      status TEXT DEFAULT 'open',
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
-    );
-  `);
-
-  // 12. Announcements Table [NEW]
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS announcements (
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL,
-      message TEXT NOT NULL,
-      target_role TEXT DEFAULT 'all',
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
-
-  // 13. Student Academic Profile Table [NEW]
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS student_academic_profile (
-      id TEXT PRIMARY KEY,
-      student_id TEXT NOT NULL,
-      student_name TEXT,
-      roll_no TEXT,
-      register_no TEXT,
-      department TEXT,
-      department_id TEXT,
-      class TEXT,
-      section TEXT,
-      year TEXT,
-      semester TEXT,
-      college_id TEXT,
-      college_name TEXT,
-      cgpa REAL DEFAULT 0,
-      percentage REAL DEFAULT 0,
-      total_subjects INTEGER DEFAULT 0,
-      arrears INTEGER DEFAULT 0,
-      attendance_percentage REAL DEFAULT 0,
-      placement_readiness_score REAL DEFAULT 0,
-      internship_count INTEGER DEFAULT 0,
-      workshop_count INTEGER DEFAULT 0,
-      seminar_count INTEGER DEFAULT 0,
-      certification_count INTEGER DEFAULT 0,
-      github_url TEXT,
-      linkedin_url TEXT,
-      portfolio_url TEXT,
-      resume_url TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (student_id) REFERENCES users(uid) ON DELETE CASCADE
-    );
-  `);
-
-  // 14. Student Skills Table [NEW]
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS student_skills (
-      id TEXT PRIMARY KEY,
-      student_id TEXT NOT NULL,
-      skill_name TEXT NOT NULL,
-      skill_level TEXT, -- beginner, intermediate, expert
-      category TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (student_id) REFERENCES users(uid) ON DELETE CASCADE
-    );
-  `);
-
-  // 15. Student Goals Table [NEW]
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS student_goals (
-      id TEXT PRIMARY KEY,
-      student_id TEXT NOT NULL,
-      goal_title TEXT NOT NULL,
-      goal_description TEXT,
-      target_date DATETIME,
-      status TEXT DEFAULT 'pending',
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (student_id) REFERENCES users(uid) ON DELETE CASCADE
-    );
-  `);
-
-  // 16. Student Notifications Table [NEW]
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS student_notifications (
-      id TEXT PRIMARY KEY,
-      student_id TEXT NOT NULL,
-      title TEXT NOT NULL,
-      message TEXT NOT NULL,
-      type TEXT DEFAULT 'info',
-      is_read INTEGER DEFAULT 0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (student_id) REFERENCES users(uid) ON DELETE CASCADE
-    );
-  `);
-
-  // 17. Student Resume Data Table [NEW]
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS student_resume_data (
-      id TEXT PRIMARY KEY,
-      student_id TEXT NOT NULL,
-      objective TEXT,
-      projects TEXT, -- JSON string
-      achievements TEXT, -- JSON string
-      certifications TEXT, -- JSON string
-      experience TEXT, -- JSON string
-      languages TEXT, -- JSON string
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (student_id) REFERENCES users(uid) ON DELETE CASCADE
-    );
-  `);
-
-  // 18. Alumni Table [NEW]
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS alumni (
-      id TEXT PRIMARY KEY,
-      user_id TEXT,
-      company TEXT,
-      role TEXT,
-      salary TEXT,
-      graduation_year INTEGER,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (user_id) REFERENCES users(uid) ON DELETE CASCADE
-    );
-  `);
-
-  // 15. Opportunities Table [NEW]
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS opportunities (
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL,
-      company_name TEXT NOT NULL,
-      type TEXT NOT NULL,
-      required_skills TEXT,
-      location TEXT,
-      description TEXT,
-      external_link TEXT,
-      deadline DATETIME,
-      status TEXT DEFAULT 'open',
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
-
-  // 16. Staff Student Remarks Table [NEW]
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS staff_student_remarks (
-      id TEXT PRIMARY KEY,
-      student_id TEXT NOT NULL,
-      staff_id TEXT NOT NULL,
-      remark_type TEXT NOT NULL, -- academic, behavior, achievement
-      remark TEXT NOT NULL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (student_id) REFERENCES users(uid) ON DELETE CASCADE,
-      FOREIGN KEY (staff_id) REFERENCES users(uid) ON DELETE CASCADE
-    );
-  `);
-
-  // 17. Student Attendance Table [NEW]
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS student_attendance (
-      id TEXT PRIMARY KEY,
-      student_id TEXT NOT NULL,
-      department_id TEXT,
-      class TEXT,
-      semester TEXT,
-      attendance_percentage REAL DEFAULT 0,
-      month TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (student_id) REFERENCES users(uid) ON DELETE CASCADE
-    );
-  `);
-
-  // 18. Student Performance Logs Table [NEW]
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS student_performance_logs (
-      id TEXT PRIMARY KEY,
-      student_id TEXT NOT NULL,
-      cgpa REAL,
-      arrears INTEGER,
-      placement_score REAL,
-      updated_by TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (student_id) REFERENCES users(uid) ON DELETE CASCADE
-    );
-  `);
-
-  // 19. HOD Department Announcements [NEW]
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS hod_department_announcements (
-      id TEXT PRIMARY KEY,
-      hod_id TEXT NOT NULL,
-      department_id TEXT NOT NULL,
-      title TEXT NOT NULL,
-      message TEXT NOT NULL,
-      target_year TEXT,
-      target_section TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (hod_id) REFERENCES users(uid) ON DELETE CASCADE
-    );
-  `);
-
-  // 20. HOD Student Flags [NEW]
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS hod_student_flags (
-      id TEXT PRIMARY KEY,
-      student_id TEXT NOT NULL,
-      flagged_by TEXT NOT NULL,
-      flag_type TEXT NOT NULL,
-      reason TEXT,
-      severity TEXT DEFAULT 'medium',
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (student_id) REFERENCES users(uid) ON DELETE CASCADE,
-      FOREIGN KEY (flagged_by) REFERENCES users(uid) ON DELETE CASCADE
-    );
-  `);
-
-  // 21. Department Monthly Reports [NEW]
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS department_monthly_reports (
-      id TEXT PRIMARY KEY,
-      department_id TEXT NOT NULL,
-      month TEXT NOT NULL,
-      avg_cgpa REAL DEFAULT 0,
-      placement_score REAL DEFAULT 0,
-      certificate_count INTEGER DEFAULT 0,
-      activity_count INTEGER DEFAULT 0,
-      arrear_count INTEGER DEFAULT 0,
-      attendance_avg REAL DEFAULT 0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
-
-  // 22. College Announcements [NEW]
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS college_announcements (
-      id TEXT PRIMARY KEY,
-      college_id TEXT NOT NULL,
-      admin_id TEXT NOT NULL,
-      title TEXT NOT NULL,
-      message TEXT NOT NULL,
-      target_role TEXT DEFAULT 'all',
-      target_department TEXT,
-      target_year TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (college_id) REFERENCES colleges(id) ON DELETE CASCADE,
-      FOREIGN KEY (admin_id) REFERENCES users(uid) ON DELETE CASCADE
-    );
-  `);
-
-  // 23. College Reports [NEW]
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS college_reports (
-      id TEXT PRIMARY KEY,
-      college_id TEXT NOT NULL,
-      report_type TEXT NOT NULL,
-      generated_by TEXT NOT NULL,
-      report_data TEXT, -- JSON
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (college_id) REFERENCES colleges(id) ON DELETE CASCADE,
-      FOREIGN KEY (generated_by) REFERENCES users(uid) ON DELETE CASCADE
-    );
-  `);
-
-  // 24. Department Performance [NEW]
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS department_performance (
-      id TEXT PRIMARY KEY,
-      college_id TEXT NOT NULL,
-      department_id TEXT NOT NULL,
-      avg_cgpa REAL DEFAULT 0,
-      total_certificates INTEGER DEFAULT 0,
-      total_activities INTEGER DEFAULT 0,
-      placement_score REAL DEFAULT 0,
-      arrear_count INTEGER DEFAULT 0,
-      attendance_avg REAL DEFAULT 0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (college_id) REFERENCES colleges(id) ON DELETE CASCADE,
-      FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE CASCADE
-    );
-  `);
-
-  // 25. System Health Logs [NEW]
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS system_health_logs (
-      id TEXT PRIMARY KEY,
-      cpu_usage REAL,
-      ram_usage REAL,
-      storage_usage REAL,
-      active_sessions INTEGER,
-      db_size REAL,
-      api_status TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
-
-  // 26. Security Events [NEW]
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS security_events (
-      id TEXT PRIMARY KEY,
-      event_type TEXT,
-      user_id TEXT,
-      ip_address TEXT,
-      description TEXT,
-      severity TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
-
-  // 27. Platform Backups [NEW]
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS platform_backups (
-      id TEXT PRIMARY KEY,
-      backup_name TEXT,
-      backup_size INTEGER,
-      backup_path TEXT,
-      created_by TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
-
-  // 28. Fraud Detection Logs [NEW]
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS fraud_detection_logs (
-      id TEXT PRIMARY KEY,
-      certificate_id TEXT,
-      student_id TEXT,
-      fraud_type TEXT,
-      confidence_score REAL,
-      status TEXT DEFAULT 'flagged',
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
-
-  // 29. Academic Subjects Master [NEW]
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS academic_subjects (
-      id TEXT PRIMARY KEY,
-      college_id TEXT,
-      department_id TEXT,
-      semester INTEGER,
-      subject_code TEXT,
-      subject_name TEXT,
-      credits INTEGER,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
-
-  // 30. Student Academic Records [NEW]
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS student_academic_records (
-      id TEXT PRIMARY KEY,
-      student_id TEXT,
-      subject_id TEXT,
-      semester INTEGER,
-      internal_marks REAL,
-      attendance_percentage REAL,
-      grade TEXT,
-      grade_point INTEGER,
-      result_status TEXT, -- Pass, Fail, Arrear
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (student_id) REFERENCES users(uid) ON DELETE CASCADE,
-      FOREIGN KEY (subject_id) REFERENCES academic_subjects(id) ON DELETE CASCADE
-    );
-  `);
-
-  // 31. Student Semester Summary [NEW]
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS student_semester_summary (
-      id TEXT PRIMARY KEY,
-      student_id TEXT,
-      semester INTEGER,
-      semester_gpa REAL,
-      attendance_avg REAL,
-      arrear_count INTEGER,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(student_id, semester),
-      FOREIGN KEY (student_id) REFERENCES users(uid) ON DELETE CASCADE
-    );
-  `);
-
-  // 32. Student CGPA Summary [NEW]
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS student_cgpa_summary (
-      id TEXT PRIMARY KEY,
-      student_id TEXT UNIQUE,
-      cgpa REAL DEFAULT 0,
-      total_arrears INTEGER DEFAULT 0,
-      total_semesters INTEGER DEFAULT 0,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (student_id) REFERENCES users(uid) ON DELETE CASCADE
-    );
-  `);
-
-  // 33. AI Career Insights Table [NEW]
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS ai_career_insights (
-      id TEXT PRIMARY KEY,
-      student_id TEXT NOT NULL,
-      placement_readiness_score REAL DEFAULT 0,
-      recommended_skills TEXT, -- JSON array
-      missing_skills TEXT, -- JSON array
-      suggested_certifications TEXT, -- JSON array
-      suggested_internships TEXT, -- JSON array
-      career_path_suggestions TEXT, -- JSON array
-      course_recommendations TEXT, -- JSON array
-      smart_alerts TEXT, -- JSON array
-      analysis_summary TEXT,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (student_id) REFERENCES users(uid) ON DELETE CASCADE
-    );
-  `);
-
-  // 34. AI Analytics Summary Table [NEW]
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS ai_analytics_summary (
-      id TEXT PRIMARY KEY,
-      scope_type TEXT NOT NULL, -- 'department' or 'college'
-      scope_id TEXT NOT NULL,
-      skill_gaps TEXT, -- JSON array
-      top_skills TEXT, -- JSON array
-      readiness_stats TEXT, -- JSON object
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_ai_analytics_scope ON ai_analytics_summary(scope_type, scope_id);
-  `);
-
-  // 35. Resume Profiles Table [NEW]
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS resume_profiles (
-      id TEXT PRIMARY KEY,
-      student_id TEXT NOT NULL,
-      headline TEXT,
-      summary TEXT,
-      linkedin_url TEXT,
-      github_url TEXT,
-      portfolio_url TEXT,
-      languages TEXT, -- JSON string
-      interests TEXT, -- JSON string
-      template_name TEXT DEFAULT 'modern',
-      public_visibility INTEGER DEFAULT 1,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (student_id) REFERENCES users(uid) ON DELETE CASCADE
-    );
-  `);
-
-  // 34. Resume Projects Table [NEW]
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS resume_projects (
-      id TEXT PRIMARY KEY,
-      student_id TEXT NOT NULL,
-      project_name TEXT NOT NULL,
-      description TEXT,
-      technologies TEXT, -- Comma separated
-      github_url TEXT,
-      live_url TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (student_id) REFERENCES users(uid) ON DELETE CASCADE
-    );
-  `);
-
-  // 35. Resume Experience Table [NEW]
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS resume_experience (
-      id TEXT PRIMARY KEY,
-      student_id TEXT NOT NULL,
-      company_name TEXT NOT NULL,
-      role TEXT NOT NULL,
-      duration TEXT,
-      description TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (student_id) REFERENCES users(uid) ON DELETE CASCADE
-    );
-  `);
-
-  // 36. Resume Skills Table [NEW]
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS resume_skills (
-      id TEXT PRIMARY KEY,
-      student_id TEXT NOT NULL,
-      skill_name TEXT NOT NULL,
-      skill_level TEXT, -- Beginner, Intermediate, Expert
-      auto_detected INTEGER DEFAULT 0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (student_id) REFERENCES users(uid) ON DELETE CASCADE
-    );
-  `);
-
-  // 37. Signup Access Codes Table [NEW]
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS signup_codes (
-      id TEXT PRIMARY KEY,
-      code TEXT UNIQUE NOT NULL,
-      college_id TEXT NOT NULL,
-      department_id TEXT NOT NULL,
-      batch_year TEXT,
-      usage_limit INTEGER DEFAULT 1, -- 1 for single, >1 for multi, -1 for unlimited
-      usage_count INTEGER DEFAULT 0,
-      expiry_date DATETIME,
-      is_active INTEGER DEFAULT 1,
-      role TEXT DEFAULT 'student',
-      created_by TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (college_id) REFERENCES colleges(id) ON DELETE CASCADE,
-      FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE CASCADE
-    );
-  `);
-
-  // Column enhancements for existing tables
+  console.log("🌐 Database engine: Supabase PostgreSQL (Prisma Client backend via worker)");
   try {
-    // Users: score, otp, otp_expiry, preferences, social_links, skills
-    const userCols = db.prepare("PRAGMA table_info(users)").all() as any[];
-    if (!userCols.find(c => c.name === 'score')) db.exec("ALTER TABLE users ADD COLUMN score REAL DEFAULT 0;");
-    if (!userCols.find(c => c.name === 'otp')) db.exec("ALTER TABLE users ADD COLUMN otp TEXT;");
-    if (!userCols.find(c => c.name === 'otp_expiry')) db.exec("ALTER TABLE users ADD COLUMN otp_expiry DATETIME;");
-    if (!userCols.find(c => c.name === 'preferences')) db.exec("ALTER TABLE users ADD COLUMN preferences TEXT DEFAULT '{}';");
-    if (!userCols.find(c => c.name === 'social_links')) db.exec("ALTER TABLE users ADD COLUMN social_links TEXT DEFAULT '{}';");
-    if (!userCols.find(c => c.name === 'skills')) db.exec("ALTER TABLE users ADD COLUMN skills TEXT;");
-    if (!userCols.find(c => c.name === 'bio')) db.exec("ALTER TABLE users ADD COLUMN bio TEXT;");
-    if (!userCols.find(c => c.name === 'profile_photo')) db.exec("ALTER TABLE users ADD COLUMN profile_photo TEXT;");
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS department_invite_codes (
+        id VARCHAR(255) PRIMARY KEY,
+        code VARCHAR(255) UNIQUE NOT NULL,
+        college_id VARCHAR(255) NOT NULL,
+        department_id VARCHAR(255) NOT NULL,
+        is_active INTEGER DEFAULT 1,
+        max_registrations INTEGER DEFAULT -1,
+        current_registrations INTEGER DEFAULT 0,
+        expires_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_by VARCHAR(255),
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
     
-    const certCols = db.prepare("PRAGMA table_info(certifications)").all() as any[];
-    if (!certCols.find(c => c.name === 'verification_slug')) db.exec("ALTER TABLE certifications ADD COLUMN verification_slug TEXT;");
+    // Create indexes safely
+    try { db.exec("CREATE INDEX IF NOT EXISTS idx_invite_code ON department_invite_codes(code)"); } catch(e){}
+    try { db.exec("CREATE INDEX IF NOT EXISTS idx_invite_college ON department_invite_codes(college_id)"); } catch(e){}
+    try { db.exec("CREATE INDEX IF NOT EXISTS idx_invite_dept ON department_invite_codes(department_id)"); } catch(e){}
 
-    // Colleges: city, state, country, pincode
-    const colCols = db.prepare("PRAGMA table_info(colleges)").all() as any[];
-    if (!colCols.find(c => c.name === 'college_id')) db.exec("ALTER TABLE colleges ADD COLUMN college_id TEXT;");
-    if (!colCols.find(c => c.name === 'type')) db.exec("ALTER TABLE colleges ADD COLUMN type TEXT;");
-    if (!colCols.find(c => c.name === 'city')) db.exec("ALTER TABLE colleges ADD COLUMN city TEXT;");
-    if (!colCols.find(c => c.name === 'state')) db.exec("ALTER TABLE colleges ADD COLUMN state TEXT;");
-    if (!colCols.find(c => c.name === 'country')) db.exec("ALTER TABLE colleges ADD COLUMN country TEXT;");
-    if (!colCols.find(c => c.name === 'pincode')) db.exec("ALTER TABLE colleges ADD COLUMN pincode TEXT;");
+  // ─── Phase 1: High-frequency query indexes ───────────────────────────────
+  // users table
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)"); } catch(e){}
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)"); } catch(e){}
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_users_college_id ON users(college_id)"); } catch(e){}
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_users_dept_id ON users(department_id)"); } catch(e){}
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_users_college_role ON users(college_id, role)"); } catch(e){}
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_users_dept_role ON users(department_id, role)"); } catch(e){}
+
+  // certifications table
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_certs_user_id ON certifications(user_id)"); } catch(e){}
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_certs_status ON certifications(status)"); } catch(e){}
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_certs_college_id ON certifications(college_id)"); } catch(e){}
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_certs_dept_id ON certifications(department_id)"); } catch(e){}
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_certs_college_status ON certifications(college_id, status)"); } catch(e){}
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_certs_dept_status ON certifications(department_id, status)"); } catch(e){}
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_certs_deleted ON certifications(is_deleted)"); } catch(e){}
+
+  // career_activities table
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_careers_user_id ON career_activities(user_id)"); } catch(e){}
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_careers_status ON career_activities(status)"); } catch(e){}
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_careers_college_id ON career_activities(college_id)"); } catch(e){}
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_careers_dept_id ON career_activities(department_id)"); } catch(e){}
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_careers_deleted ON career_activities(is_deleted)"); } catch(e){}
+
+  // audit_logs table
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_audit_user_id ON audit_logs(user_id)"); } catch(e){}
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_audit_college_id ON audit_logs(college_id)"); } catch(e){}
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_logs(timestamp DESC)"); } catch(e){}
+
+  // notifications table
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_notif_user_id ON notifications(user_id)"); } catch(e){}
+
+  // students table
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_students_dept_id ON students(department_id)"); } catch(e){}
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_students_college_id ON students(college_id)"); } catch(e){}
+
+  // career_activities student_id index
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_careers_student_id ON career_activities(student_id)"); } catch(e){}
+
+  // student sub-tables indexes
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_st_skills_sid ON student_skills(student_id)"); } catch(e){}
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_st_goals_sid ON student_goals(student_id)"); } catch(e){}
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_st_notif_sid ON student_notifications(student_id)"); } catch(e){}
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_st_resume_sid ON student_resume_data(student_id)"); } catch(e){}
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_st_remarks_sid ON staff_student_remarks(student_id)"); } catch(e){}
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_st_attendance_sid ON student_attendance(student_id)"); } catch(e){}
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_st_perf_logs_sid ON student_performance_logs(student_id)"); } catch(e){}
+
+  // signup and invite codes
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_signup_codes_val ON signup_codes(code)"); } catch(e){}
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_signup_codes_active ON signup_codes(is_active)"); } catch(e){}
+
+  console.log("✅ Performance indexes verified in PostgreSQL");
     
-    // Data Healing for Colleges
-    db.exec(`UPDATE colleges SET college_id = id WHERE college_id IS NULL OR college_id = '';`);
-
-    const deptCols = db.prepare("PRAGMA table_info(departments)").all() as any[];
-    if (!deptCols.find(c => c.name === 'department_id')) db.exec("ALTER TABLE departments ADD COLUMN department_id TEXT;");
-    
-    // Data Healing for Departments (Ensure they reference existing colleges by ID)
-    db.exec(`UPDATE departments SET department_id = id WHERE department_id IS NULL OR department_id = '';`);
-    // Attempt to fix college_id in departments to point to colleges.id if it was pointing to colleges.college_id
-    try {
-      db.exec(`
-        UPDATE departments 
-        SET college_id = (SELECT id FROM colleges WHERE colleges.college_id = departments.college_id)
-        WHERE college_id IN (SELECT college_id FROM colleges WHERE college_id != id);
-      `);
-    } catch (e) {
-      console.warn("Soft healing for departments failed (minor):", e);
-    }
-    
-    // Ensure UNIQUE constraints are enforced
-    db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_colleges_college_id ON colleges(college_id);");
-    db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_departments_department_id ON departments(department_id);");
-
-    // Enhance student_academic_profile
-    const profileCols = db.prepare("PRAGMA table_info(student_academic_profile)").all() as any[];
-    if (!profileCols.find(c => c.name === 'department')) db.exec("ALTER TABLE student_academic_profile ADD COLUMN department TEXT;");
-    if (!profileCols.find(c => c.name === 'department_id')) db.exec("ALTER TABLE student_academic_profile ADD COLUMN department_id TEXT;");
-    if (!profileCols.find(c => c.name === 'college_id')) db.exec("ALTER TABLE student_academic_profile ADD COLUMN college_id TEXT;");
-    if (!profileCols.find(c => c.name === 'college_name')) db.exec("ALTER TABLE student_academic_profile ADD COLUMN college_name TEXT;");
-    if (!profileCols.find(c => c.name === 'placement_readiness_score')) db.exec("ALTER TABLE student_academic_profile ADD COLUMN placement_readiness_score REAL DEFAULT 0;");
-    if (!profileCols.find(c => c.name === 'attendance_percentage')) db.exec("ALTER TABLE student_academic_profile ADD COLUMN attendance_percentage REAL DEFAULT 0;");
-    if (!profileCols.find(c => c.name === 'cgpa')) db.exec("ALTER TABLE student_academic_profile ADD COLUMN cgpa REAL DEFAULT 0;");
-    if (!profileCols.find(c => c.name === 'arrears')) db.exec("ALTER TABLE student_academic_profile ADD COLUMN arrears INTEGER DEFAULT 0;");
-    if (!profileCols.find(c => c.name === 'internship_count')) db.exec("ALTER TABLE student_academic_profile ADD COLUMN internship_count INTEGER DEFAULT 0;");
-    if (!profileCols.find(c => c.name === 'workshop_count')) db.exec("ALTER TABLE student_academic_profile ADD COLUMN workshop_count INTEGER DEFAULT 0;");
-    if (!profileCols.find(c => c.name === 'seminar_count')) db.exec("ALTER TABLE student_academic_profile ADD COLUMN seminar_count INTEGER DEFAULT 0;");
-    if (!profileCols.find(c => c.name === 'certification_count')) db.exec("ALTER TABLE student_academic_profile ADD COLUMN certification_count INTEGER DEFAULT 0;");
-    if (!profileCols.find(c => c.name === 'github_url')) db.exec("ALTER TABLE student_academic_profile ADD COLUMN github_url TEXT;");
-    if (!profileCols.find(c => c.name === 'linkedin_url')) db.exec("ALTER TABLE student_academic_profile ADD COLUMN linkedin_url TEXT;");
-    if (!profileCols.find(c => c.name === 'portfolio_url')) db.exec("ALTER TABLE student_academic_profile ADD COLUMN portfolio_url TEXT;");
-    if (!profileCols.find(c => c.name === 'resume_url')) db.exec("ALTER TABLE student_academic_profile ADD COLUMN resume_url TEXT;");
-
-
+    console.log("✅ department_invite_codes table successfully verified in PostgreSQL");
   } catch (err) {
-    console.error("Schema enhancement failed:", err);
+    console.error("⚠️ Failed to verify department_invite_codes schema at boot:", err);
   }
-
-  // Legacy JSON table (for backwards compatibility during migration)
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS documents (
-      collectionName TEXT,
-      id TEXT,
-      data TEXT NOT NULL,
-      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-      PRIMARY KEY (collectionName, id)
-    );
-  `);
-
-  migrateLegacyData();
 }
+
+// Generic helpers (for transitional period)
 
 function migrateLegacyData() {
   try {

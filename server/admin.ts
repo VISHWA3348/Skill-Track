@@ -1,10 +1,19 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { getCollection, setDocument, deleteDocument, queryDocuments, getDocument } from './db';
+import { db, getCollection, setDocument, deleteDocument, queryDocuments, getDocument } from './db';
 import { authenticate, checkRole, getDataIsolationFilters } from './middleware';
+import { cacheService } from './redis_cache';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-jwt-key-change-in-production';
+
+function getStatsCacheKey(userData: any): string {
+  return `stats:${userData.role}:${userData.college_id || ''}:${userData.department_id || ''}:${userData.uid || ''}`;
+}
+
+export function invalidateStatsCache(): void {
+  cacheService.clearPattern('stats:*').catch(() => {});
+}
 
 export function setupAdmin(app: express.Express) {
   
@@ -38,9 +47,7 @@ export function setupAdmin(app: express.Express) {
 
   seedDatabase();
 
-  app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", mode: "sqlite" });
-  });
+
 
   app.get("/api/admin/backup", authenticate, checkRole(["super_admin"]), (req: any, res) => {
     try {
@@ -152,138 +159,264 @@ export function setupAdmin(app: express.Express) {
     }
   });
 
-  app.get("/api/admin/stats", authenticate, checkRole(["super_admin", "admin", "hod", "staff", "student"]), (req: any, res) => {
+  app.get("/api/admin/stats", authenticate, checkRole(["super_admin", "admin", "hod", "staff", "student"]), async (req: any, res) => {
     try {
+      const cacheKey = getStatsCacheKey(req.userData);
+      const cached = await cacheService.get(cacheKey);
+      if (cached) {
+        return res.json({ success: true, data: cached, _cached: true });
+      }
+
       const callerRole = req.userData.role;
-      
-      // Get filtered data using isolation logic
-      let users = queryDocuments('users', getDataIsolationFilters('users', req.userData));
-      let certs = queryDocuments('certifications', getDataIsolationFilters('certifications', req.userData));
-      let careers = queryDocuments('career_activities', getDataIsolationFilters('career_activities', req.userData));
+      const collegeId  = req.userData.college_id  || null;
+      const deptId     = req.userData.department_id || null;
+      const callerUid  = req.userData.uid;
 
-      const totalUsers = users.length;
-      const students = users.filter((u: any) => u.role === 'student');
-      const totalStudents = students.length;
-      const totalAdmins = users.filter((u: any) => u.role === 'admin').length;
-      const totalHODs = users.filter((u: any) => u.role === 'hod').length;
-      const totalStaff = users.filter((u: any) => u.role === 'staff').length;
-
-      const totalCertificates = certs.length;
-      const pendingCertificates = certs.filter((c: any) => c.status === 'pending').length;
-      const staffApprovedCertificates = certs.filter((c: any) => c.status === 'staff_approved').length;
-      const approvedCertificates = certs.filter((c: any) => c.status === 'approved' || c.status === 'verified').length;
-      const rejectedCertificates = certs.filter((c: any) => c.status === 'rejected').length;
-
-      const totalCareerActivities = careers.length;
-      const pendingCareerActivities = careers.filter((c: any) => c.status === 'pending').length;
-      const approvedCareerActivities = careers.filter((c: any) => c.status === 'approved').length;
-
-      const collegesCount = getCollection('colleges').length;
-      
-      // Calculate top performers based on ALL verified data (filtered by scope)
-      const allStudentScores = students.map((s: any) => {
-        const studentCerts = certs.filter((c: any) => (c.user_id === s.uid || c.userId === s.uid) && (c.status === 'verified' || c.status === 'approved')).length;
-        const studentActivities = careers.filter((c: any) => (c.user_id === s.uid || c.userId === s.uid) && c.status === 'approved').length;
+      // ── Build WHERE clauses for scope isolation ──────────────────────────
+      const buildWhere = (table: string): { clause: string; params: any[] } => {
+        const parts: string[] = [];
+        const params: any[] = [];
+        if (callerRole === 'admin') {
+          parts.push(`${table}.college_id = $${params.length + 1}`); params.push(collegeId);
+        } else if (callerRole === 'hod' || callerRole === 'staff') {
+          parts.push(`${table}.college_id = $${params.length + 1}`); params.push(collegeId);
+          parts.push(`${table}.department_id = $${params.length + 1}`); params.push(deptId);
+        } else if (callerRole === 'student') {
+          // student only sees own data for certs/activities
+          if (table === 'certifications' || table === 'career_activities') {
+            parts.push(`${table}.user_id = $${params.length + 1}`); params.push(callerUid);
+          }
+        }
         return {
-          uid: s.uid,
-          name: s.name,
-          rollNo: s.roll_no || s.rollNo,
-          score: (studentCerts * 10) + (studentActivities * 5),
-          certsCount: studentCerts,
-          activitiesCount: studentActivities
+          clause: parts.length > 0 ? 'AND ' + parts.join(' AND ') : '',
+          params
         };
-      }).sort((a: any, b: any) => b.score - a.score);
+      };
 
-      const topPerformers = allStudentScores.slice(0, 10);
-      
+      // ── Phase 2: SQL COUNT aggregations (replaces JS in-memory filtering) ─
+      // Users
+      const userScope = buildWhere('u');
+      const userCountsSql = `
+        SELECT
+          COUNT(*) FILTER (WHERE u.role = 'student') as total_students,
+          COUNT(*) FILTER (WHERE u.role = 'admin')   as total_admins,
+          COUNT(*) FILTER (WHERE u.role = 'hod')     as total_hods,
+          COUNT(*) FILTER (WHERE u.role = 'staff')   as total_staff,
+          COUNT(*)                                   as total_users
+        FROM users u
+        WHERE 1=1 ${userScope.clause}
+      `;
+      const userCounts = db.prepare(userCountsSql).get(...userScope.params) as any;
+
+      // Certs
+      const certScope = buildWhere('c');
+      const certCountsSql = `
+        SELECT
+          COUNT(*) FILTER (WHERE c.is_deleted IS NOT TRUE) as total_certs,
+          COUNT(*) FILTER (WHERE c.status = 'pending' AND c.is_deleted IS NOT TRUE) as pending_certs,
+          COUNT(*) FILTER (WHERE c.status = 'staff_approved' AND c.is_deleted IS NOT TRUE) as staff_approved_certs,
+          COUNT(*) FILTER (WHERE c.status IN ('approved','verified') AND c.is_deleted IS NOT TRUE) as approved_certs,
+          COUNT(*) FILTER (WHERE c.status = 'rejected' AND c.is_deleted IS NOT TRUE) as rejected_certs,
+          COUNT(*) FILTER (WHERE (c.fraud_flag = true OR c.fraud_flag = 1) AND c.is_deleted IS NOT TRUE) as fraud_certs,
+          COUNT(*) FILTER (WHERE (c.gps_verified = true OR c.gps_verified = 1) AND c.is_deleted IS NOT TRUE) as gps_certs
+        FROM certifications c
+        WHERE 1=1 ${certScope.clause}
+      `;
+      const certCounts = db.prepare(certCountsSql).get(...certScope.params) as any;
+
+      // Career activities
+      const careerScope = buildWhere('ca');
+      const careerCountsSql = `
+        SELECT
+          COUNT(*) FILTER (WHERE ca.is_deleted IS NOT TRUE) as total_activities,
+          COUNT(*) FILTER (WHERE ca.status = 'pending' AND ca.is_deleted IS NOT TRUE) as pending_activities,
+          COUNT(*) FILTER (WHERE ca.status = 'approved' AND ca.is_deleted IS NOT TRUE) as approved_activities
+        FROM career_activities ca
+        WHERE 1=1 ${careerScope.clause}
+      `;
+      const careerCounts = db.prepare(careerCountsSql).get(...careerScope.params) as any;
+
+      // Colleges count
+      const collegesCount = (db.prepare('SELECT COUNT(*) as cnt FROM colleges').get() as any)?.cnt || 0;
+
+      // ── Top Performers (SQL-ranked) ────────────────────────────────────────
+      const tpWhere = callerRole === 'admin' ? `AND u.college_id = '${collegeId}'`
+        : (callerRole === 'hod' || callerRole === 'staff') ? `AND u.college_id = '${collegeId}' AND u.department_id = '${deptId}'`
+        : '';
+      const topPerformersRows = db.prepare(`
+        SELECT
+          u.uid,
+          u.name,
+          u.roll_no as rollNo,
+          COALESCE(cert_counts.cnt, 0) as certsCount,
+          COALESCE(career_counts.cnt, 0) as activitiesCount,
+          (COALESCE(cert_counts.cnt, 0) * 10 + COALESCE(career_counts.cnt, 0) * 5) as score
+        FROM users u
+        LEFT JOIN (
+          SELECT user_id, COUNT(*) as cnt FROM certifications
+          WHERE status IN ('verified','approved') AND (is_deleted IS NOT TRUE)
+          GROUP BY user_id
+        ) cert_counts ON cert_counts.user_id = u.uid
+        LEFT JOIN (
+          SELECT user_id, COUNT(*) as cnt FROM career_activities
+          WHERE status = 'approved' AND (is_deleted IS NOT TRUE)
+          GROUP BY user_id
+        ) career_counts ON career_counts.user_id = u.uid
+        WHERE u.role = 'student' ${tpWhere}
+        ORDER BY score DESC
+        LIMIT 10
+      `).all() as any[];
+      const topPerformers = topPerformersRows;
+
+      // Student rank (only for student role)
       let studentRank = null;
       let studentScore = null;
-      if (req.userData.role === 'student') {
-        const index = allStudentScores.findIndex(s => s.uid === req.userData.uid);
-        if (index !== -1) {
-          studentRank = index + 1;
-          studentScore = allStudentScores[index].score;
+      if (callerRole === 'student') {
+        const rankRows = db.prepare(`
+          SELECT uid,
+            (COALESCE(cert_counts.cnt,0)*10 + COALESCE(career_counts.cnt,0)*5) as score
+          FROM users u
+          LEFT JOIN (
+            SELECT user_id, COUNT(*) as cnt FROM certifications
+            WHERE status IN ('verified','approved') AND (is_deleted IS NOT TRUE) GROUP BY user_id
+          ) cert_counts ON cert_counts.user_id = u.uid
+          LEFT JOIN (
+            SELECT user_id, COUNT(*) as cnt FROM career_activities
+            WHERE status='approved' AND (is_deleted IS NOT TRUE) GROUP BY user_id
+          ) career_counts ON career_counts.user_id = u.uid
+          WHERE u.role = 'student'
+          ORDER BY score DESC
+        `).all() as any[];
+        const idx = rankRows.findIndex((r: any) => r.uid === callerUid);
+        if (idx !== -1) {
+          studentRank = idx + 1;
+          studentScore = rankRows[idx].score;
         }
       }
 
-      // Additional Chart Data
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      // ── Monthly Growth (SQL GROUP BY) ────────────────────────────────────
+      const monthlyGrowthRows = db.prepare(`
+        SELECT
+          TO_CHAR(created_at, 'Mon') as month,
+          EXTRACT(MONTH FROM created_at) as month_num,
+          COUNT(*) FILTER (WHERE role = 'student') as students
+        FROM users u
+        WHERE 1=1 ${userScope.clause.replace(/u\./g, '')}
+        GROUP BY month, month_num
+        ORDER BY month_num
+      `).all(...userScope.params) as any[];
+
+      const certMonthlyRows = db.prepare(`
+        SELECT TO_CHAR(created_at, 'Mon') as month, EXTRACT(MONTH FROM created_at) as month_num, COUNT(*) as certs
+        FROM certifications c
+        WHERE is_deleted IS NOT TRUE ${certScope.clause.replace(/c\./g, '')}
+        GROUP BY month, month_num ORDER BY month_num
+      `).all(...certScope.params) as any[];
+
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
       const monthlyGrowth = months.map((m, i) => {
-        const studentGrowth = users.filter((u: any) => u.role === 'student' && new Date(u.created_at).getMonth() === i).length;
-        const certGrowth = certs.filter((c: any) => new Date(c.created_at || c.createdAt).getMonth() === i).length;
-        return { name: m, students: studentGrowth, certs: certGrowth };
+        const sg = monthlyGrowthRows.find((r: any) => parseInt(r.month_num) === i + 1);
+        const cg = certMonthlyRows.find((r: any) => parseInt(r.month_num) === i + 1);
+        return { name: m, students: sg ? Number(sg.students) : 0, certs: cg ? Number(cg.certs) : 0 };
       });
 
-      const depts = [...new Set(users.map((u: any) => u.department_id || u.departmentId).filter(Boolean))];
-      const deptAchievements = depts.map(d => ({
-        name: d,
-        certs: certs.filter((c: any) => (c.department_id === d || c.departmentId === d) && (c.status === 'verified' || c.status === 'approved')).length,
-        activities: careers.filter((c: any) => (c.department_id === d || c.departmentId === d) && c.status === 'approved').length
+      // ── Dept Achievements (SQL GROUP BY) ─────────────────────────────────
+      const deptAchievementsRows = db.prepare(`
+        SELECT
+          c.department_id as name,
+          COUNT(*) FILTER (WHERE c.status IN ('verified','approved')) as certs,
+          0 as activities
+        FROM certifications c
+        WHERE c.is_deleted IS NOT TRUE ${certScope.clause}
+        GROUP BY c.department_id
+      `).all(...certScope.params) as any[];
+      const deptAchievements = deptAchievementsRows.map((r: any) => ({
+        name: r.name, certs: Number(r.certs), activities: Number(r.activities)
       }));
 
-      const activityTypes = [...new Set(careers.map((a: any) => a.type).filter(Boolean))];
-      const activityDistribution = activityTypes.map(t => ({
-        name: t,
-        value: careers.filter((a: any) => a.type === t).length
-      }));
+      // ── Activity Distribution (SQL GROUP BY) ─────────────────────────────
+      const actDistRows = db.prepare(`
+        SELECT type as name, COUNT(*) as value
+        FROM career_activities ca
+        WHERE ca.is_deleted IS NOT TRUE AND type IS NOT NULL ${careerScope.clause}
+        GROUP BY type
+      `).all(...careerScope.params) as any[];
+      const activityDistribution = actDistRows.map((r: any) => ({ name: r.name, value: Number(r.value) }));
 
-      // System Health Stats
-      const fraudulentCertificates = certs.filter((c: any) => c.fraud_flag || c.fraudFlag).length;
-      const gpsVerifiedCertificates = certs.filter((c: any) => c.gps_verified || c.gpsVerified).length;
+      // ── Recent Audit Logs ─────────────────────────────────────────────────
+      const logScope = buildWhere('al');
+      const recentLogs = db.prepare(`
+        SELECT * FROM audit_logs al
+        WHERE 1=1 ${logScope.clause}
+        ORDER BY timestamp DESC LIMIT 10
+      `).all(...logScope.params) as any[];
 
-      // Recent Audit Logs (Filtered by scope)
-      const recentLogs = queryDocuments('audit_logs', getDataIsolationFilters('audit_logs', req.userData))
-        .sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-        .slice(0, 10);
+      // ── Recent Pending Lists ──────────────────────────────────────────────
+      const pendingCertificatesList = db.prepare(`
+        SELECT * FROM certifications c
+        WHERE c.status = 'pending' AND c.is_deleted IS NOT TRUE ${certScope.clause}
+        ORDER BY created_at DESC LIMIT 5
+      `).all(...certScope.params) as any[];
 
-      const pendingCertificatesList = certs.filter((c: any) => c.status === 'pending')
-        .sort((a: any, b: any) => new Date(b.created_at || b.createdAt).getTime() - new Date(a.created_at || a.createdAt).getTime())
-        .slice(0, 5);
-        
-      const pendingActivitiesList = careers.filter((c: any) => c.status === 'pending')
-        .sort((a: any, b: any) => new Date(b.created_at || b.createdAt).getTime() - new Date(a.created_at || a.createdAt).getTime())
-        .slice(0, 5);
+      const pendingActivitiesList = db.prepare(`
+        SELECT * FROM career_activities ca
+        WHERE ca.status = 'pending' AND ca.is_deleted IS NOT TRUE ${careerScope.clause}
+        ORDER BY created_at DESC LIMIT 5
+      `).all(...careerScope.params) as any[];
 
-      const recentStudents = students.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-        .slice(0, 5);
+      const recentStudents = db.prepare(`
+        SELECT * FROM users u
+        WHERE u.role = 'student' ${userScope.clause}
+        ORDER BY created_at DESC LIMIT 5
+      `).all(...userScope.params) as any[];
 
-      res.json({
-        success: true,
-        data: {
-          totalUsers,
-          totalStudents,
-          totalAdmins,
-          totalHODs,
-          totalStaff,
-          totalCertificates,
-          pendingCertificates,
-          staffApprovedCertificates,
-          approvedCertificates,
-          rejectedCertificates,
-          totalColleges: collegesCount,
-          totalCareerActivities,
-          pendingCareerActivities,
-          approvedCareerActivities,
-          topPerformers,
-          studentRank,
-          studentScore,
-          fraudulentCertificates,
-          gpsVerifiedCertificates,
-          recentLogs,
-          pendingCertificatesList,
-          pendingActivitiesList,
-          recentStudents,
-          monthlyGrowth,
-          deptAchievements,
-          activityDistribution,
-          systemHealth: "Operational",
-          timestamp: new Date().toISOString()
-        }
-      });
+      // ── Assemble response ─────────────────────────────────────────────────
+      const data = {
+        totalUsers:            Number(userCounts?.total_users    || 0),
+        totalStudents:         Number(userCounts?.total_students || 0),
+        totalAdmins:           Number(userCounts?.total_admins   || 0),
+        totalHODs:             Number(userCounts?.total_hods     || 0),
+        totalStaff:            Number(userCounts?.total_staff    || 0),
+        totalCertificates:     Number(certCounts?.total_certs          || 0),
+        pendingCertificates:   Number(certCounts?.pending_certs        || 0),
+        staffApprovedCertificates: Number(certCounts?.staff_approved_certs || 0),
+        approvedCertificates:  Number(certCounts?.approved_certs       || 0),
+        rejectedCertificates:  Number(certCounts?.rejected_certs       || 0),
+        totalColleges:         Number(collegesCount),
+        totalCareerActivities: Number(careerCounts?.total_activities    || 0),
+        pendingCareerActivities: Number(careerCounts?.pending_activities || 0),
+        approvedCareerActivities: Number(careerCounts?.approved_activities || 0),
+        fraudulentCertificates: Number(certCounts?.fraud_certs          || 0),
+        gpsVerifiedCertificates: Number(certCounts?.gps_certs           || 0),
+        topPerformers,
+        studentRank,
+        studentScore,
+        monthlyGrowth,
+        deptAchievements,
+        activityDistribution,
+        recentLogs,
+        pendingCertificatesList,
+        pendingActivitiesList,
+        recentStudents,
+        systemHealth: "Operational",
+        timestamp: new Date().toISOString()
+      };
+
+      // Store in cache (30 seconds TTL)
+      await cacheService.set(cacheKey, data, 30);
+
+      res.json({ success: true, data });
     } catch (error) {
       console.error("Failed to fetch stats", error);
       res.status(500).json({ error: "Failed to fetch stats" });
     }
+  });
+
+  // Consolidated dashboard overview endpoint aliasing stats
+  app.get("/api/dashboard/overview", authenticate, checkRole(["super_admin", "admin", "hod", "staff", "student"]), async (req: any, res) => {
+    // Rewrites url internally to stats to run the exact same consolidated cached SQL query logic
+    req.url = "/api/admin/stats";
+    (app as any)._router.handle(req, res);
   });
 
   app.delete("/api/admin/users/:uid", authenticate, checkRole(["super_admin", "admin", "hod", "staff"]), (req: any, res) => {

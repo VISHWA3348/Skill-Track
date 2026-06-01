@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { db, handleApiError, OperationType, storage } from '../api/localApi';
 import { collection, query, where, onSnapshot, doc, updateDoc } from '../api/localApi';
@@ -77,6 +77,20 @@ const Students: React.FC = () => {
     
     return matchesSearch && matchesYear && matchesDepartment;
   });
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedYear, selectedDepartment]);
+
+  const paginatedStudents = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredStudents.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredStudents, currentPage]);
+
+  const totalPages = Math.ceil(filteredStudents.length / itemsPerPage);
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -363,7 +377,7 @@ const Students: React.FC = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-100">
-              {(filteredStudents || []).map((student) => (
+              {(paginatedStudents || []).map((student) => (
                 <tr key={student.uid} className="hover:bg-gray-50/50 transition-colors group">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-3">
@@ -425,6 +439,34 @@ const Students: React.FC = () => {
             <div className="p-8 text-center text-gray-500">No students found matching your criteria.</div>
           )}
           </div>
+          {totalPages > 1 && (
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="text-sm text-gray-500">
+                Showing <span className="font-semibold">{Math.min(filteredStudents.length, (currentPage - 1) * itemsPerPage + 1)}</span> to{' '}
+                <span className="font-semibold">{Math.min(filteredStudents.length, currentPage * itemsPerPage)}</span> of{' '}
+                <span className="font-semibold">{filteredStudents.length}</span> students
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Previous
+                </button>
+                <span className="px-3 py-1.5 text-sm font-semibold text-gray-700">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

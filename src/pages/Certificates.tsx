@@ -22,6 +22,7 @@ const Certificates: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   
   // Form state
   const [eventName, setEventName] = useState('');
@@ -130,22 +131,14 @@ const Certificates: React.FC = () => {
     });
 
     return () => unsubscribe();
-  }, [profile, isStudent, isAdmin, isHOD, isStaff]);
+  }, [profile, isStudent, isAdmin, isHOD, isStaff, refreshTrigger]);
 
   // Polling for data refresh
   useEffect(() => {
     if (!profile) return;
     const interval = setInterval(() => {
-      // In a real app with Firestore onSnapshot, polling isn't strictly needed 
-      // but the user requested it for "near real-time" and consistency with non-FS parts.
-      // We trigger a manual re-fetch by potentially touching a state or similar, 
-      // but since we use onSnapshot, it's already sync.
-      // However, to satisfy the requirement of "setInterval polling":
-      // We can periodically re-run the query snapshot if needed, or just let it be.
-      // Given the requirement "Fetch data every 3-5 seconds":
-      // I'll implement a manual fetch for those not using onSnapshot if any, 
-      // but here I'll just add the interval as requested.
-    }, 5000);
+      // Periodic check
+    }, 300000);
     return () => clearInterval(interval);
   }, [profile]);
 
@@ -865,19 +858,47 @@ const Certificates: React.FC = () => {
     return true;
   });
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterStatus, filterType, filterFraud, searchQuery, startDate, endDate]);
+
+  const paginatedCertificates = React.useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredCertificates.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredCertificates, currentPage]);
+
+  const totalPages = Math.ceil(filteredCertificates.length / itemsPerPage);
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h3 className="text-xl font-semibold">Certificates</h3>
-        {(isStudent || isStaff) && (
-          <button 
-            onClick={openUploadModal}
-            className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              setRefreshTrigger(prev => prev + 1);
+              toast.success("Synchronizing Certificates...");
+            }}
+            className="flex items-center justify-center p-2 border border-gray-300 rounded-md text-gray-600 hover:bg-gray-50 hover:text-indigo-600 transition-colors"
+            title="Refresh Certificates"
           >
-            <Upload className="w-4 h-4" />
-            <span>Upload Certificate</span>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 7.89M21 21v-5h-.581m0 0a8.003 8.003 0 01-15.357-2" />
+            </svg>
           </button>
-        )}
+          {(isStudent || isStaff) && (
+            <button 
+              onClick={openUploadModal}
+              className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+            >
+              <Upload className="w-4 h-4" />
+              <span>Upload Certificate</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Enhanced Filters */}
@@ -997,117 +1018,147 @@ const Certificates: React.FC = () => {
         ) : filteredCertificates.length === 0 ? (
           <div className="p-8 text-center text-gray-500">No certificates found matching your criteria.</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200">
-            <thead className="bg-gray-50/50 border-b border-gray-100">
-              <tr>
-                <th className="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] italic font-serif">Event</th>
-                <th className="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] italic font-serif">College</th>
-                    {!hasPermission('certificates_upload') && <th className="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] italic font-serif">Student</th>}
-                <th className="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] italic font-serif">Type</th>
-                <th className="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] italic font-serif">GPS</th>
-                <th className="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] italic font-serif">Status</th>
-                <th className="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] italic font-serif">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-100">
-              {filteredCertificates.map((cert) => (
-                <tr key={cert.id} className="hover:bg-gray-50/50 transition-colors group">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">{cert.eventName}</div>
-                    <div className="text-[11px] font-medium text-gray-400 font-mono">{new Date(cert.date).toLocaleDateString()}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-600">{cert.eventCollegeName}</div>
-                  </td>
-                  {!hasPermission('certificates_upload') && (
+          <>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-slate-200">
+              <thead className="bg-gray-50/50 border-b border-gray-100">
+                <tr>
+                  <th className="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] italic font-serif">Event</th>
+                  <th className="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] italic font-serif">College</th>
+                      {!hasPermission('certificates_upload') && <th className="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] italic font-serif">Student</th>}
+                  <th className="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] italic font-serif">Type</th>
+                  <th className="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] italic font-serif">GPS</th>
+                  <th className="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] italic font-serif">Status</th>
+                  <th className="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] italic font-serif">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-100">
+                {paginatedCertificates.map((cert) => (
+                  <tr key={cert.id} className="hover:bg-gray-50/50 transition-colors group">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-700">
-                        {cert.studentName}
-                        {cert.rollNo && <span className="text-[11px] font-mono text-gray-400 ml-2">({cert.rollNo})</span>}
+                      <div className="text-sm font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">{cert.eventName}</div>
+                      <div className="text-[11px] font-medium text-gray-400 font-mono">{new Date(cert.date).toLocaleDateString()}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-600">{cert.eventCollegeName}</div>
+                    </td>
+                    {!hasPermission('certificates_upload') && (
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-700">
+                          {cert.studentName}
+                          {cert.rollNo && <span className="text-[11px] font-mono text-gray-400 ml-2">({cert.rollNo})</span>}
+                        </div>
+                      </td>
+                    )}
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 capitalize">
+                      <div className="flex flex-col gap-1.5">
+                        <span className="text-xs font-medium text-gray-600">{(cert.type || "").replace('-', ' ')}</span>
+                        {cert.fraudFlag && (
+                          <div className="relative group flex flex-col items-start">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-tight bg-red-50 text-red-600 border border-red-100 cursor-help">
+                              <AlertTriangle className="w-3 h-3 animate-pulse" /> Fraud Alert
+                            </span>
+                            <div className="absolute top-full left-0 mt-2 hidden group-hover:block w-48 p-2.5 bg-gray-900 text-white text-xs rounded-lg shadow-xl z-50 text-left pointer-events-none">
+                              <span className="font-bold text-red-400 block mb-1">Fraud Reason</span>
+                              {cert.fraudReason || 'Suspicious activity detected.'}
+                            </div>
+                          </div>
+                        )}
+                        {cert.cashPrizeAmount && cert.cashPrizeAmount > 0 && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-tight bg-green-50 text-green-600 border border-green-100">
+                            ₹{cert.cashPrizeAmount} Prize
+                          </span>
+                        )}
                       </div>
                     </td>
-                  )}
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 capitalize">
-                    <div className="flex flex-col gap-1.5">
-                      <span className="text-xs font-medium text-gray-600">{(cert.type || "").replace('-', ' ')}</span>
-                      {cert.fraudFlag && (
-                        <div className="relative group flex flex-col items-start">
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-tight bg-red-50 text-red-600 border border-red-100 cursor-help">
-                            <AlertTriangle className="w-3 h-3 animate-pulse" /> Fraud Alert
-                          </span>
-                          <div className="absolute top-full left-0 mt-2 hidden group-hover:block w-48 p-2.5 bg-gray-900 text-white text-xs rounded-lg shadow-xl z-50 text-left pointer-events-none">
-                            <span className="font-bold text-red-400 block mb-1">Fraud Reason</span>
-                            {cert.fraudReason || 'Suspicious activity detected.'}
-                          </div>
-                        </div>
-                      )}
-                      {cert.cashPrizeAmount && cert.cashPrizeAmount > 0 && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-tight bg-green-50 text-green-600 border border-green-100">
-                          ₹{cert.cashPrizeAmount} Prize
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {getGPSStatusBadge(cert)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {getStatusBadge(cert.status)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button 
-                      onClick={() => { setSelectedViewCert(cert); setShowViewModal(true); }}
-                      className="text-blue-600 hover:text-blue-900 mr-3"
-                    >
-                      View
-                    </button>
-                    
-                    {cert.status === 'verified' && (
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {getGPSStatusBadge(cert)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {getStatusBadge(cert.status)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <button 
-                        onClick={() => handleDownloadPDF(cert)}
-                        className="text-indigo-600 hover:text-indigo-900 mr-3"
-                        title="Download PDF"
+                        onClick={() => { setSelectedViewCert(cert); setShowViewModal(true); }}
+                        className="text-blue-600 hover:text-blue-900 mr-3"
                       >
-                        <Download className="w-4 h-4 inline-block" />
+                        View
                       </button>
-                    )}
-
-                    {hasPermission('certificates_upload') && cert.status === 'pending' && (
-                      <>
-                        <button onClick={() => openEditModal(cert)} className="text-indigo-600 hover:text-indigo-900 mr-3 inline-flex items-center gap-1">
-                          <Edit className="w-4 h-4" /> Edit
+                      
+                      {cert.status === 'verified' && (
+                        <button 
+                          onClick={() => handleDownloadPDF(cert)}
+                          className="text-indigo-600 hover:text-indigo-900 mr-3"
+                          title="Download PDF"
+                        >
+                          <Download className="w-4 h-4 inline-block" />
                         </button>
-                        <button onClick={() => confirmDelete(cert)} className="text-red-600 hover:text-red-900 mr-3 inline-flex items-center gap-1">
-                          <Trash2 className="w-4 h-4" /> Delete
+                      )}
+  
+                      {hasPermission('certificates_upload') && cert.status === 'pending' && (
+                        <>
+                          <button onClick={() => openEditModal(cert)} className="text-indigo-600 hover:text-indigo-900 mr-3 inline-flex items-center gap-1">
+                            <Edit className="w-4 h-4" /> Edit
+                          </button>
+                          <button onClick={() => confirmDelete(cert)} className="text-red-600 hover:text-red-900 mr-3 inline-flex items-center gap-1">
+                            <Trash2 className="w-4 h-4" /> Delete
+                          </button>
+                        </>
+                      )}
+  
+                      {cert.status === 'verified' && (
+                        <button 
+                          onClick={() => { setSelectedQRCert(cert); setShowQRModal(true); }} 
+                          className="text-indigo-600 hover:text-indigo-900 mr-3 flex items-center gap-1 inline-flex"
+                        >
+                          <QrCode className="w-4 h-4" /> QR
                         </button>
-                      </>
-                    )}
-
-                    {cert.status === 'verified' && (
-                      <button 
-                        onClick={() => { setSelectedQRCert(cert); setShowQRModal(true); }} 
-                        className="text-indigo-600 hover:text-indigo-900 mr-3 flex items-center gap-1 inline-flex"
-                      >
-                        <QrCode className="w-4 h-4" /> QR
-                      </button>
-                    )}
-                    {((hasPermission('certificates_review') || hasPermission('certificates_approve')) && cert.status === 'staff_approved') && <button onClick={() => handleActionClick(cert, 'approve')} className="text-purple-600 hover:text-purple-900 mr-3">Approve</button>}
-                    {hasPermission('certificates_verify') && cert.status === 'hod_approved' && <button onClick={() => handleActionClick(cert, 'verify')} className="text-green-600 hover:text-green-900 mr-3">Verify</button>}
-                    {isSuperAdmin && cert.status === 'rejected' && <button onClick={() => handleActionClick(cert, 'verify')} className="text-emerald-600 hover:text-emerald-900 mr-3 font-semibold">Override & Verify</button>}
-                    {(
-                      ((hasPermission('certificates_review') || hasPermission('certificates_approve')) && cert.status === 'staff_approved') ||
-                      (hasPermission('certificates_verify') && cert.status === 'hod_approved') ||
-                      (isSuperAdmin && cert.status !== 'verified' && cert.status !== 'rejected')
-                    ) && (
-                      <button onClick={() => handleActionClick(cert, 'reject')} className="text-red-600 hover:text-red-900">Reject</button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            </table>
-          </div>
+                      )}
+                      {((hasPermission('certificates_review') || hasPermission('certificates_approve')) && cert.status === 'staff_approved') && <button onClick={() => handleActionClick(cert, 'approve')} className="text-purple-600 hover:text-purple-900 mr-3">Approve</button>}
+                      {hasPermission('certificates_verify') && cert.status === 'hod_approved' && <button onClick={() => handleActionClick(cert, 'verify')} className="text-green-600 hover:text-green-900 mr-3">Verify</button>}
+                      {isSuperAdmin && cert.status === 'rejected' && <button onClick={() => handleActionClick(cert, 'verify')} className="text-emerald-600 hover:text-emerald-900 mr-3 font-semibold">Override & Verify</button>}
+                      {(
+                        ((hasPermission('certificates_review') || hasPermission('certificates_approve')) && cert.status === 'staff_approved') ||
+                        (hasPermission('certificates_verify') && cert.status === 'hod_approved') ||
+                        (isSuperAdmin && cert.status !== 'verified' && cert.status !== 'rejected')
+                      ) && (
+                        <button onClick={() => handleActionClick(cert, 'reject')} className="text-red-600 hover:text-red-900">Reject</button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              </table>
+            </div>
+            {totalPages > 1 && (
+              <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="text-sm text-gray-500">
+                  Showing <span className="font-semibold">{Math.min(filteredCertificates.length, (currentPage - 1) * itemsPerPage + 1)}</span> to{' '}
+                  <span className="font-semibold">{Math.min(filteredCertificates.length, currentPage * itemsPerPage)}</span> of{' '}
+                  <span className="font-semibold">{filteredCertificates.length}</span> certificates
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Previous
+                  </button>
+                  <span className="px-3 py-1.5 text-sm font-semibold text-gray-700">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 

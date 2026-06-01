@@ -61,7 +61,7 @@ export function setupResumeFeatures(app: express.Express) {
   app.get('/api/resume/projects', authenticate, (req: any, res) => {
     try {
       const student_id = req.user.uid;
-      const projects = db.prepare('SELECT * FROM resume_projects WHERE student_id = ? ORDER BY created_at DESC').all();
+      const projects = db.prepare('SELECT * FROM resume_projects WHERE student_id = ? ORDER BY created_at DESC').all(student_id);
       res.json({ success: true, data: projects });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
@@ -101,7 +101,7 @@ export function setupResumeFeatures(app: express.Express) {
   app.get('/api/resume/experience', authenticate, (req: any, res) => {
     try {
       const student_id = req.user.uid;
-      const experience = db.prepare('SELECT * FROM resume_experience WHERE student_id = ? ORDER BY created_at DESC').all();
+      const experience = db.prepare('SELECT * FROM resume_experience WHERE student_id = ? ORDER BY created_at DESC').all(student_id);
       res.json({ success: true, data: experience });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
@@ -141,7 +141,7 @@ export function setupResumeFeatures(app: express.Express) {
   app.get('/api/resume/skills', authenticate, (req: any, res) => {
     try {
       const student_id = req.user.uid;
-      const skills = db.prepare('SELECT * FROM resume_skills WHERE student_id = ? ORDER BY skill_name ASC').all();
+      const skills = db.prepare('SELECT * FROM resume_skills WHERE student_id = ? ORDER BY skill_name ASC').all(student_id);
       res.json({ success: true, data: skills });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
@@ -190,13 +190,13 @@ export function setupResumeFeatures(app: express.Express) {
       const student_id = req.user.uid;
       
       // 1. Fetch certifications
-      const certs = db.prepare("SELECT event_name, type FROM certifications WHERE user_id = ? AND status = 'approved'").all() as any[];
+      const certs = db.prepare("SELECT event_name, type FROM certifications WHERE user_id = ? AND status = 'approved'").all(student_id) as any[];
       
       // 2. Fetch projects
-      const projects = db.prepare("SELECT project_name, description, technologies FROM resume_projects WHERE student_id = ?").all() as any[];
+      const projects = db.prepare("SELECT project_name, description, technologies FROM resume_projects WHERE student_id = ?").all(student_id) as any[];
       
       // 3. Fetch activities
-      const activities = db.prepare("SELECT type, organization, details FROM career_activities WHERE user_id = ? AND status = 'approved'").all() as any[];
+      const activities = db.prepare("SELECT type, organization, details FROM career_activities WHERE user_id = ? AND status = 'approved'").all(student_id) as any[];
 
       const detectedSkills = new Set<string>();
       const skillKeywords: Record<string, string[]> = {
@@ -229,7 +229,7 @@ export function setupResumeFeatures(app: express.Express) {
 
       // Save detected skills
       const insertStmt = db.prepare(`
-        INSERT OR IGNORE INTO resume_skills (id, student_id, skill_name, skill_level, auto_detected)
+        INSERT INTO resume_skills (id, student_id, skill_name, skill_level, auto_detected)
         VALUES (?, ?, ?, ?, ?)
       `);
 
@@ -255,9 +255,9 @@ export function setupResumeFeatures(app: express.Express) {
       const student_id = req.user.uid;
       
       const user = db.prepare('SELECT name, department_id, class, year FROM users WHERE uid = ?').get(student_id) as any;
-      const skills = db.prepare('SELECT skill_name FROM resume_skills WHERE student_id = ?').all() as any[];
-      const certs = db.prepare("SELECT count(*) as count FROM certifications WHERE user_id = ? AND status = 'approved'").get() as any;
-      const projects = db.prepare("SELECT count(*) as count FROM resume_projects WHERE student_id = ?").get() as any;
+      const skills = db.prepare('SELECT skill_name FROM resume_skills WHERE student_id = ?').all(student_id) as any[];
+      const certs = db.prepare("SELECT count(*) as count FROM certifications WHERE user_id = ? AND status = 'approved'").get(student_id) as any;
+      const projects = db.prepare("SELECT count(*) as count FROM resume_projects WHERE student_id = ?").get(student_id) as any;
 
       const skillList = skills.map(s => s.skill_name).slice(0, 5).join(', ');
       const dept = user.department_id || 'Engineering';
@@ -289,10 +289,10 @@ export function setupResumeFeatures(app: express.Express) {
       const student_id = req.user.uid;
       
       const profile = db.prepare('SELECT * FROM resume_profiles WHERE student_id = ?').get(student_id) as any;
-      const skills = db.prepare('SELECT count(*) as count FROM resume_skills WHERE student_id = ?').get() as any;
-      const projects = db.prepare('SELECT count(*) as count FROM resume_projects WHERE student_id = ?').get() as any;
-      const experience = db.prepare('SELECT count(*) as count FROM resume_experience WHERE student_id = ?').get() as any;
-      const certs = db.prepare("SELECT count(*) as count FROM certifications WHERE user_id = ? AND status = 'approved'").get() as any;
+      const skills = db.prepare('SELECT count(*) as count FROM resume_skills WHERE student_id = ?').get(student_id) as any;
+      const projects = db.prepare('SELECT count(*) as count FROM resume_projects WHERE student_id = ?').get(student_id) as any;
+      const experience = db.prepare('SELECT count(*) as count FROM resume_experience WHERE student_id = ?').get(student_id) as any;
+      const certs = db.prepare("SELECT count(*) as count FROM certifications WHERE user_id = ? AND status = 'approved'").get(student_id) as any;
 
       let score = 20; // Base score for having an account
       const suggestions = [];
@@ -326,10 +326,10 @@ export function setupResumeFeatures(app: express.Express) {
       }
 
       const user = db.prepare('SELECT name, email, department_id, college_name, profile_photo FROM users WHERE uid = ?').get(student_id) as any;
-      const skills = db.prepare('SELECT * FROM resume_skills WHERE student_id = ?').all();
-      const projects = db.prepare('SELECT * FROM resume_projects WHERE student_id = ?').all();
-      const experience = db.prepare('SELECT * FROM resume_experience WHERE student_id = ?').all();
-      const certs = db.prepare("SELECT * FROM certifications WHERE user_id = ? AND status = 'approved'").all();
+      const skills = db.prepare('SELECT * FROM resume_skills WHERE student_id = ?').all(student_id);
+      const projects = db.prepare('SELECT * FROM resume_projects WHERE student_id = ?').all(student_id);
+      const experience = db.prepare('SELECT * FROM resume_experience WHERE student_id = ?').all(student_id);
+      const certs = db.prepare("SELECT * FROM certifications WHERE user_id = ? AND status = 'approved'").all(student_id);
 
       res.json({
         success: true,

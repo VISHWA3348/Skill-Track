@@ -1,56 +1,98 @@
 import jwt from 'jsonwebtoken';
 import { db, queryDocuments, getDocument } from './db';
+import { cacheService } from './redis_cache';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-jwt-key-change-in-production';
 
-const loginAttempts = new Map<string, { count: number, lastAttempt: number }>();
-
-export const rateLimiter = (req: any, res: any, next: any) => {
-  const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-  const now = Date.now();
-  const limit = 5000;
-  const windowMs = 60 * 1000; // 1 minute
-
-  const attempts = loginAttempts.get(ip);
-  if (attempts) {
-    if (now - attempts.lastAttempt > windowMs) {
-      loginAttempts.set(ip, { count: 1, lastAttempt: now });
-    } else if (attempts.count >= limit) {
-      return res.status(429).json({ 
-        error: 'auth/too-many-requests', 
-        message: 'Too many login attempts. Please try again after 1 minute.' 
-      });
-    } else {
-      attempts.count++;
-      attempts.lastAttempt = now;
-    }
-  } else {
-    loginAttempts.set(ip, { count: 1, lastAttempt: now });
+const getClientIp = (req: any): string => {
+  let ip = req.headers['cf-connecting-ip'] || 
+           req.headers['x-real-ip'] || 
+           req.headers['x-forwarded-for'] || 
+           req.ip || 
+           req.socket?.remoteAddress || 
+           '127.0.0.1';
+  
+  if (typeof ip === 'string' && ip.includes(',')) {
+    ip = ip.split(',')[0].trim();
   }
-  next();
+  return ip;
 };
+
+const limiterCache = new Map<string, { count: number; windowStart: number }>();
+
+export const createLimiter = (limit: number, windowMs: number, errorMessage: string = 'Too many requests. Please try again later.') => {
+  return (req: any, res: any, next: any) => {
+    const ip = getClientIp(req);
+    const key = `${ip}:${req.baseUrl || ''}${req.path}`;
+    const now = Date.now();
+
+    const record = limiterCache.get(key);
+    if (record) {
+      if (now - record.windowStart > windowMs) {
+        limiterCache.set(key, { count: 1, windowStart: now });
+      } else if (record.count >= limit) {
+        return res.status(429).json({ 
+          error: 'too-many-requests', 
+          message: errorMessage 
+        });
+      } else {
+        record.count++;
+      }
+    } else {
+      limiterCache.set(key, { count: 1, windowStart: now });
+    }
+    next();
+  };
+};
+
+export const apiRateLimiter = createLimiter(300, 60 * 1000, 'API request limit exceeded. Please slow down.');
+export const authRateLimiter = createLimiter(15, 60 * 1000, 'Too many login/auth requests. Please try again after 1 minute.');
+
+// Legacy fallback to maintain existing API imports
+export const rateLimiter = authRateLimiter;
+
+const tokenCache = new Map<string, { decoded: any; expiry: number }>();
 
 export const authenticate = (req: any, res: any, next: any) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) return res.status(401).json({ error: 'Unauthorized' });
   const token = authHeader.split("Bearer ")[1];
   try {
-    const decoded: any = jwt.verify(token, JWT_SECRET);
+    const cached = tokenCache.get(token);
+    if (cached && Date.now() < cached.expiry) {
+      req.user = cached.decoded;
+      return next();
+    }
+    
+    // Explicitly verify using HS256 to block token algorithm manipulation exploits
+    const decoded: any = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
+    tokenCache.set(token, { decoded, expiry: Date.now() + 5000 }); // 5 seconds token verification caching
     req.user = decoded; // { uid, email }
-    console.log("API HIT", req.user);
     next();
   } catch (e) {
     return res.status(401).json({ error: 'Invalid token' });
   }
 };
 
+/** Invalidate a specific user from cache (call after role/status updates) */
+export function invalidateUserCache(uid: string): void {
+  cacheService.del(`user:${uid}`).catch(() => {});
+}
+
 export const checkRole = (roles: string[]) => {
-  return (req: any, res: any, next: any) => {
+  return async (req: any, res: any, next: any) => {
     const uid = req.user.uid;
     try {
-      const stmt = db.prepare('SELECT * FROM users WHERE uid = ?');
-      const userData = stmt.get(uid) as any;
-      
+      // Try cache first to avoid a DB query on every authenticated request
+      let userData = await cacheService.get(`user:${uid}`);
+      if (!userData) {
+        const stmt = db.prepare('SELECT * FROM users WHERE uid = ?');
+        userData = stmt.get(uid) as any;
+        if (userData) {
+          await cacheService.set(`user:${uid}`, userData, 60); // Cache user for 60 seconds
+        }
+      }
+
       if (!userData || !roles.includes(userData.role)) {
         return res.status(403).json({ error: "Forbidden" });
       }
@@ -64,18 +106,22 @@ export const checkRole = (roles: string[]) => {
 };
 
 export const checkPermission = (module: string, action: string) => {
-  return (req: any, res: any, next: any) => {
+  return async (req: any, res: any, next: any) => {
     const role = req.userData.role;
     try {
       // Super admin bypass
       if (role === 'super_admin') return next();
 
-      const perms = queryDocuments('permissions', [
-        { field: 'role', operator: '==', value: role },
-        { field: 'module', operator: 'in', value: [module, '*'] }
-      ]);
-
-      const isAllowed = perms.some(p => p.allowed === true && (p.action === action || p.action === '*'));
+      const cacheKey = `perms:${role}:${module}:${action}`;
+      let isAllowed = await cacheService.get<boolean>(cacheKey);
+      if (isAllowed === null) {
+        const perms = queryDocuments('permissions', [
+          { field: 'role', operator: '==', value: role },
+          { field: 'module', operator: 'in', value: [module, '*'] }
+        ]);
+        isAllowed = perms.some(p => p.allowed === true && (p.action === action || p.action === '*'));
+        await cacheService.set(cacheKey, isAllowed, 60); // Cache permissions for 60 seconds
+      }
 
       if (!isAllowed) {
         return res.status(403).json({ error: `Forbidden: No ${action} permission for ${module}` });

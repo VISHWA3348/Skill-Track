@@ -79,7 +79,7 @@ export default function HODDashboardView() {
   useEffect(() => {
     if (!profile) return;
     fetchData();
-    const interval = setInterval(fetchData, 30000);
+    const interval = setInterval(fetchData, 300000);
     return () => clearInterval(interval);
   }, [profile]);
 

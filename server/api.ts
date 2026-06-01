@@ -5,6 +5,8 @@ import fs from 'fs';
 import { db, getCollection, getDocument, setDocument, deleteDocument, queryDocuments } from './db';
 import { hashPassword, comparePassword, generateToken, verifyToken, validatePassword } from './auth';
 import { authenticate, checkRole, getDataIsolationFilters, rateLimiter } from './middleware';
+import { uploadMediaFile } from './cloudinary_helper';
+import { cacheService } from './redis_cache';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-jwt-key-change-in-production';
 
@@ -19,21 +21,42 @@ for (const dir of [UPLOADS_DIR, CERTS_DIR, PHOTOS_DIR]) {
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
+    // Avoid dynamic directory construction from client inputs to prevent traversal
     const type = req.query.type === 'photo' ? 'photos' : 'certificates';
     cb(null, path.join(UPLOADS_DIR, type));
   },
   filename: (req, file, cb) => {
+    const originalName = file.originalname;
+    // Sanitize the file extension strictly against traversal or double extensions
+    const ext = path.extname(originalName).toLowerCase();
+    const allowedExtensions = ['.pdf', '.png', '.jpg', '.jpeg'];
+    
+    if (!allowedExtensions.includes(ext)) {
+      return cb(new Error('Invalid file extension. Only .pdf, .png, .jpg, and .jpeg are allowed.'), '');
+    }
+    
+    // Sanitize original basename to remove traversal components (../ etc.)
+    const cleanBase = path.basename(originalName, ext).replace(/[^a-zA-Z0-9_-]/g, '');
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+    cb(null, `${file.fieldname}-${cleanBase}-${uniqueSuffix}${ext}`);
   }
 });
 
 const upload = multer({ 
   storage,
   fileFilter: (req, file, cb) => {
-    const allowed = ['image/jpeg', 'image/png', 'application/pdf'];
-    if (allowed.includes(file.mimetype)) cb(null, true);
-    else cb(new Error('Invalid file type. Only JPG, PNG, and PDF are allowed.'));
+    const allowedMime = ['image/jpeg', 'image/png', 'application/pdf'];
+    if (!allowedMime.includes(file.mimetype)) {
+      return cb(new Error('Invalid file type. Only JPG, PNG, and PDF are allowed.'));
+    }
+    
+    const ext = path.extname(file.originalname).toLowerCase();
+    const allowedExtensions = ['.pdf', '.png', '.jpg', '.jpeg'];
+    if (!allowedExtensions.includes(ext)) {
+      return cb(new Error('Invalid file extension. Only .pdf, .png, .jpg, and .jpeg are allowed.'));
+    }
+    
+    cb(null, true);
   },
   limits: { fileSize: 5 * 1024 * 1024 }
 });
@@ -44,7 +67,7 @@ export function setupApi(app: express.Express) {
   // MOCK AUTHENTICATION API
   // ============================================
   
-  app.post('/api/auth/verify-signup-code', async (req, res) => {
+  app.post('/api/auth/verify-signup-code', rateLimiter, async (req, res) => {
     const { code } = req.body;
     try {
       if (!code) return res.status(400).json({ error: 'Code is required' });
@@ -87,11 +110,11 @@ export function setupApi(app: express.Express) {
     }
   });
 
-  app.post('/api/auth/register', async (req, res) => {
+  app.post('/api/auth/register', rateLimiter, async (req, res) => {
     const { 
       email, password, name, role, collegeId, departmentId, 
       rollNo, class: className, year, section, city, phoneNumber, collegeName, skills, bio,
-      signupCode // [NEW]
+      signupCode, inviteCode // inviteCode = new CAMP-DEPT-XXXXXX system; signupCode = legacy fallback
     } = req.body;
     try {
       // 0. Check if registration is enabled
@@ -101,32 +124,78 @@ export function setupApi(app: express.Express) {
 
       if (!email || !password) return res.status(400).json({ error: 'auth/invalid-credential', message: 'Email and password are required' });
 
-      // [NEW] SECURE SIGNUP CODE VERIFICATION
-      if (!signupCode) {
-        return res.status(403).json({ error: 'auth/code-required', message: 'Secure Signup Code is mandatory for registration.' });
+      // Accept either inviteCode or signupCode; inviteCode takes priority
+      const providedCode: string | undefined = (inviteCode || signupCode || '').trim() || undefined;
+
+      if (!providedCode) {
+        return res.status(403).json({ error: 'auth/code-required', message: 'A Department Invite Code or Signup Code is mandatory for registration.' });
       }
 
-      const verifiedCode = db.prepare(`
-        SELECT * FROM signup_codes WHERE code = ? AND is_active = 1
-      `).get(signupCode) as any;
+      // -------------------------------------------------------
+      // BRANCH A: New Department Invite Code (CAMP-DEPT-XXXXXX)
+      // -------------------------------------------------------
+      let finalCollegeId: string;
+      let finalDeptId: string;
+      let finalRole: string = 'student';
+      let finalYear: string | null = year || null;
+      let finalCollegeName: string | null = collegeName || null;
+      let usedInviteCodeId: string | null = null;      // for DepartmentInviteCodes row
+      let usedLegacyCode: string | null = null;        // for signup_codes row
 
-      if (!verifiedCode) {
-        return res.status(403).json({ error: 'auth/invalid-code', message: 'Invalid or unauthorized signup code' });
+      const uppercaseCode = providedCode.toUpperCase();
+
+      if (uppercaseCode.startsWith('CAMP-')) {
+        // Try new department_invite_codes table
+        const inviteRow = db.prepare(`
+          SELECT d.*, c.name as college_name, dep.name as department_name
+          FROM department_invite_codes d
+          LEFT JOIN colleges c ON d.college_id = c.id
+          LEFT JOIN departments dep ON d.department_id = dep.id
+          WHERE d.code = ?
+        `).get(uppercaseCode) as any;
+
+        if (!inviteRow) {
+          return res.status(403).json({ error: 'auth/invalid-code', message: 'Invalid or unrecognized Department Invite Code' });
+        }
+        if (!inviteRow.is_active || inviteRow.is_active === 0) {
+          return res.status(403).json({ error: 'auth/code-inactive', message: 'This Department Invite Code has been deactivated' });
+        }
+        if (inviteRow.expires_at && new Date(inviteRow.expires_at) < new Date()) {
+          return res.status(403).json({ error: 'auth/expired-code', message: 'This Department Invite Code has expired' });
+        }
+        if (inviteRow.max_registrations !== -1 && inviteRow.current_registrations >= inviteRow.max_registrations) {
+          return res.status(403).json({ error: 'auth/usage-limit', message: 'This Department Invite Code has reached its maximum registration limit' });
+        }
+
+        finalCollegeId = inviteRow.college_id;
+        finalDeptId = inviteRow.department_id;
+        finalRole = 'student';
+        finalCollegeName = inviteRow.college_name || collegeName || null;
+        usedInviteCodeId = inviteRow.id;
+      } else {
+        // -------------------------------------------------------
+        // BRANCH B: Legacy signup_codes (full backward compat)
+        // -------------------------------------------------------
+        const verifiedCode = db.prepare(`
+          SELECT * FROM signup_codes WHERE code = ? AND is_active = 1
+        `).get(providedCode) as any;
+
+        if (!verifiedCode) {
+          return res.status(403).json({ error: 'auth/invalid-code', message: 'Invalid or unauthorized signup code' });
+        }
+        if (verifiedCode.expiry_date && new Date(verifiedCode.expiry_date) < new Date()) {
+          return res.status(403).json({ error: 'auth/expired-code', message: 'Signup code has expired' });
+        }
+        if (verifiedCode.usage_limit !== -1 && verifiedCode.usage_count >= verifiedCode.usage_limit) {
+          return res.status(403).json({ error: 'auth/usage-limit', message: 'Signup code usage limit reached' });
+        }
+
+        finalCollegeId = verifiedCode.college_id;
+        finalDeptId = verifiedCode.department_id;
+        finalRole = verifiedCode.role || 'student';
+        finalYear = verifiedCode.batch_year || year || null;
+        usedLegacyCode = providedCode;
       }
-
-      if (verifiedCode.expiry_date && new Date(verifiedCode.expiry_date) < new Date()) {
-        return res.status(403).json({ error: 'auth/expired-code', message: 'Signup code has expired' });
-      }
-
-      if (verifiedCode.usage_limit !== -1 && verifiedCode.usage_count >= verifiedCode.usage_limit) {
-        return res.status(403).json({ error: 'auth/usage-limit', message: 'Signup code usage limit reached' });
-      }
-
-      // Enforce data from code
-      const finalCollegeId = verifiedCode.college_id;
-      const finalDeptId = verifiedCode.department_id;
-      const finalRole = verifiedCode.role || 'student';
-      const finalYear = verifiedCode.batch_year || year;
 
       const existing = db.prepare('SELECT email FROM users WHERE email = ?').get(email);
       if (existing) return res.status(400).json({ error: 'auth/email-already-in-use', message: 'Email already exists' });
@@ -149,11 +218,11 @@ export function setupApi(app: express.Express) {
         department_id: finalDeptId,
         roll_no: rollNo || null,
         class: className || null,
-        year: finalYear || null,
+        year: finalYear,
         section: section || null,
         city: city || null,
         phone_number: phoneNumber || null,
-        college_name: collegeName || null,
+        college_name: finalCollegeName || null,
         skills: skills || null,
         bio: bio || null,
         created_at: new Date().toISOString()
@@ -172,8 +241,23 @@ export function setupApi(app: express.Express) {
         newUser.section, newUser.city, newUser.phone_number, newUser.college_name, newUser.skills, newUser.bio, newUser.created_at
       );
 
-      // Increment code usage
-      db.prepare('UPDATE signup_codes SET usage_count = usage_count + 1 WHERE code = ?').run(signupCode);
+      // Increment usage counter on the appropriate code table
+      if (usedInviteCodeId) {
+        db.prepare(
+          'UPDATE department_invite_codes SET current_registrations = current_registrations + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+        ).run(usedInviteCodeId);
+
+        // Write security audit trail for new invite code usage
+        try {
+          const logId = 'alog_' + Date.now() + Math.random().toString(36).substring(2, 7);
+          db.prepare(`
+            INSERT INTO audit_logs (id, user_id, action, details, college_id, timestamp)
+            VALUES (?, ?, 'INVITE_CODE_USED', ?, ?, CURRENT_TIMESTAMP)
+          `).run(logId, uid, `Student ${email} registered using invite code ${uppercaseCode} (dept: ${finalDeptId})`, finalCollegeId);
+        } catch (_) {}
+      } else if (usedLegacyCode) {
+        db.prepare('UPDATE signup_codes SET usage_count = usage_count + 1 WHERE code = ?').run(usedLegacyCode);
+      }
 
       // If student, add to students table for academic linkage
       if (newUser.role === 'student') {
@@ -192,6 +276,7 @@ export function setupApi(app: express.Express) {
       console.error("User creation error:", e);
       res.status(500).json({ error: e.message });
     }
+
   });
 
   app.post('/api/auth/login', rateLimiter, async (req, res) => {
@@ -244,11 +329,16 @@ export function setupApi(app: express.Express) {
 
   app.use('/uploads', express.static(UPLOADS_DIR));
 
-  app.post('/api/upload', authenticate, upload.single('file'), (req: any, res) => {
+  app.post('/api/upload', authenticate, upload.single('file'), async (req: any, res) => {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
     const type = req.query.type === 'photo' ? 'photos' : 'certificates';
-    const fileUrl = `/uploads/${type}/${req.file.filename}`;
-    res.json({ url: fileUrl, filename: req.file.filename });
+    const localUrl = `/uploads/${type}/${req.file.filename}`;
+    try {
+      const finalUrl = await uploadMediaFile(req.file.path, type, localUrl);
+      res.json({ url: finalUrl, filename: req.file.filename });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || 'Upload failed' });
+    }
   });
 
   app.get("/api/auth/verify", (req, res) => {
@@ -469,9 +559,45 @@ export function setupApi(app: express.Express) {
     }
   });
 
-  // Legacy health check
+  // Enterprise health and readiness checks
   app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", mode: "sqlite", timestamp: new Date().toISOString() });
+    let databaseStatus = 'disconnected';
+    try {
+      const result = db.prepare('SELECT 1 as health').get() as any;
+      // SQLite/PG translations can return 1 in different fields depending on parser
+      if (result && (result.health === 1 || result['?column?'] === 1 || Object.values(result).includes(1))) {
+        databaseStatus = 'connected';
+      }
+    } catch (dbError) {
+      databaseStatus = 'error';
+    }
+
+    let storageStatus = 'unwritable';
+    try {
+      const testFile = path.join(UPLOADS_DIR, '.health_check');
+      fs.writeFileSync(testFile, 'healthcheck_ok', 'utf8');
+      fs.unlinkSync(testFile);
+      storageStatus = 'writable';
+    } catch (err) {
+      storageStatus = 'error';
+    }
+
+    const envConfigured = !!(process.env.DATABASE_URL && process.env.JWT_SECRET);
+    const environmentStatus = envConfigured ? 'configured' : 'incomplete';
+
+    const systemHealthy = databaseStatus === 'connected' && storageStatus === 'writable' && environmentStatus === 'configured';
+
+    res.status(systemHealthy ? 200 : 503).json({
+      status: systemHealthy ? "ok" : "degraded",
+      database: databaseStatus,
+      uptime: process.uptime(),
+      version: "1.0.0",
+      readiness: {
+        database: databaseStatus,
+        storage: storageStatus,
+        environment: environmentStatus
+      }
+    });
   });
 
   app.post('/api/seed-users', async (req, res) => {
@@ -816,19 +942,24 @@ export function setupApi(app: express.Express) {
   // MOCK STORAGE API AND UPLOAD ENDPOINT
   // ============================================
   
-  app.post('/api/storage/upload', authenticate, checkRole(['super_admin', 'admin', 'hod', 'staff', 'student']), upload.single('file'), (req: any, res) => {
+  app.post('/api/storage/upload', authenticate, checkRole(['super_admin', 'admin', 'hod', 'staff', 'student']), upload.single('file'), async (req: any, res) => {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded.' });
     }
     const type = req.query.type === 'photo' ? 'photos' : 'certificates';
-    const fileUrl = `/uploads/${type}/${req.file.filename}`;
-    res.json({ url: fileUrl, path: req.file.path });
+    const localUrl = `/uploads/${type}/${req.file.filename}`;
+    try {
+      const finalUrl = await uploadMediaFile(req.file.path, type, localUrl);
+      res.json({ url: finalUrl, path: req.file.path });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || 'Upload failed' });
+    }
   });
 
   app.post('/api/certifications', authenticate, upload.fields([
     { name: 'certificate', maxCount: 1 },
     { name: 'photo', maxCount: 1 }
-  ]), checkRole(['super_admin', 'admin', 'hod', 'staff', 'student']), (req: any, res) => {
+  ]), checkRole(['super_admin', 'admin', 'hod', 'staff', 'student']), async (req: any, res) => {
     try {
       const files = (req.files || {}) as { [fieldname: string]: Express.Multer.File[] };
       const certificateFile = files['certificate']?.[0];
@@ -836,8 +967,17 @@ export function setupApi(app: express.Express) {
 
       const { studentName, rollNo, class: className, year, phoneNumber, city, collegeName, collegeId, departmentId, eventName, eventCollegeName, type, date, gpsLat, gpsLng } = req.body;
 
-      const certUrl = certificateFile ? `/uploads/certificates/${certificateFile.filename}` : req.body.fileUrl;
-      const photoUrl = photoFile ? `/uploads/photos/${photoFile.filename}` : req.body.photoUrl;
+      let certUrl = req.body.fileUrl;
+      if (certificateFile) {
+        const localCertUrl = `/uploads/certificates/${certificateFile.filename}`;
+        certUrl = await uploadMediaFile(certificateFile.path, 'certificates', localCertUrl);
+      }
+
+      let photoUrl = req.body.photoUrl;
+      if (photoFile) {
+        const localPhotoUrl = `/uploads/photos/${photoFile.filename}`;
+        photoUrl = await uploadMediaFile(photoFile.path, 'photos', localPhotoUrl);
+      }
 
       const id = 'cert_' + Date.now() + Math.random().toString(36).substring(2, 9);
       
@@ -1222,9 +1362,15 @@ export function setupApi(app: express.Express) {
     }
   });
 
-  app.get('/api/staff/dashboard-stats', authenticate, checkRole(['staff', 'hod', 'admin']), (req: any, res) => {
+  app.get('/api/staff/dashboard-stats', authenticate, checkRole(['staff', 'hod', 'admin']), async (req: any, res) => {
     try {
-      const { college_id, department_id } = req.userData;
+      const { college_id, department_id, uid } = req.userData;
+      const cacheKey = `staff:dashboard-stats:${college_id || 'any'}:${department_id || 'any'}:${uid}`;
+      const cached = await cacheService.get(cacheKey);
+      if (cached) {
+        return res.json({ success: true, data: cached, _cached: true });
+      }
+
       const stats = db.prepare(`
         SELECT 
           (SELECT count(*) FROM users WHERE role='student' AND college_id = ? AND department_id = ?) as totalStudents,
@@ -1235,6 +1381,7 @@ export function setupApi(app: express.Express) {
           (SELECT avg(attendance_percentage) FROM student_academic_profile WHERE college_id = ? AND department_id = ?) as avgAttendance
       `).get(college_id, department_id, college_id, department_id, college_id, department_id, college_id, department_id, college_id, department_id, college_id, department_id) as any;
 
+      await cacheService.set(cacheKey, stats, 30);
       res.json({ success: true, data: stats });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -1290,9 +1437,14 @@ export function setupApi(app: express.Express) {
     }
   });
 
-  app.get('/api/staff/analytics', authenticate, checkRole(['staff', 'hod', 'admin']), (req: any, res) => {
+  app.get('/api/staff/analytics', authenticate, checkRole(['staff', 'hod', 'admin']), async (req: any, res) => {
     try {
-      const { college_id, department_id } = req.userData;
+      const { college_id, department_id, uid } = req.userData;
+      const cacheKey = `staff:analytics:${college_id || 'any'}:${department_id || 'any'}:${uid}`;
+      const cached = await cacheService.get(cacheKey);
+      if (cached) {
+        return res.json({ success: true, data: cached, _cached: true });
+      }
       
       const cgpaDist = db.prepare(`
         SELECT 
@@ -1318,7 +1470,9 @@ export function setupApi(app: express.Express) {
         LIMIT 6
       `).all(college_id, department_id);
 
-      res.json({ success: true, data: { cgpaDist, certTrends } });
+      const responseData = { cgpaDist, certTrends };
+      await cacheService.set(cacheKey, responseData, 60);
+      res.json({ success: true, data: responseData });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

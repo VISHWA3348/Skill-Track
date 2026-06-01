@@ -81,7 +81,7 @@ export default function CollegeAdminDashboardView() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 10000);
+    const interval = setInterval(fetchData, 300000);
     return () => clearInterval(interval);
   }, []);
 

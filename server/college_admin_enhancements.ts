@@ -2,6 +2,7 @@ import express from 'express';
 import { db, queryDocuments, getDocument, setDocument } from './db';
 import { authenticate, checkRole, getDataIsolationFilters } from './middleware';
 import bcrypt from 'bcryptjs';
+import { cacheService } from './redis_cache';
 
 export function setupCollegeAdminEnhancements(app: express.Express) {
 
@@ -9,11 +10,17 @@ export function setupCollegeAdminEnhancements(app: express.Express) {
   // 1. COLLEGE DASHBOARD OVERVIEW STATS
   // ============================================
 
-  app.get("/api/admin/dashboard-stats", authenticate, checkRole(["admin", "super_admin"]), (req: any, res) => {
+  app.get("/api/admin/dashboard-stats", authenticate, checkRole(["admin", "super_admin"]), async (req: any, res) => {
     try {
       const collegeId = req.userData.collegeId || req.userData.college_id;
       if (!collegeId && req.userData.role !== 'super_admin') {
         return res.status(400).json({ error: "College context missing" });
+      }
+
+      const cacheKey = `admin:dashboard-stats:${req.userData.role}:${collegeId || 'super'}:${req.userData.uid}`;
+      const cached = await cacheService.get(cacheKey);
+      if (cached) {
+        return res.json({ success: true, data: cached, _cached: true });
       }
 
       const filters = req.userData.role === 'super_admin' ? [] : [{ field: 'college_id', operator: '==', value: collegeId }];
@@ -59,27 +66,31 @@ export function setupCollegeAdminEnhancements(app: express.Express) {
         WHERE (college_id = ? OR ? = 'super_admin')
       `).get(collegeId, req.userData.role);
 
+      const responseData = {
+        totalStudents,
+        totalStaff,
+        totalHODs,
+        totalDepartments,
+        totalUsers,
+        activeUsers,
+        totalCertificates: certStats.total || 0,
+        approvedCertificates: certStats.approved || 0,
+        pendingCertificates: certStats.pending || 0,
+        rejectedCertificates: certStats.rejected || 0,
+        totalActivities,
+        averageCollegeCGPA: academicStats.avg_cgpa ? parseFloat(academicStats.avg_cgpa.toFixed(2)) : 0,
+        placementReadyStudents: academicStats.placement_ready || 0,
+        studentsWithArrears: academicStats.total_arrears || 0,
+        internshipParticipations: academicStats.total_internships || 0,
+        attendanceAverage: academicStats.avg_attendance ? parseFloat(academicStats.avg_attendance.toFixed(2)) : 0,
+        monthlyGrowth: 12.5 // Hardcoded for now as mock, can be calculated from created_at
+      };
+
+      await cacheService.set(cacheKey, responseData, 30); // Cache for 30s
+
       res.json({
         success: true,
-        data: {
-          totalStudents,
-          totalStaff,
-          totalHODs,
-          totalDepartments,
-          totalUsers,
-          activeUsers,
-          totalCertificates: certStats.total || 0,
-          approvedCertificates: certStats.approved || 0,
-          pendingCertificates: certStats.pending || 0,
-          rejectedCertificates: certStats.rejected || 0,
-          totalActivities,
-          averageCollegeCGPA: academicStats.avg_cgpa ? parseFloat(academicStats.avg_cgpa.toFixed(2)) : 0,
-          placementReadyStudents: academicStats.placement_ready || 0,
-          studentsWithArrears: academicStats.total_arrears || 0,
-          internshipParticipations: academicStats.total_internships || 0,
-          attendanceAverage: academicStats.avg_attendance ? parseFloat(academicStats.avg_attendance.toFixed(2)) : 0,
-          monthlyGrowth: 12.5 // Hardcoded for now as mock, can be calculated from created_at
-        }
+        data: responseData
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -90,9 +101,15 @@ export function setupCollegeAdminEnhancements(app: express.Express) {
   // 2. COLLEGE ANALYTICS DATA
   // ============================================
 
-  app.get("/api/admin/college-analytics", authenticate, checkRole(["admin", "super_admin"]), (req: any, res) => {
+  app.get("/api/admin/college-analytics", authenticate, checkRole(["admin", "super_admin"]), async (req: any, res) => {
     try {
       const collegeId = req.userData.collegeId || req.userData.college_id;
+
+      const cacheKey = `admin:college-analytics:${req.userData.role}:${collegeId || 'super'}:${req.userData.uid}`;
+      const cached = await cacheService.get(cacheKey);
+      if (cached) {
+        return res.json({ success: true, data: cached, _cached: true });
+      }
       
       // Monthly Certificate Uploads (Last 6 months)
       const monthlyCerts = db.prepare(`
@@ -128,14 +145,18 @@ export function setupCollegeAdminEnhancements(app: express.Express) {
         GROUP BY month ORDER BY month DESC LIMIT 6
       `).all(collegeId, req.userData.role);
 
+      const responseData = {
+        monthlyCertificates: monthlyCerts.reverse(),
+        departmentStudents: deptStudents,
+        departmentReadiness: deptReadiness,
+        userGrowth: growthTrend.reverse()
+      };
+
+      await cacheService.set(cacheKey, responseData, 60); // Cache for 60s
+
       res.json({
         success: true,
-        data: {
-          monthlyCertificates: monthlyCerts.reverse(),
-          departmentStudents: deptStudents,
-          departmentReadiness: deptReadiness,
-          userGrowth: growthTrend.reverse()
-        }
+        data: responseData
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message });

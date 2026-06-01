@@ -3,6 +3,7 @@ import { db, queryDocuments, getDocument, setDocument } from './db';
 import { authenticate, checkRole, getDataIsolationFilters } from './middleware';
 import PDFDocument from 'pdfkit';
 import ExcelJS from 'exceljs';
+import { cacheService } from './redis_cache';
 
 export function setupHODFeatures(app: express.Express) {
 
@@ -10,9 +11,14 @@ export function setupHODFeatures(app: express.Express) {
   // 1. HOD DASHBOARD STATS
   // ============================================
 
-  app.get('/api/hod/dashboard-stats', authenticate, checkRole(['hod', 'super_admin']), (req: any, res) => {
+  app.get('/api/hod/dashboard-stats', authenticate, checkRole(['hod', 'super_admin']), async (req: any, res) => {
     try {
-      const { college_id, department_id } = req.userData;
+      const { college_id, department_id, uid } = req.userData;
+      const cacheKey = `hod:dashboard-stats:${college_id || 'any'}:${department_id || 'any'}:${uid}`;
+      const cached = await cacheService.get(cacheKey);
+      if (cached) {
+        return res.json({ success: true, data: cached, _cached: true });
+      }
       
       const students = db.prepare("SELECT * FROM users WHERE role = 'student' AND college_id = ? AND department_id = ?").all(college_id, department_id) as any[];
       const staff = db.prepare("SELECT * FROM users WHERE role = 'staff' AND college_id = ? AND department_id = ?").all(college_id, department_id) as any[];
@@ -38,6 +44,7 @@ export function setupHODFeatures(app: express.Express) {
         activeOpportunities: opportunities.length
       };
 
+      await cacheService.set(cacheKey, stats, 30); // Cache for 30s
       res.json({ success: true, data: stats });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -48,9 +55,14 @@ export function setupHODFeatures(app: express.Express) {
   // 2. DEPARTMENT ANALYTICS
   // ============================================
 
-  app.get('/api/hod/department-analytics', authenticate, checkRole(['hod', 'super_admin']), (req: any, res) => {
+  app.get('/api/hod/department-analytics', authenticate, checkRole(['hod', 'super_admin']), async (req: any, res) => {
     try {
-      const { department_id } = req.userData;
+      const { college_id, department_id, uid } = req.userData;
+      const cacheKey = `hod:department-analytics:${college_id || 'any'}:${department_id || 'any'}:${uid}`;
+      const cached = await cacheService.get(cacheKey);
+      if (cached) {
+        return res.json({ success: true, data: cached, _cached: true });
+      }
       
       // Semester-wise CGPA trend (Mocking data for visualization)
       const cgpaTrend = [
@@ -80,14 +92,17 @@ export function setupHODFeatures(app: express.Express) {
         { name: 'Needs Improvement', value: students.filter(s => (s.score || 0) < 50).length },
       ];
 
+      const responseData = {
+        cgpaTrend,
+        certGrowth: certGrowth.reverse(),
+        readinessDistribution: readiness,
+        averageReadiness: (students.reduce((acc, s) => acc + (s.score || 0), 0) / (students.length || 1)).toFixed(1)
+      };
+
+      await cacheService.set(cacheKey, responseData, 60); // Cache for 60s
       res.json({
         success: true,
-        data: {
-          cgpaTrend,
-          certGrowth: certGrowth.reverse(),
-          readinessDistribution: readiness,
-          averageReadiness: (students.reduce((acc, s) => acc + (s.score || 0), 0) / (students.length || 1)).toFixed(1)
-        }
+        data: responseData
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message });

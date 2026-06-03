@@ -1,9 +1,34 @@
 import express from 'express';
+import crypto from 'crypto';
 import { db, queryDocuments, getDocument, setDocument } from './db';
 import { authenticate, checkRole, getDataIsolationFilters } from './middleware';
 import bcrypt from 'bcryptjs';
 import { cacheService } from './redis_cache';
 import { queueService } from './queue';
+
+/**
+ * Generate a collision-safe, human-readable department invite code.
+ * Format: {DEPT_CODE}-{6 uppercase alphanumeric chars}
+ * e.g. CSE-X7A92K, MECH-H3Q8LM
+ */
+function generateDeptInviteCode(deptCode: string): string {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  const bytes = crypto.randomBytes(6);
+  const suffix = Array.from(bytes).map(b => alphabet[b % alphabet.length]).join('');
+  const prefix = String(deptCode || 'DEPT').toUpperCase().replace(/[^A-Z0-9]/g, '').substring(0, 6);
+  return `${prefix}-${suffix}`;
+}
+
+/** Write an audit log entry (best-effort, never throws) */
+function auditLog(userId: string, action: string, details: string, collegeId?: string | null) {
+  try {
+    const id = 'alog_' + Date.now() + crypto.randomBytes(4).toString('hex');
+    db.prepare(`
+      INSERT INTO audit_logs (id, user_id, action, details, college_id, timestamp)
+      VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `).run(id, userId, action, details, collegeId || null);
+  } catch (_) {}
+}
 
 export function setupCollegeAdminEnhancements(app: express.Express) {
 
@@ -241,17 +266,26 @@ export function setupCollegeAdminEnhancements(app: express.Express) {
   // 5. DEPARTMENT MANAGEMENT
   // ============================================
 
+  // ─── GET /api/admin/departments ─────────────────────────────────────────────
+  // Returns departments for the caller's college, with their active invite code.
   app.get("/api/admin/departments", authenticate, checkRole(["admin", "super_admin"]), (req: any, res) => {
     try {
       const collegeId = req.userData.collegeId || req.userData.college_id;
 
       const departments = db.prepare(`
-        SELECT 
+        SELECT
           d.*,
           (SELECT COUNT(*) FROM users WHERE department_id = d.id AND role = 'student') as student_count,
           (SELECT COUNT(*) FROM users WHERE department_id = d.id AND role = 'staff') as staff_count,
           (SELECT name FROM users WHERE department_id = d.id AND role = 'hod' LIMIT 1) as hod_name,
-          (SELECT AVG(cgpa) FROM student_academic_profile WHERE department_id = d.id) as avg_cgpa
+          (SELECT AVG(cgpa) FROM student_academic_profile WHERE department_id = d.id) as avg_cgpa,
+          -- Active invite code for this department
+          (SELECT code FROM department_invite_codes
+            WHERE department_id = d.id AND is_active = 1
+            ORDER BY created_at DESC LIMIT 1) as invite_code,
+          (SELECT id FROM department_invite_codes
+            WHERE department_id = d.id AND is_active = 1
+            ORDER BY created_at DESC LIMIT 1) as invite_code_id
         FROM departments d
         WHERE (d.college_id = ? OR ? = 'super_admin')
       `).all(collegeId, req.userData.role);
@@ -262,14 +296,107 @@ export function setupCollegeAdminEnhancements(app: express.Express) {
     }
   });
 
+  // ─── POST /api/admin/department/add ─────────────────────────────────────────
+  // Creates a department and immediately auto-generates a department invite code.
   app.post("/api/admin/department/add", authenticate, checkRole(["admin", "super_admin"]), (req: any, res) => {
     try {
       const { name, department_id } = req.body;
-      const collegeId = req.userData.collegeId || req.userData.college_id;
-      const id = 'dept_' + Date.now();
+      if (!name) return res.status(400).json({ error: 'Department name is required' });
 
-      db.prepare("INSERT INTO departments (id, department_id, college_id, name) VALUES (?, ?, ?, ?)").run(id, department_id || id, collegeId, name);
-      res.json({ success: true, id });
+      const adminUser = req.userData;
+      const collegeId = adminUser.collegeId || adminUser.college_id;
+      if (!collegeId && adminUser.role !== 'super_admin') {
+        return res.status(400).json({ error: 'College context missing — ensure your account is linked to a college' });
+      }
+
+      const deptId   = 'dept_' + Date.now() + crypto.randomBytes(3).toString('hex');
+      const deptCode = department_id || name;
+
+      // Insert the department row
+      db.prepare(`
+        INSERT INTO departments (id, department_id, college_id, name)
+        VALUES (?, ?, ?, ?)
+      `).run(deptId, department_id || deptId, collegeId, name);
+
+      // Auto-generate a collision-safe invite code
+      let inviteCode: string;
+      let attempts = 0;
+      do {
+        inviteCode = generateDeptInviteCode(deptCode);
+        attempts++;
+      } while (
+        db.prepare('SELECT id FROM department_invite_codes WHERE code = ?').get(inviteCode) &&
+        attempts < 10
+      );
+
+      const inviteId = 'dic_' + Date.now() + crypto.randomBytes(3).toString('hex');
+      db.prepare(`
+        INSERT INTO department_invite_codes
+          (id, code, college_id, department_id, is_active, max_registrations, current_registrations, created_by)
+        VALUES (?, ?, ?, ?, 1, -1, 0, ?)
+      `).run(inviteId, inviteCode, collegeId, deptId, adminUser.uid || 'admin');
+
+      // Audit both events
+      auditLog(adminUser.uid, 'DEPARTMENT_CREATED', `Department "${name}" (${deptId}) created in college ${collegeId}`, collegeId);
+      auditLog(adminUser.uid, 'INVITE_CODE_AUTO_CREATED', `Invite code ${inviteCode} auto-generated for department ${deptId}`, collegeId);
+
+      res.json({
+        success: true,
+        id: deptId,
+        inviteCode,
+        message: `Department created. Invite code: ${inviteCode}`
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ─── POST /api/admin/department/:id/regenerate-code ──────────────────────────
+  // Deactivates the current invite code and generates a fresh one.
+  // Only Super Admin and College Admin can regenerate.
+  app.post("/api/admin/department/:id/regenerate-code", authenticate, checkRole(["admin", "super_admin"]), (req: any, res) => {
+    try {
+      const { id: deptId } = req.params;
+      const adminUser = req.userData;
+      const collegeId = adminUser.collegeId || adminUser.college_id;
+
+      // Verify the department exists and belongs to this admin's college
+      const dept = db.prepare(`
+        SELECT id, name, college_id, department_id FROM departments WHERE id = ?
+      `).get(deptId) as any;
+
+      if (!dept) return res.status(404).json({ error: 'Department not found' });
+      if (adminUser.role !== 'super_admin' && dept.college_id !== collegeId) {
+        return res.status(403).json({ error: 'Forbidden: This department does not belong to your college' });
+      }
+
+      // Deactivate all current active codes for this department
+      db.prepare(`
+        UPDATE department_invite_codes SET is_active = 0 WHERE department_id = ? AND is_active = 1
+      `).run(deptId);
+
+      // Generate a new collision-safe invite code
+      const deptCode = dept.department_id || dept.name;
+      let newCode: string;
+      let attempts = 0;
+      do {
+        newCode = generateDeptInviteCode(deptCode);
+        attempts++;
+      } while (
+        db.prepare('SELECT id FROM department_invite_codes WHERE code = ?').get(newCode) &&
+        attempts < 10
+      );
+
+      const newInviteId = 'dic_' + Date.now() + crypto.randomBytes(3).toString('hex');
+      db.prepare(`
+        INSERT INTO department_invite_codes
+          (id, code, college_id, department_id, is_active, max_registrations, current_registrations, created_by)
+        VALUES (?, ?, ?, ?, 1, -1, 0, ?)
+      `).run(newInviteId, newCode, dept.college_id, deptId, adminUser.uid || 'admin');
+
+      auditLog(adminUser.uid, 'INVITE_CODE_REGENERATED', `Invite code regenerated → ${newCode} for dept ${deptId}`, dept.college_id);
+
+      res.json({ success: true, inviteCode: newCode, message: `Invite code regenerated: ${newCode}` });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

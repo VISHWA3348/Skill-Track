@@ -50,6 +50,21 @@ export default function SuperAdminDashboardView() {
   });
   const [loading, setLoading] = useState(true);
   const [systemHealth, setSystemHealth] = useState('Healthy');
+  const [emailHealth, setEmailHealth] = useState<{
+    resendStatus: string;
+    growSmtpStatus: string;
+    googleSmtpStatus: string;
+    sentToday: number;
+    failedToday: number;
+    activeProvider: string;
+  }>({
+    resendStatus: 'Not Configured',
+    growSmtpStatus: 'Not Configured',
+    googleSmtpStatus: 'Not Configured',
+    sentToday: 0,
+    failedToday: 0,
+    activeProvider: 'None'
+  });
 
   useEffect(() => {
     if (!profile || profile.role !== 'super_admin') return;
@@ -92,6 +107,7 @@ export default function SuperAdminDashboardView() {
           if (data.recentLogs) setRecentLogs(data.recentLogs);
           if (data.topPerformers) setTopStudents(data.topPerformers);
           setSystemHealth(data.systemHealth || 'Healthy');
+          if (data.emailHealth) setEmailHealth(data.emailHealth);
         }
 
         // 2. Fetch Users for Management
@@ -466,6 +482,48 @@ export default function SuperAdminDashboardView() {
               <HealthItem icon={<Server className="w-4 h-4" />} label="API Status" value="Operational" status="good" />
               <HealthItem icon={<Database className="w-4 h-4" />} label="Database Load" value="Low (12%)" status="good" />
               <HealthItem icon={<ShieldAlert className="w-4 h-4" />} label="Security Events" value="2 Recent" status="warning" />
+            </div>
+          </div>
+
+          {/* Email Service Health */}
+          <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6">
+            <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+              <Zap className="w-5 h-5 text-indigo-500" />
+              Email Service Health
+            </h2>
+            <div className="space-y-3 mb-4">
+              <HealthItem
+                icon={<CheckCircle2 className="w-4 h-4" />}
+                label="Resend (Primary)"
+                value={emailHealth.resendStatus}
+                status={emailHealth.resendStatus === 'Operational' ? 'good' : emailHealth.resendStatus === 'Error' ? 'error' : 'warning'}
+              />
+              <HealthItem
+                icon={<CheckCircle2 className="w-4 h-4" />}
+                label="Grow SMTP (Secondary)"
+                value={emailHealth.growSmtpStatus}
+                status={emailHealth.growSmtpStatus === 'Operational' ? 'good' : emailHealth.growSmtpStatus === 'Error' ? 'error' : 'warning'}
+              />
+              <HealthItem
+                icon={<CheckCircle2 className="w-4 h-4" />}
+                label="Google SMTP (Tertiary)"
+                value={emailHealth.googleSmtpStatus}
+                status={emailHealth.googleSmtpStatus === 'Operational' ? 'good' : emailHealth.googleSmtpStatus === 'Error' ? 'error' : 'warning'}
+              />
+            </div>
+            <div className="border-t border-slate-100 pt-3 space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500 font-medium">Sent Today</span>
+                <span className="font-bold text-emerald-600">{emailHealth.sentToday}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500 font-medium">Failed Today</span>
+                <span className="font-bold text-red-500">{emailHealth.failedToday}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500 font-medium">Active Provider</span>
+                <span className="font-bold text-indigo-600 text-xs">{emailHealth.activeProvider}</span>
+              </div>
             </div>
           </div>
 

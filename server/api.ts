@@ -2,12 +2,17 @@ import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 import { db, getCollection, getDocument, setDocument, deleteDocument, queryDocuments } from './db';
 import { hashPassword, comparePassword, generateToken, verifyToken, validatePassword } from './auth';
 import { authenticate, checkRole, getDataIsolationFilters, rateLimiter } from './middleware';
 import { uploadMediaFile } from './cloudinary_helper';
 import { cacheService } from './redis_cache';
 import { queueService } from './queue';
+import { sendEmail, initEmailLogsTable } from './services/email.service';
+
+// Initialize email-related tables on startup
+initEmailLogsTable();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-jwt-key-change-in-production';
 
@@ -328,7 +333,152 @@ export function setupApi(app: express.Express) {
     }
   });
 
+  // ─── OTP / Password Reset Tables (idempotent) ───────────────────────────────
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS otp_codes (
+        id          VARCHAR(64)  PRIMARY KEY,
+        user_id     VARCHAR(255) NOT NULL,
+        code        VARCHAR(10)  NOT NULL,
+        purpose     VARCHAR(50)  NOT NULL DEFAULT 'login',
+        expires_at  TIMESTAMP    NOT NULL,
+        used        BOOLEAN      DEFAULT FALSE,
+        created_at  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS password_reset_tokens (
+        id          VARCHAR(64)  PRIMARY KEY,
+        user_id     VARCHAR(255) NOT NULL,
+        token_hash  VARCHAR(128) NOT NULL,
+        expires_at  TIMESTAMP    NOT NULL,
+        used        BOOLEAN      DEFAULT FALSE,
+        created_at  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+  } catch (_) { /* Tables may already exist in production */ }
+
+  // POST /api/auth/verify-otp — Validate a 6-digit OTP and return a JWT
+  app.post('/api/auth/verify-otp', rateLimiter, async (req, res) => {
+    const { email, otp } = req.body;
+    if (!email || !otp) return res.status(400).json({ error: 'auth/missing-fields', message: 'Email and OTP are required' });
+
+    try {
+      const user = db.prepare('SELECT uid, email, name, role FROM users WHERE email = ?').get(email) as any;
+      if (!user) return res.status(400).json({ error: 'auth/invalid-credential', message: 'Invalid credentials' });
+
+      const record = db.prepare(`
+        SELECT id, code FROM otp_codes
+        WHERE user_id = ? AND purpose = 'login' AND used = FALSE AND expires_at > NOW()
+        ORDER BY created_at DESC LIMIT 1
+      `).get(user.uid) as any;
+
+      if (!record) return res.status(400).json({ error: 'auth/otp-expired', message: 'OTP has expired. Please request a new one.' });
+
+      // Timing-safe comparison to prevent timing attacks
+      const providedHash = crypto.createHash('sha256').update(otp).digest('hex');
+      const storedHash   = crypto.createHash('sha256').update(record.code).digest('hex');
+      if (!crypto.timingSafeEqual(Buffer.from(providedHash), Buffer.from(storedHash))) {
+        return res.status(400).json({ error: 'auth/invalid-otp', message: 'Invalid OTP code' });
+      }
+
+      // Mark OTP as used
+      db.prepare('UPDATE otp_codes SET used = TRUE WHERE id = ?').run(record.id);
+      db.prepare("UPDATE users SET login_attempts = 0, last_login = CURRENT_TIMESTAMP WHERE uid = ?").run(user.uid);
+
+      const token = generateToken({ uid: user.uid, email: user.email });
+      return res.json({ token, user: { uid: user.uid, email: user.email, displayName: user.name, role: user.role } });
+    } catch (e: any) {
+      console.error("OTP verification error:", e.message);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // POST /api/auth/forgot-password — Send a password reset link email
+  app.post('/api/auth/forgot-password', rateLimiter, async (req, res) => {
+    const { email } = req.body;
+    // Always respond with 200 to prevent user enumeration (CWE-204)
+    const genericResponse = { message: 'If that email is registered, a password reset link has been sent.' };
+
+    if (!email || typeof email !== 'string') return res.status(200).json(genericResponse);
+
+    try {
+      const user = db.prepare('SELECT uid, email, name FROM users WHERE email = ?').get(email) as any;
+      if (!user) return res.status(200).json(genericResponse);
+
+      // Generate a cryptographically secure reset token
+      const rawToken  = crypto.randomBytes(32).toString('hex');
+      const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+      const tokenId   = 'pwr_' + crypto.randomBytes(8).toString('hex');
+
+      // Invalidate any previous unused tokens for this user
+      db.prepare("DELETE FROM password_reset_tokens WHERE user_id = ? AND used = FALSE").run(user.uid);
+
+      db.prepare(`
+        INSERT INTO password_reset_tokens (id, user_id, token_hash, expires_at, used, created_at)
+        VALUES (?, ?, ?, NOW() + INTERVAL '1 hour', FALSE, NOW())
+      `).run(tokenId, user.uid, tokenHash);
+
+      const frontendUrl = process.env.FRONTEND_URL || 'https://skilltrack.zinoingroup.in';
+      const resetLink = `${frontendUrl}/reset-password?token=${rawToken}&id=${tokenId}`;
+
+      const html = `
+        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px">
+          <h2 style="color:#4f46e5">Skill Track – Password Reset</h2>
+          <p>Hello ${user.name || 'User'},</p>
+          <p>We received a request to reset your Skill Track password. Click the button below to set a new password.</p>
+          <p style="margin:24px 0">
+            <a href="${resetLink}" style="background:#4f46e5;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:bold">
+              Reset Password
+            </a>
+          </p>
+          <p style="color:#64748b;font-size:13px">This link expires in 1 hour. If you did not request this, please ignore this email.</p>
+          <hr style="border:none;border-top:1px solid #e2e8f0;margin-top:24px"/>
+          <p style="color:#94a3b8;font-size:12px">Powered by ZinoinTech &middot; Skill Track Platform</p>
+        </div>`;
+
+      sendEmail(user.email, 'Skill Track – Reset Your Password', html).catch(err =>
+        console.error('[Auth] Password reset email failed to send:', err.message)
+      );
+
+      return res.status(200).json(genericResponse);
+    } catch (e: any) {
+      console.error("Forgot password error:", e.message);
+      return res.status(200).json(genericResponse);
+    }
+  });
+
+  // POST /api/auth/reset-password — Validate reset token and set new password
+  app.post('/api/auth/reset-password', rateLimiter, async (req, res) => {
+    const { tokenId, token, newPassword } = req.body;
+    if (!tokenId || !token || !newPassword)
+      return res.status(400).json({ error: 'auth/missing-fields', message: 'All fields are required' });
+
+    const validation = validatePassword(newPassword);
+    if (!validation.valid) return res.status(400).json({ error: 'auth/weak-password', message: validation.message });
+
+    try {
+      const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+      const record = db.prepare(`
+        SELECT id, user_id FROM password_reset_tokens
+        WHERE id = ? AND token_hash = ? AND used = FALSE AND expires_at > NOW()
+      `).get(tokenId, tokenHash) as any;
+
+      if (!record) return res.status(400).json({ error: 'auth/invalid-token', message: 'This reset link is invalid or has expired.' });
+
+      const newHash = await hashPassword(newPassword);
+      db.prepare('UPDATE users SET password_hash = ?, login_attempts = 0 WHERE uid = ?').run(newHash, record.user_id);
+      db.prepare('UPDATE password_reset_tokens SET used = TRUE WHERE id = ?').run(record.id);
+
+      return res.json({ message: 'Password has been reset successfully. You can now log in with your new password.' });
+    } catch (e: any) {
+      console.error("Reset password error:", e.message);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
   app.use('/uploads', express.static(UPLOADS_DIR));
+
 
   app.post('/api/upload', authenticate, upload.single('file'), async (req: any, res) => {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
@@ -603,6 +753,10 @@ export function setupApi(app: express.Express) {
 
   app.post('/api/seed-users', async (req, res) => {
     try {
+      if (process.env.NODE_ENV === 'production') {
+        return res.status(403).json({ error: "Forbidden: Seeding is disabled in production environment." });
+      }
+
       // 1. Ensure College & Dept (already done in existing logic)
       let college = getDocument('colleges', 'COL001');
       if (!college) setDocument('colleges', 'COL001', { id: 'COL001', name: 'Test Engineering College', location: 'Test City', createdAt: new Date().toISOString() });
@@ -610,14 +764,22 @@ export function setupApi(app: express.Express) {
       let department = getDocument('departments', 'CSE');
       if (!department) setDocument('departments', 'CSE', { id: 'CSE', collegeId: 'COL001', name: 'Computer Science & Engineering' });
 
+      const superadminExamplePass = process.env.SEED_SUPERADMIN_PASSWORD || 'password123';
+      const superadminCerttrackPass = process.env.SEED_SUPERADMIN_PASSWORD || 'SuperAdminPassword123!';
+      const zinoinPass = process.env.SEED_ZINOIN_PASSWORD || 'Vishwa@8105';
+      const adminPass = process.env.SEED_ADMIN_PASSWORD || 'Admin@123';
+      const hodPass = process.env.SEED_HOD_PASSWORD || 'Hod@123';
+      const staffPass = process.env.SEED_STAFF_PASSWORD || 'Staff@123';
+      const studentPass = process.env.SEED_STUDENT_PASSWORD || 'Student@123';
+
       const seedUsers = [
-        { email: 'superadmin@example.com', password: 'password123', role: 'super_admin', name: 'Super Admin' },
-        { email: 'superadmin@certtrack.com', password: 'SuperAdminPassword123!', role: 'super_admin', name: 'Super Admin' },
-        { email: 'zinointech@gmail.com', password: 'Vishwa@8105', role: 'super_admin', name: 'Skill Track Super Admin' },
-        { email: 'admin@test.com', password: 'Admin@123', role: 'admin', name: 'College Admin', collegeId: 'COL001' },
-        { email: 'hod@test.com', password: 'Hod@123', role: 'hod', name: 'HOD User', collegeId: 'COL001', departmentId: 'CSE' },
-        { email: 'staff@test.com', password: 'Staff@123', role: 'staff', name: 'Staff User', collegeId: 'COL001', departmentId: 'CSE' },
-        { email: 'student@test.com', password: 'Student@123', role: 'student', name: 'Student User', collegeId: 'COL001', departmentId: 'CSE', rollNo: 'STU001', class: 'CS-A', year: '3rd' }
+        { email: 'superadmin@example.com', password: superadminExamplePass, role: 'super_admin', name: 'Super Admin' },
+        { email: 'superadmin@certtrack.com', password: superadminCerttrackPass, role: 'super_admin', name: 'Super Admin' },
+        { email: 'zinointech@gmail.com', password: zinoinPass, role: 'super_admin', name: 'Skill Track Super Admin' },
+        { email: 'admin@test.com', password: adminPass, role: 'admin', name: 'College Admin', collegeId: 'COL001' },
+        { email: 'hod@test.com', password: hodPass, role: 'hod', name: 'HOD User', collegeId: 'COL001', departmentId: 'CSE' },
+        { email: 'staff@test.com', password: staffPass, role: 'staff', name: 'Staff User', collegeId: 'COL001', departmentId: 'CSE' },
+        { email: 'student@test.com', password: studentPass, role: 'student', name: 'Student User', collegeId: 'COL001', departmentId: 'CSE', rollNo: 'STU001', class: 'CS-A', year: '3rd' }
       ];
 
       let inserted = 0;

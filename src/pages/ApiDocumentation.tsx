@@ -23,8 +23,8 @@ const ApiDocumentation: React.FC = () => {
       method: 'POST',
       path: '/api/auth/login',
       desc: 'Authenticate user and retrieve JSON Web Token (JWT) along with role permissions.',
-      req: `{\n  "email": "student@test.com",\n  "password": "Student@123"\n}`,
-      res: `{\n  "token": "eyJhbGciOi...",\n  "user": {\n    "uid": "user_123",\n    "email": "student@test.com",\n    "role": "student"\n  }\n}`
+      req: `{\n  "email": "user@example.com",\n  "password": "••••••••"\n}`,
+      res: `{\n  "token": "eyJhbGciOi...",\n  "user": {\n    "uid": "user_123",\n    "email": "user@example.com",\n    "role": "student"\n  }\n}`
     },
     {
       method: 'GET',

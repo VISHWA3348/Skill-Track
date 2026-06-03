@@ -1,6 +1,6 @@
 import { API_BASE_URL } from '@/config/api';
 import React, { useState, useEffect } from 'react';
-import { Shield, Plus, Trash2, CheckCircle, XCircle, Calendar, Hash, Building2, BookOpen, UserCheck, Search, Filter, Loader2, QrCode } from 'lucide-react';
+import { Shield, Plus, Trash2, CheckCircle, XCircle, Calendar, Hash, Building2, BookOpen, UserCheck, Search, Filter, Loader2, QrCode, Key, RefreshCw, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -21,8 +21,11 @@ interface SignupCode {
 }
 
 export default function SignupCodesManagement() {
+  const [activeTab, setActiveTab] = useState<'legacy' | 'dept'>('dept');
   const [codes, setCodes] = useState<SignupCode[]>([]);
+  const [deptCodes, setDeptCodes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deptLoading, setDeptLoading] = useState(true);
   const [colleges, setColleges] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -52,6 +55,21 @@ export default function SignupCodesManagement() {
     }
   };
 
+  const fetchDeptInviteCodes = async () => {
+    try {
+      setDeptLoading(true);
+      const response = await fetch(`${API_BASE_URL}/api/invite-codes`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      const result = await response.json();
+      if (result.success) setDeptCodes(result.data);
+    } catch (error) {
+      toast.error("Failed to fetch department invite codes");
+    } finally {
+      setDeptLoading(false);
+    }
+  };
+
   const fetchCollegesAndDepts = async () => {
     try {
       const colRes = await fetch(`${API_BASE_URL}/api/superadmin/colleges`, {
@@ -68,8 +86,27 @@ export default function SignupCodesManagement() {
 
   useEffect(() => {
     fetchCodes();
+    fetchDeptInviteCodes();
     fetchCollegesAndDepts();
   }, []);
+
+  const handleRegenerateDeptCode = async (deptId: string, deptName: string) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/department/${deptId}/regenerate-code`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(`New code for ${deptName}: ${data.inviteCode}`);
+        fetchDeptInviteCodes();
+      } else {
+        toast.error(data.error || 'Failed to regenerate');
+      }
+    } catch (e) {
+      toast.error('Failed to regenerate invite code');
+    }
+  };
 
   const generateRandomCode = (collegeId: string, deptId: string, year: string) => {
     const random = Math.random().toString(36).substring(2, 7).toUpperCase();
@@ -145,28 +182,128 @@ export default function SignupCodesManagement() {
 
   return (
     <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
           <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
             <Shield className="w-6 h-6 text-indigo-600" />
-            Signup Access Codes
+            Signup & Invite Codes
           </h2>
-          <p className="text-slate-500 text-sm mt-1">Manage secure invitation codes for student registration.</p>
+          <p className="text-slate-500 text-sm mt-1">Manage all department invite codes and legacy signup codes.</p>
         </div>
+        {activeTab === 'legacy' && (
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100"
+          >
+            <Plus className="w-4 h-4" />
+            Generate New Code
+          </button>
+        )}
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-2 mb-6 border-b border-slate-100">
         <button
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100"
+          onClick={() => setActiveTab('dept')}
+          className={`px-5 py-2.5 text-sm font-bold rounded-t-lg transition-all flex items-center gap-2 ${
+            activeTab === 'dept'
+              ? 'bg-indigo-50 text-indigo-600 border-b-2 border-indigo-600'
+              : 'text-slate-500 hover:text-slate-700'
+          }`}
         >
-          <Plus className="w-4 h-4" />
-          Generate New Code
+          <Key className="w-4 h-4" />
+          Department Invite Codes
+        </button>
+        <button
+          onClick={() => setActiveTab('legacy')}
+          className={`px-5 py-2.5 text-sm font-bold rounded-t-lg transition-all flex items-center gap-2 ${
+            activeTab === 'legacy'
+              ? 'bg-indigo-50 text-indigo-600 border-b-2 border-indigo-600'
+              : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <Shield className="w-4 h-4" />
+          Legacy Signup Codes
         </button>
       </div>
 
-      {loading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
-        </div>
-      ) : (
+      {/* Department Invite Codes Tab */}
+      {activeTab === 'dept' && (
+        deptLoading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="bg-slate-50 text-slate-900 font-bold border-b border-slate-100">
+                  <th className="p-4 rounded-tl-xl">College</th>
+                  <th className="p-4">Department</th>
+                  <th className="p-4">Invite Code</th>
+                  <th className="p-4 text-center">Registrations</th>
+                  <th className="p-4">Status</th>
+                  <th className="p-4">Created</th>
+                  <th className="p-4 text-right rounded-tr-xl">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {deptCodes.map(dc => (
+                  <tr key={dc.id} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="p-4 font-semibold text-slate-900">{dc.college_name || dc.college_id}</td>
+                    <td className="p-4 text-slate-600">{dc.department_name || dc.department_id}</td>
+                    <td className="p-4">
+                      <div className="flex items-center gap-2">
+                        <code className="bg-indigo-50 px-2 py-1 rounded text-indigo-700 font-mono font-bold text-xs uppercase">
+                          {dc.code}
+                        </code>
+                        <button
+                          onClick={() => { navigator.clipboard.writeText(dc.code); toast.success('Code copied!'); }}
+                          className="text-slate-400 hover:text-indigo-600 transition-colors"
+                        >
+                          <Copy className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </td>
+                    <td className="p-4 text-center">
+                      <span className="font-bold text-slate-900">
+                        {dc.current_registrations} / {dc.max_registrations === -1 ? '∞' : dc.max_registrations}
+                      </span>
+                    </td>
+                    <td className="p-4">
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                        dc.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
+                      }`}>
+                        {dc.is_active ? <><CheckCircle className="w-3 h-3" />Active</> : <><XCircle className="w-3 h-3" />Inactive</>}
+                      </span>
+                    </td>
+                    <td className="p-4 text-xs text-slate-400">{new Date(dc.created_at).toLocaleDateString()}</td>
+                    <td className="p-4 text-right">
+                      <button
+                        onClick={() => handleRegenerateDeptCode(dc.department_id, dc.department_name || dc.department_id)}
+                        className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                        title="Regenerate Invite Code"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {deptCodes.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="p-12 text-center text-slate-400 font-medium italic">
+                      No department invite codes found. Create a department to auto-generate codes.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )
+      )}
+
+      {/* Legacy Signup Codes Tab */}
+      {activeTab === 'legacy' && (
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
@@ -277,6 +414,7 @@ export default function SignupCodesManagement() {
         </div>
       )}
 
+      {/* Legacy codes table - wrapped in legacy tab condition */}
       {/* Add Modal */}
       <AnimatePresence>
         {showAddModal && (

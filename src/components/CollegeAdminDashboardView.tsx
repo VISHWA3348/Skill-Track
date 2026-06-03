@@ -7,7 +7,8 @@ import {
   ArrowRight, UserCheck, Settings, Search, Filter, Briefcase,
   ShieldAlert, ShieldCheck, Send, Download, Plus, Trash2, PieChart as PieIcon,
   ChevronRight, Calendar, GraduationCap, MapPin, Mail, Phone,
-  ExternalLink, Camera, MapPinOff, Eye, History, User, Check, X
+  ExternalLink, Camera, MapPinOff, Eye, History, User, Check, X,
+  Key, Copy, RefreshCw
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
@@ -47,6 +48,7 @@ export default function CollegeAdminDashboardView() {
     target_year: ''
   });
   const [newDept, setNewDept] = useState({ name: '', department_id: '' });
+  const [createdInviteCode, setCreatedInviteCode] = useState<string | null>(null);
 
   const fetchData = async () => {
     try {
@@ -118,15 +120,40 @@ export default function CollegeAdminDashboardView() {
         },
         body: JSON.stringify(newDept)
       });
-      if (res.ok) {
-        toast.success("Department added!");
-        setShowAddDeptModal(false);
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setCreatedInviteCode(data.inviteCode || null);
+        toast.success(`Department added! Invite Code: ${data.inviteCode}`);
         setNewDept({ name: '', department_id: '' });
         fetchData();
+      } else {
+        toast.error(data.error || 'Failed to add department');
       }
     } catch (e) {
-      toast.error("Failed to add department");
+      toast.error('Failed to add department');
     }
+  };
+
+  const handleRegenerateCode = async (deptId: string, deptName: string) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/department/${deptId}/regenerate-code`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(`New code for ${deptName}: ${data.inviteCode}`);
+        fetchData();
+      } else {
+        toast.error(data.error || 'Failed to regenerate code');
+      }
+    } catch (e) {
+      toast.error('Failed to regenerate invite code');
+    }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text).then(() => toast.success('Invite code copied!'));
   };
 
   if (loading) return (
@@ -522,42 +549,66 @@ export default function CollegeAdminDashboardView() {
             animate={{ opacity: 1, y: 0 }}
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
           >
-            {departments.map((d) => (
-              <div key={d.id} className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden group">
-                <div className="p-6 bg-gradient-to-br from-indigo-600 to-indigo-800 text-white">
-                  <div className="flex items-center justify-between mb-4">
-                    <Building2 className="w-6 h-6 text-indigo-100" />
-                    <button className="p-2 bg-white/10 rounded-xl hover:bg-white/20 transition-colors">
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                  <h4 className="text-xl font-bold">{d.name}</h4>
-                  <p className="text-indigo-100 text-xs mt-1">ID: {d.department_id}</p>
+          {departments.map((d) => (
+            <div key={d.id} className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden group">
+              <div className="p-6 bg-gradient-to-br from-indigo-600 to-indigo-800 text-white">
+                <div className="flex items-center justify-between mb-4">
+                  <Building2 className="w-6 h-6 text-indigo-100" />
+                  <button
+                    onClick={() => handleRegenerateCode(d.id, d.name)}
+                    title="Regenerate Invite Code"
+                    className="p-2 bg-white/10 rounded-xl hover:bg-white/20 transition-colors"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                  </button>
                 </div>
-                <div className="p-6 space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="p-3 bg-slate-50 rounded-2xl text-center">
-                      <p className="text-[10px] font-black text-slate-400 uppercase">Students</p>
-                      <p className="text-lg font-black text-slate-900">{d.student_count}</p>
-                    </div>
-                    <div className="p-3 bg-slate-50 rounded-2xl text-center">
-                      <p className="text-[10px] font-black text-slate-400 uppercase">Staff</p>
-                      <p className="text-lg font-black text-slate-900">{d.staff_count}</p>
-                    </div>
+                <h4 className="text-xl font-bold">{d.name}</h4>
+                <p className="text-indigo-100 text-xs mt-1">ID: {d.department_id}</p>
+              </div>
+              <div className="p-6 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-3 bg-slate-50 rounded-2xl text-center">
+                    <p className="text-[10px] font-black text-slate-400 uppercase">Students</p>
+                    <p className="text-lg font-black text-slate-900">{d.student_count}</p>
                   </div>
-                  <div className="pt-4 space-y-3">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-500">HOD</span>
-                      <span className="font-bold text-slate-900">{d.hod_name || 'Not Assigned'}</span>
+                  <div className="p-3 bg-slate-50 rounded-2xl text-center">
+                    <p className="text-[10px] font-black text-slate-400 uppercase">Staff</p>
+                    <p className="text-lg font-black text-slate-900">{d.staff_count}</p>
+                  </div>
+                </div>
+                {/* Invite Code Section */}
+                <div className="bg-indigo-50 rounded-2xl p-3 border border-indigo-100">
+                  <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-1">
+                    <Key className="w-3 h-3" /> Invite Code
+                  </p>
+                  {d.invite_code ? (
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono font-bold text-indigo-700 text-sm tracking-wider">{d.invite_code}</span>
+                      <button
+                        onClick={() => copyToClipboard(d.invite_code)}
+                        title="Copy invite code"
+                        className="p-1.5 bg-indigo-100 text-indigo-600 rounded-lg hover:bg-indigo-200 transition-colors"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                      </button>
                     </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-500">Avg CGPA</span>
-                      <span className="font-bold text-emerald-600">{d.avg_cgpa ? d.avg_cgpa.toFixed(2) : '0.00'}</span>
-                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-400 italic">No active code — click ↻ to generate</p>
+                  )}
+                </div>
+                <div className="pt-2 space-y-3">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-500">HOD</span>
+                    <span className="font-bold text-slate-900">{d.hod_name || 'Not Assigned'}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-500">Avg CGPA</span>
+                    <span className="font-bold text-emerald-600">{d.avg_cgpa ? d.avg_cgpa.toFixed(2) : '0.00'}</span>
                   </div>
                 </div>
               </div>
-            ))}
+            </div>
+          ))}
             <button
               onClick={() => setShowAddDeptModal(true)}
               className="bg-white border-2 border-dashed border-slate-200 rounded-3xl p-8 flex flex-col items-center justify-center gap-3 text-slate-400 hover:border-indigo-600 hover:text-indigo-600 hover:bg-indigo-50/10 transition-all group"
@@ -788,39 +839,72 @@ export default function CollegeAdminDashboardView() {
                 <Building2 className="w-6 h-6" />
                 <h3 className="text-xl font-bold">New Department</h3>
               </div>
-              <button onClick={() => setShowAddDeptModal(false)} className="text-slate-400 hover:text-white transition-colors">
+              <button onClick={() => { setShowAddDeptModal(false); setCreatedInviteCode(null); }} className="text-slate-400 hover:text-white transition-colors">
                 <Plus className="w-6 h-6 rotate-45" />
               </button>
             </div>
-            <form onSubmit={handleAddDept} className="p-8 space-y-6">
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700">Department Name</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Mechanical Engineering"
-                  value={newDept.name}
-                  onChange={e => setNewDept({ ...newDept, name: e.target.value })}
-                  className="w-full px-5 py-3 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-indigo-500 transition-all"
-                />
+            {createdInviteCode ? (
+              <div className="p-8 text-center space-y-6">
+                <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto">
+                  <CheckCircle2 className="w-8 h-8 text-emerald-600" />
+                </div>
+                <div>
+                  <h4 className="text-xl font-bold text-slate-900 mb-2">Department Created!</h4>
+                  <p className="text-slate-500 text-sm mb-6">Share this invite code with students so they can register under this department.</p>
+                  <div className="bg-indigo-50 rounded-2xl p-4 flex items-center justify-between gap-3 border border-indigo-100">
+                    <div className="text-left">
+                      <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Department Invite Code</p>
+                      <p className="font-mono font-black text-2xl text-indigo-700 tracking-widest">{createdInviteCode}</p>
+                    </div>
+                    <button
+                      onClick={() => copyToClipboard(createdInviteCode)}
+                      className="p-3 bg-indigo-100 text-indigo-600 rounded-xl hover:bg-indigo-200 transition-colors flex-shrink-0"
+                    >
+                      <Copy className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+                <button
+                  onClick={() => { setShowAddDeptModal(false); setCreatedInviteCode(null); }}
+                  className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-lg hover:bg-slate-800 transition-all"
+                >
+                  Done
+                </button>
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700">Code (Optional)</label>
-                <input
-                  type="text"
-                  placeholder="e.g. MECH-01"
-                  value={newDept.department_id}
-                  onChange={e => setNewDept({ ...newDept, department_id: e.target.value })}
-                  className="w-full px-5 py-3 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-indigo-500 transition-all"
-                />
-              </div>
-              <button
-                type="submit"
-                className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-lg hover:bg-slate-800 transition-all"
-              >
-                Create Department
-              </button>
-            </form>
+            ) : (
+              <form onSubmit={handleAddDept} className="p-8 space-y-6">
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-700">Department Name</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Mechanical Engineering"
+                    value={newDept.name}
+                    onChange={e => setNewDept({ ...newDept, name: e.target.value })}
+                    className="w-full px-5 py-3 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-indigo-500 transition-all"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-700">Code (Optional)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. MECH"
+                    value={newDept.department_id}
+                    onChange={e => setNewDept({ ...newDept, department_id: e.target.value })}
+                    className="w-full px-5 py-3 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-indigo-500 transition-all"
+                  />
+                </div>
+                <p className="text-xs text-slate-400 flex items-center gap-1">
+                  <Key className="w-3 h-3" /> An invite code will be auto-generated after creation.
+                </p>
+                <button
+                  type="submit"
+                  className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-lg hover:bg-slate-800 transition-all"
+                >
+                  Create Department
+                </button>
+              </form>
+            )}
           </motion.div>
         </div>
       )}

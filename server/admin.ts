@@ -23,40 +23,52 @@ export function setupAdmin(app: express.Express) {
   // Seed generic roles safely
   const seedDatabase = async () => {
     try {
+      const isProduction = process.env.NODE_ENV === 'production';
+      const superAdminPass = process.env.SEED_SUPERADMIN_PASSWORD || (isProduction ? '' : 'SuperAdmin@123');
+      const zinoinPass = process.env.SEED_ZINOIN_PASSWORD || (isProduction ? '' : 'Vishwa@8105');
+
       // Seed super admin
       const superAdmins = queryDocuments('users', [{ field: 'role', operator: '==', value: 'super_admin' }]);
       if (superAdmins.length === 0) {
-        const hashedPassword = await bcrypt.hash('SuperAdmin@123', 10);
-        setDocument('users', 'user_super_admin_seed', {
-          uid: 'user_super_admin_seed',
-          email: 'superadmin@certtrack.com',
-          passwordHash: hashedPassword,
-          role: 'super_admin',
-          name: 'Super Admin',
-          displayName: 'Super Admin',
-          status: 'active',
-          isActive: true,
-          createdAt: new Date().toISOString()
-        });
-        console.log("Super admin seeded: superadmin@certtrack.com | SuperAdmin@123");
+        if (!superAdminPass) {
+          console.warn("⚠️ [SECURITY] SEED_SUPERADMIN_PASSWORD is not set. Skipping superadmin@certtrack.com database seeding in production.");
+        } else {
+          const hashedPassword = await bcrypt.hash(superAdminPass, 10);
+          setDocument('users', 'user_super_admin_seed', {
+            uid: 'user_super_admin_seed',
+            email: 'superadmin@certtrack.com',
+            passwordHash: hashedPassword,
+            role: 'super_admin',
+            name: 'Super Admin',
+            displayName: 'Super Admin',
+            status: 'active',
+            isActive: true,
+            createdAt: new Date().toISOString()
+          });
+          console.log("Super admin seeded: superadmin@certtrack.com");
+        }
       }
 
       // Seed zinointech@gmail.com as super admin
       const zinoinUser = queryDocuments('users', [{ field: 'email', operator: '==', value: 'zinointech@gmail.com' }]);
       if (zinoinUser.length === 0) {
-        const hashedPassword = await bcrypt.hash('Vishwa@8105', 10);
-        setDocument('users', 'user_zinoin_super_admin', {
-          uid: 'user_zinoin_super_admin',
-          email: 'zinointech@gmail.com',
-          passwordHash: hashedPassword,
-          role: 'super_admin',
-          name: 'Skill Track Super Admin',
-          displayName: 'Skill Track Super Admin',
-          status: 'active',
-          isActive: true,
-          createdAt: new Date().toISOString()
-        });
-        console.log("Super admin seeded: zinointech@gmail.com | Vishwa@8105");
+        if (!zinoinPass) {
+          console.warn("⚠️ [SECURITY] SEED_ZINOIN_PASSWORD is not set. Skipping zinointech@gmail.com database seeding in production.");
+        } else {
+          const hashedPassword = await bcrypt.hash(zinoinPass, 10);
+          setDocument('users', 'user_zinoin_super_admin', {
+            uid: 'user_zinoin_super_admin',
+            email: 'zinointech@gmail.com',
+            passwordHash: hashedPassword,
+            role: 'super_admin',
+            name: 'Skill Track Super Admin',
+            displayName: 'Skill Track Super Admin',
+            status: 'active',
+            isActive: true,
+            createdAt: new Date().toISOString()
+          });
+          console.log("Super admin seeded: zinointech@gmail.com");
+        }
       }
     } catch (e) {
       console.error("Error seeding:", e);
@@ -388,6 +400,63 @@ export function setupAdmin(app: express.Express) {
         ORDER BY created_at DESC LIMIT 5
       `).all(...userScope.params) as any[];
 
+      // ── Email Health Calculations ───────────────────────────
+      let emailHealth = {
+        resendStatus: "Not Configured",
+        growSmtpStatus: "Not Configured",
+        googleSmtpStatus: "Not Configured",
+        sentToday: 0,
+        failedToday: 0,
+        activeProvider: "None"
+      };
+
+      try {
+        const resendConfigured = !!process.env.RESEND_API_KEY;
+        const growConfigured = !!(process.env.GROW_SMTP_USER || process.env.BREVO_SMTP_USER);
+        const googleConfigured = !!(process.env.GOOGLE_SMTP_USER || process.env.GMAIL_SMTP_USER);
+
+        // Fetch counts from email_logs
+        const sentRes = db.prepare(`
+          SELECT COUNT(*) as cnt FROM email_logs 
+          WHERE status = 'success' 
+          AND sent_at >= CURRENT_DATE
+        `).get() as any;
+        const failedRes = db.prepare(`
+          SELECT COUNT(*) as cnt FROM email_logs 
+          WHERE status = 'failed' 
+          AND sent_at >= CURRENT_DATE
+        `).get() as any;
+
+        // Check recent errors in last 1 hour
+        const resendRecentError = (db.prepare(`
+          SELECT COUNT(*) as cnt FROM email_logs 
+          WHERE provider_used = 'Resend' AND status = 'failed' AND sent_at >= NOW() - INTERVAL '1 hour'
+        `).get() as any)?.cnt > 0;
+
+        const growRecentError = (db.prepare(`
+          SELECT COUNT(*) as cnt FROM email_logs 
+          WHERE provider_used = 'Grow SMTP' AND status = 'failed' AND sent_at >= NOW() - INTERVAL '1 hour'
+        `).get() as any)?.cnt > 0;
+
+        const googleRecentError = (db.prepare(`
+          SELECT COUNT(*) as cnt FROM email_logs 
+          WHERE provider_used = 'Google SMTP' AND status = 'failed' AND sent_at >= NOW() - INTERVAL '1 hour'
+        `).get() as any)?.cnt > 0;
+
+        emailHealth.sentToday = sentRes ? parseInt(sentRes.cnt, 10) : 0;
+        emailHealth.failedToday = failedRes ? parseInt(failedRes.cnt, 10) : 0;
+
+        emailHealth.resendStatus = !resendConfigured ? "Not Configured" : (resendRecentError ? "Error" : "Operational");
+        emailHealth.growSmtpStatus = !growConfigured ? "Not Configured" : (growRecentError ? "Error" : "Operational");
+        emailHealth.googleSmtpStatus = !googleConfigured ? "Not Configured" : (googleRecentError ? "Error" : "Operational");
+
+        if (emailHealth.resendStatus === "Operational") emailHealth.activeProvider = "Resend (Primary)";
+        else if (emailHealth.growSmtpStatus === "Operational") emailHealth.activeProvider = "Grow SMTP (Secondary)";
+        else if (emailHealth.googleSmtpStatus === "Operational") emailHealth.activeProvider = "Google SMTP (Tertiary)";
+      } catch (err) {
+        // Table may not exist yet, fallback silently
+      }
+
       // ── Assemble response ─────────────────────────────────────────────────
       const data = {
         totalUsers:            Number(userCounts?.total_users    || 0),
@@ -417,6 +486,7 @@ export function setupAdmin(app: express.Express) {
         pendingActivitiesList,
         recentStudents,
         systemHealth: "Operational",
+        emailHealth,
         timestamp: new Date().toISOString()
       };
 

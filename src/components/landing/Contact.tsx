@@ -30,7 +30,7 @@ const Contact: React.FC = () => {
                 <p className="text-indigo-100 text-lg mb-12 leading-relaxed opacity-80 font-medium">
                   Have questions about our system? Our team is here to help you scale your educational records.
                 </p>
-                
+
                 <div className="space-y-8">
                   <div className="flex items-center space-x-4 group">
                     <div className="p-3 bg-white/10 rounded-2xl group-hover:bg-white/20 transition-colors">
@@ -38,7 +38,7 @@ const Contact: React.FC = () => {
                     </div>
                     <div>
                       <p className="text-xs font-bold uppercase tracking-widest text-indigo-200 mb-1 leading-none">Support Email</p>
-                      <p className="text-lg font-bold">support@SkillTrack.com</p>
+                      <p className="text-lg font-bold">zinointech@gmail.com</p>
                     </div>
                   </div>
                   <div className="flex items-center space-x-4 group">
@@ -47,7 +47,7 @@ const Contact: React.FC = () => {
                     </div>
                     <div>
                       <p className="text-xs font-bold uppercase tracking-widest text-indigo-200 mb-1 leading-none">Phone Support</p>
-                      <p className="text-lg font-bold">+1 (555) 123-4567</p>
+                      <p className="text-lg font-bold">+91 6369027043</p>
                     </div>
                   </div>
                   <div className="flex items-center space-x-4 group">
@@ -61,7 +61,7 @@ const Contact: React.FC = () => {
                   </div>
                 </div>
               </div>
-              
+
               <div className="mt-12 p-6 bg-white/10 rounded-3xl border border-white/10 backdrop-blur-sm">
                 <p className="text-sm font-medium italic opacity-90 leading-relaxed text-indigo-50">
                   "The goal of education is the advancement of knowledge and the dissemination of truth."

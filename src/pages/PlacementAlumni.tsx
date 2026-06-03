@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/config/api';
 import React, { useState, useEffect } from 'react';
 import { Building2, Briefcase, Users, Plus, Trash2, Search, Filter, Globe, ExternalLink, GraduationCap, DollarSign } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -17,9 +18,9 @@ export default function PlacementAlumni() {
       const token = localStorage.getItem('token');
       const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
       
-      const compRes = await fetch('/api/companies', { headers });
-      const jobRes = await fetch('/api/job-posts', { headers });
-      const alumRes = await fetch('/api/alumni', { headers });
+      const compRes = await fetch(`${API_BASE_URL}/api/companies`, { headers });
+      const jobRes = await fetch(`${API_BASE_URL}/api/job-posts`, { headers });
+      const alumRes = await fetch(`${API_BASE_URL}/api/alumni`, { headers });
 
       if (compRes.ok) {
         const result = await compRes.json();
@@ -47,7 +48,7 @@ export default function PlacementAlumni() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const endpoint = activeTab === 'companies' ? '/api/companies' : (activeTab === 'jobs' ? '/api/job-posts' : '/api/alumni');
+      const endpoint = activeTab === 'companies' ? `${API_BASE_URL}/api/companies` : (activeTab === 'jobs' ? `${API_BASE_URL}/api/job-posts` : `${API_BASE_URL}/api/alumni`);
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 

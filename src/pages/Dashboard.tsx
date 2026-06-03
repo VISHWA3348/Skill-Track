@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/config/api';
 import React, { useEffect, useState, useCallback, memo, Suspense } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Users, GraduationCap, Award, Activity, ShieldCheck, Database, Server, Clock, RefreshCw } from 'lucide-react';
@@ -19,7 +20,7 @@ const AnnouncementBanner: React.FC = memo(() => {
   useEffect(() => {
     const fetchAnnouncements = async () => {
       try {
-        const response = await fetch('/api/announcements', {
+        const response = await fetch(`${API_BASE_URL}/api/announcements`, {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         });
         if (response.ok) {
@@ -75,7 +76,7 @@ const Dashboard: React.FC = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/admin/stats', {
+      const response = await fetch(`${API_BASE_URL}/api/admin/stats`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

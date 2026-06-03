@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/config/api';
 import React, { useState, useEffect } from 'react';
 import { 
   Users, Award, ShieldCheck, Activity, TrendingUp, BarChart3, PieChart, 
@@ -38,10 +39,10 @@ export default function HODDashboardView() {
     try {
       const token = localStorage.getItem('token');
       const [statsRes, analyticsRes, studentsRes, staffRes] = await Promise.all([
-        fetch('/api/hod/dashboard-stats', { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch('/api/hod/department-analytics', { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch('/api/hod/students', { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch('/api/hod/staff-performance', { headers: { 'Authorization': `Bearer ${token}` } })
+        fetch(`${API_BASE_URL}/api/hod/dashboard-stats`, { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(`${API_BASE_URL}/api/hod/department-analytics`, { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(`${API_BASE_URL}/api/hod/students`, { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(`${API_BASE_URL}/api/hod/staff-performance`, { headers: { 'Authorization': `Bearer ${token}` } })
       ]);
 
       if (statsRes.ok) {
@@ -62,7 +63,7 @@ export default function HODDashboardView() {
       }
 
       // Fetch Academic Overview
-      const academicRes = await fetch('/api/academic/analytics/overview', { 
+      const academicRes = await fetch(`${API_BASE_URL}/api/academic/analytics/overview`, { 
         headers: { 'Authorization': `Bearer ${token}` } 
       });
       if (academicRes.ok) {
@@ -85,7 +86,7 @@ export default function HODDashboardView() {
 
   const handleSendAnnouncement = async () => {
     try {
-      const res = await fetch('/api/hod/announcements/send', {
+      const res = await fetch(`${API_BASE_URL}/api/hod/announcements/send`, {
         method: 'POST',
         headers: { 
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -105,7 +106,7 @@ export default function HODDashboardView() {
 
   const handleFlagStudent = async () => {
     try {
-      const res = await fetch('/api/hod/student-flag', {
+      const res = await fetch(`${API_BASE_URL}/api/hod/student-flag`, {
         method: 'POST',
         headers: { 
           'Authorization': `Bearer ${localStorage.getItem('token')}`,

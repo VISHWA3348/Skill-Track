@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/config/api';
 import React, { useState, useEffect } from 'react';
 import { Activity, Server, Database, HardDrive, Cpu, Zap, Clock, ShieldCheck, RefreshCw, AlertCircle } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -14,7 +15,7 @@ export default function SystemHealthMonitor() {
 
   const fetchHealth = async () => {
     try {
-      const res = await fetch('/api/superadmin/system-health', {
+      const res = await fetch(`${API_BASE_URL}/api/superadmin/system-health`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
       const result = await res.json();

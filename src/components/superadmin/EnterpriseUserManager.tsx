@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/config/api';
 import React, { useState, useEffect } from 'react';
 import { Search, UserPlus, Shield, UserX, UserCheck, MoreVertical, Mail, Building2, MapPin, Filter, Download, Key, LogOut } from 'lucide-react';
 import { toast } from 'sonner';
@@ -14,7 +15,7 @@ export default function EnterpriseUserManager() {
 
   const fetchUsers = async () => {
     try {
-      const res = await fetch('/api/superadmin/users', {
+      const res = await fetch(`${API_BASE_URL}/api/superadmin/users`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
       const result = await res.json();
@@ -27,7 +28,7 @@ export default function EnterpriseUserManager() {
 
   const handleUpdateStatus = async (uid: string, status: string) => {
     try {
-      const res = await fetch(`/api/admin/users/${uid}/status`, {
+      const res = await fetch(`${API_BASE_URL}/api/admin/users/${uid}/status`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
@@ -46,7 +47,7 @@ export default function EnterpriseUserManager() {
 
   const handleForceLogout = async (uid: string) => {
     try {
-      const res = await fetch(`/api/superadmin/users/${uid}/force-logout`, {
+      const res = await fetch(`${API_BASE_URL}/api/superadmin/users/${uid}/force-logout`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });

@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/config/api';
 import React, { useState, useEffect } from 'react';
 import { Shield, Plus, Trash2, CheckCircle, XCircle, Calendar, Hash, Building2, BookOpen, UserCheck, Search, Filter, Loader2, QrCode } from 'lucide-react';
 import { toast } from 'sonner';
@@ -39,7 +40,7 @@ export default function SignupCodesManagement() {
 
   const fetchCodes = async () => {
     try {
-      const response = await fetch('/api/superadmin/signup-codes', {
+      const response = await fetch(`${API_BASE_URL}/api/superadmin/signup-codes`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
       const result = await response.json();
@@ -53,13 +54,13 @@ export default function SignupCodesManagement() {
 
   const fetchCollegesAndDepts = async () => {
     try {
-      const colRes = await fetch('/api/superadmin/colleges', {
+      const colRes = await fetch(`${API_BASE_URL}/api/superadmin/colleges`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
       const colData = await colRes.json();
       if (colData.success) setColleges(colData.data);
 
-      const deptRes = await fetch('/api/public/departments');
+      const deptRes = await fetch(`${API_BASE_URL}/api/public/departments`);
       const deptData = await deptRes.json();
       if (deptData.success) setDepartments(deptData.data);
     } catch (error) {}
@@ -81,7 +82,7 @@ export default function SignupCodesManagement() {
   const handleCreateCode = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const response = await fetch('/api/superadmin/signup-codes', {
+      const response = await fetch(`${API_BASE_URL}/api/superadmin/signup-codes`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -113,7 +114,7 @@ export default function SignupCodesManagement() {
 
   const toggleStatus = async (id: string, currentStatus: number) => {
     try {
-      const response = await fetch(`/api/superadmin/signup-codes/${id}/status`, {
+      const response = await fetch(`${API_BASE_URL}/api/superadmin/signup-codes/${id}/status`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -131,7 +132,7 @@ export default function SignupCodesManagement() {
   const deleteCode = async (id: string) => {
     if (!confirm("Are you sure you want to delete this code?")) return;
     try {
-      const response = await fetch(`/api/superadmin/signup-codes/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/superadmin/signup-codes/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });

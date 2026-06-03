@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/config/api';
 import React, { useState, useEffect } from 'react';
 import {
   Shield, Users, FileCheck, Activity, Database, Clock,
@@ -53,14 +54,14 @@ export default function CollegeAdminDashboardView() {
       const headers = { 'Authorization': `Bearer ${token}` };
 
       const [statsRes, analyticsRes, studentsRes, staffRes, deptsRes, weakRes, logsRes, certsRes] = await Promise.all([
-        fetch('/api/admin/dashboard-stats', { headers }),
-        fetch('/api/admin/college-analytics', { headers }),
-        fetch('/api/admin/students', { headers }),
-        fetch('/api/admin/staff', { headers }),
-        fetch('/api/admin/departments', { headers }),
-        fetch('/api/admin/weak-students', { headers }),
-        fetch('/api/admin/stats', { headers }),
-        fetch('/api/admin/certifications', { headers })
+        fetch(`${API_BASE_URL}/api/admin/dashboard-stats`, { headers }),
+        fetch(`${API_BASE_URL}/api/admin/college-analytics`, { headers }),
+        fetch(`${API_BASE_URL}/api/admin/students`, { headers }),
+        fetch(`${API_BASE_URL}/api/admin/staff`, { headers }),
+        fetch(`${API_BASE_URL}/api/admin/departments`, { headers }),
+        fetch(`${API_BASE_URL}/api/admin/weak-students`, { headers }),
+        fetch(`${API_BASE_URL}/api/admin/stats`, { headers }),
+        fetch(`${API_BASE_URL}/api/admin/certifications`, { headers })
       ]);
 
       if (statsRes.ok) setStats((await statsRes.json()).data);
@@ -88,7 +89,7 @@ export default function CollegeAdminDashboardView() {
   const handleSendBroadcast = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch('/api/admin/broadcast/send', {
+      const res = await fetch(`${API_BASE_URL}/api/admin/broadcast/send`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -109,7 +110,7 @@ export default function CollegeAdminDashboardView() {
   const handleAddDept = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch('/api/admin/department/add', {
+      const res = await fetch(`${API_BASE_URL}/api/admin/department/add`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

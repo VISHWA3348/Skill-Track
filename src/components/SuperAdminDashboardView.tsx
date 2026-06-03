@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/config/api';
 import React, { useState, useEffect } from 'react';
 import { db, handleApiError, OperationType, auth } from '../api/localApi';
 import { collection, query, where, onSnapshot, getDocs, limit, orderBy, Timestamp } from '../api/localApi';
@@ -59,7 +60,7 @@ export default function SuperAdminDashboardView() {
         if (!token) return;
 
         // 1. Fetch Stats
-        const statsRes = await fetch('/api/admin/stats', {
+        const statsRes = await fetch(`${API_BASE_URL}/api/admin/stats`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (statsRes.ok) {
@@ -94,7 +95,7 @@ export default function SuperAdminDashboardView() {
         }
 
         // 2. Fetch Users for Management
-        const usersRes = await fetch('/api/admin/users', {
+        const usersRes = await fetch(`${API_BASE_URL}/api/admin/users`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (usersRes.ok) {
@@ -104,7 +105,7 @@ export default function SuperAdminDashboardView() {
         }
 
         // 3. Fetch Certifications for Management
-        const certsRes = await fetch('/api/admin/certifications', {
+        const certsRes = await fetch(`${API_BASE_URL}/api/admin/certifications`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (certsRes.ok) {
@@ -129,7 +130,7 @@ export default function SuperAdminDashboardView() {
       const idToken = localStorage.getItem('token');
       if (!idToken) throw new Error("No auth token");
 
-      const response = await fetch('/api/admin/backup', {
+      const response = await fetch(`${API_BASE_URL}/api/admin/backup`, {
         headers: {
           'Authorization': `Bearer ${idToken}`
         }
@@ -169,7 +170,7 @@ export default function SuperAdminDashboardView() {
               const idToken = localStorage.getItem('token');
               if (!idToken) throw new Error("No auth token");
 
-              const response = await fetch('/api/admin/restore', {
+              const response = await fetch(`${API_BASE_URL}/api/admin/restore`, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
@@ -207,7 +208,7 @@ export default function SuperAdminDashboardView() {
           const idToken = localStorage.getItem('token');
           if (!idToken) throw new Error("No auth token");
 
-          const response = await fetch('/api/admin/reset-demo', {
+          const response = await fetch(`${API_BASE_URL}/api/admin/reset-demo`, {
             method: 'DELETE',
             headers: {
               'Authorization': `Bearer ${idToken}`
@@ -236,7 +237,7 @@ export default function SuperAdminDashboardView() {
           const idToken = localStorage.getItem('token');
           if (!idToken) throw new Error("No auth token");
 
-          const response = await fetch(`/api/certifications/${id}`, {
+          const response = await fetch(`${API_BASE_URL}/api/certifications/${id}`, {
             method: 'DELETE',
             headers: {
               'Authorization': `Bearer ${idToken}`

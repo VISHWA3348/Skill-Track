@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/config/api';
 import React, { useState, useEffect } from 'react';
 import {
   ShieldCheck, ShieldAlert, Clock, MapPin, Search, Filter,
@@ -22,7 +23,7 @@ export default function HODCertificatesView() {
   const fetchCerts = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('/api/certifications', {
+      const res = await fetch(`${API_BASE_URL}/api/certifications`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -43,7 +44,7 @@ export default function HODCertificatesView() {
 
   const handleUpdateStatus = async (id: string, status: string) => {
     try {
-      const res = await fetch(`/api/certifications/${id}/status`, {
+      const res = await fetch(`${API_BASE_URL}/api/certifications/${id}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

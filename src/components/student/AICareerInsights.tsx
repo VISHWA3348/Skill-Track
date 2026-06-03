@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/config/api';
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { 
@@ -17,7 +18,7 @@ export default function AICareerInsights() {
     if (!profile?.uid) return;
     try {
       if (force) setRefreshing(true);
-      const url = force ? `/api/ai/recalculate/${profile.uid}` : `/api/ai/insights/${profile.uid}`;
+      const url = force ? `${API_BASE_URL}/api/ai/recalculate/${profile.uid}` : `${API_BASE_URL}/api/ai/insights/${profile.uid}`;
       const method = force ? 'POST' : 'GET';
       
       const response = await fetch(url, {

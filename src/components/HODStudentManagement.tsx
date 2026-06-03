@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/config/api';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useVirtual } from '../hooks/useVirtual';
 import { 
@@ -18,7 +19,7 @@ export default function HODStudentManagement() {
   const fetchStudents = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('/api/hod/students', {
+      const res = await fetch(`${API_BASE_URL}/api/hod/students`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {

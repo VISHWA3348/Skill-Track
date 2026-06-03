@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/config/api';
 import React, { useState, useEffect } from 'react';
 import { 
   FileText, 
@@ -91,11 +92,11 @@ const ResumeBuilderView: React.FC = () => {
       const headers = { 'Authorization': `Bearer ${token}` };
 
       const [profRes, projRes, expRes, skillRes, scoreRes] = await Promise.all([
-        fetch('/api/resume/profile', { headers }),
-        fetch('/api/resume/projects', { headers }),
-        fetch('/api/resume/experience', { headers }),
-        fetch('/api/resume/skills', { headers }),
-        fetch('/api/resume/score', { headers })
+        fetch(`${API_BASE_URL}/api/resume/profile`, { headers }),
+        fetch(`${API_BASE_URL}/api/resume/projects`, { headers }),
+        fetch(`${API_BASE_URL}/api/resume/experience`, { headers }),
+        fetch(`${API_BASE_URL}/api/resume/skills`, { headers }),
+        fetch(`${API_BASE_URL}/api/resume/score`, { headers })
       ]);
 
       if (profRes.ok) setProfile((await profRes.json()).data);
@@ -114,7 +115,7 @@ const ResumeBuilderView: React.FC = () => {
   const handleSaveProfile = async () => {
     setIsSaving(true);
     try {
-      const response = await fetch('/api/resume/profile', {
+      const response = await fetch(`${API_BASE_URL}/api/resume/profile`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -139,7 +140,7 @@ const ResumeBuilderView: React.FC = () => {
     const data = Object.fromEntries(formData.entries());
     
     try {
-      const response = await fetch('/api/resume/projects', {
+      const response = await fetch(`${API_BASE_URL}/api/resume/projects`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -159,7 +160,7 @@ const ResumeBuilderView: React.FC = () => {
 
   const handleDeleteProject = async (id: string) => {
     try {
-      const response = await fetch(`/api/resume/projects/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/resume/projects/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
@@ -178,7 +179,7 @@ const ResumeBuilderView: React.FC = () => {
     const data = Object.fromEntries(formData.entries());
     
     try {
-      const response = await fetch('/api/resume/experience', {
+      const response = await fetch(`${API_BASE_URL}/api/resume/experience`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -198,7 +199,7 @@ const ResumeBuilderView: React.FC = () => {
 
   const handleDeleteExperience = async (id: string) => {
     try {
-      const response = await fetch(`/api/resume/experience/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/resume/experience/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
@@ -213,7 +214,7 @@ const ResumeBuilderView: React.FC = () => {
 
   const handleDetectSkills = async () => {
     toast.promise(
-      fetch('/api/resume/ai/detect-skills', {
+      fetch(`${API_BASE_URL}/api/resume/ai/detect-skills`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       }).then(res => res.json()),
@@ -230,7 +231,7 @@ const ResumeBuilderView: React.FC = () => {
 
   const handleGenerateSummary = async () => {
     toast.promise(
-      fetch('/api/resume/ai/generate-summary', {
+      fetch(`${API_BASE_URL}/api/resume/ai/generate-summary`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       }).then(res => res.json()),
@@ -433,7 +434,7 @@ const ResumeBuilderView: React.FC = () => {
                   const skill_name = (form.elements.namedItem('skill_name') as HTMLInputElement).value;
                   const skill_level = (form.elements.namedItem('skill_level') as HTMLSelectElement).value;
                   
-                  const res = await fetch('/api/resume/skills', {
+                  const res = await fetch(`${API_BASE_URL}/api/resume/skills`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
                     body: JSON.stringify({ skill_name, skill_level })
@@ -469,7 +470,7 @@ const ResumeBuilderView: React.FC = () => {
                       )}
                       <button 
                         onClick={() => {
-                          fetch(`/api/resume/skills/${skill.id}`, {
+                          fetch(`${API_BASE_URL}/api/resume/skills/${skill.id}`, {
                             method: 'DELETE',
                             headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
                           }).then(() => fetchResumeData());

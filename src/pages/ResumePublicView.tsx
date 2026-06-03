@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/config/api';
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { 
@@ -33,7 +34,7 @@ const ResumePublicView: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch(`/api/public/resume/${id}`);
+        const response = await fetch(`${API_BASE_URL}/api/public/resume/${id}`);
         if (!response.ok) throw new Error('Resume not found or private');
         const result = await response.json();
         setData(result.data);

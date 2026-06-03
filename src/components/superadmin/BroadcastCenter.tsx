@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/config/api';
 import React, { useState, useEffect } from 'react';
 import { Megaphone, Users, Building2, MapPin, Send, Trash2, Clock, CheckCircle2, AlertCircle, Info } from 'lucide-react';
 import { toast } from 'sonner';
@@ -19,11 +20,11 @@ export default function BroadcastCenter() {
     // Fetch colleges and depts for filters
     const fetchData = async () => {
       try {
-        const colRes = await fetch('/api/public/colleges');
+        const colRes = await fetch(`${API_BASE_URL}/api/public/colleges`);
         const colData = await colRes.json();
         if (colData.success) setColleges(colData.data);
 
-        const depRes = await fetch('/api/public/departments');
+        const depRes = await fetch(`${API_BASE_URL}/api/public/departments`);
         const depData = await depRes.json();
         if (depData.success) setDepartments(depData.data);
       } catch (error) {
@@ -40,7 +41,7 @@ export default function BroadcastCenter() {
 
     setSending(true);
     try {
-      const res = await fetch('/api/superadmin/broadcast', {
+      const res = await fetch(`${API_BASE_URL}/api/superadmin/broadcast`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',

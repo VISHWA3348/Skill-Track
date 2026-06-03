@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/config/api';
 import React, { useState, useEffect } from 'react';
 import { 
   Users, Award, Briefcase, Clock, Search, Filter, CheckCircle2, AlertCircle, 
@@ -40,9 +41,9 @@ export default function StaffDashboardView() {
       if (!token) return;
 
       const [statsRes, studentsRes, analyticsRes] = await Promise.all([
-        fetch('/api/staff/dashboard-stats', { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch('/api/staff/students', { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch('/api/staff/analytics', { headers: { 'Authorization': `Bearer ${token}` } })
+        fetch(`${API_BASE_URL}/api/staff/dashboard-stats`, { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(`${API_BASE_URL}/api/staff/students`, { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(`${API_BASE_URL}/api/staff/analytics`, { headers: { 'Authorization': `Bearer ${token}` } })
       ]);
 
       if (statsRes.ok) {
@@ -72,7 +73,7 @@ export default function StaffDashboardView() {
 
   const fetchStudentDetail = async (id: string) => {
     try {
-      const response = await fetch(`/api/staff/student/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/staff/student/${id}`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
       if (response.ok) {
@@ -88,7 +89,7 @@ export default function StaffDashboardView() {
   const handleAddRemark = async () => {
     if (!remarkData.text.trim()) return;
     try {
-      const response = await fetch('/api/staff/remarks/add', {
+      const response = await fetch(`${API_BASE_URL}/api/staff/remarks/add`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -113,7 +114,7 @@ export default function StaffDashboardView() {
   const handleSendNotification = async () => {
     if (!notificationData.title || !notificationData.message) return;
     try {
-      const response = await fetch('/api/staff/notifications/send', {
+      const response = await fetch(`${API_BASE_URL}/api/staff/notifications/send`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',

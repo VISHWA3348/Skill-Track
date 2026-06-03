@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/config/api';
 import React, { useState, useEffect } from 'react';
 import { BookOpen, Users, Save, ChevronLeft, Search, CheckCircle2, AlertCircle, Calculator } from 'lucide-react';
 import { motion } from 'motion/react';
@@ -22,8 +23,8 @@ export default function MarkEntryView({ onBack }: MarkEntryViewProps) {
       try {
         const token = localStorage.getItem('token');
         const [subjRes, studentsRes] = await Promise.all([
-          fetch('/api/admin/academic/subjects', { headers: { 'Authorization': `Bearer ${token}` } }),
-          fetch('/api/staff/academic/students', { headers: { 'Authorization': `Bearer ${token}` } })
+          fetch(`${API_BASE_URL}/api/admin/academic/subjects`, { headers: { 'Authorization': `Bearer ${token}` } }),
+          fetch(`${API_BASE_URL}/api/staff/academic/students`, { headers: { 'Authorization': `Bearer ${token}` } })
         ]);
 
         if (subjRes.ok) {
@@ -67,7 +68,7 @@ export default function MarkEntryView({ onBack }: MarkEntryViewProps) {
         attendance_percentage: parseFloat(data.attendance_percentage) || 0
       }));
 
-      const res = await fetch('/api/staff/academic/marks/save', {
+      const res = await fetch(`${API_BASE_URL}/api/staff/academic/marks/save`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

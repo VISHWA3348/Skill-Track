@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/config/api';
 import React, { useState, useEffect } from 'react';
 import { collection, query, where, getDocs } from '../api/localApi';
 import { db } from '../api/localApi';
@@ -28,7 +29,7 @@ export default function Rankings() {
       setLoading(true);
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch('/api/reports/ranking', {
+        const response = await fetch(`${API_BASE_URL}/api/reports/ranking`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         

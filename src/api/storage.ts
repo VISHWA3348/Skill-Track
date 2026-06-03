@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/config/api';
 // LOCAL SQLite API STORAGE
 
 export function getStorage() {
@@ -15,7 +16,7 @@ export async function uploadBytes(storageRef: any, file: File) {
   const headers: any = {};
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const res = await fetch('/api/storage/upload', {
+  const res = await fetch(`${API_BASE_URL}/api/storage/upload`, {
     method: 'POST',
     body: formData,
     headers
@@ -44,7 +45,7 @@ export function uploadBytesResumable(storageRef: any, file: File) {
           // Simulate progress
           onProgress({ bytesTransferred: 0, totalBytes: file.size });
           
-          const res = await fetch('/api/storage/upload', {
+          const res = await fetch(`${API_BASE_URL}/api/storage/upload`, {
             method: 'POST',
             body: formData,
             headers

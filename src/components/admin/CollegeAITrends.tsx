@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/config/api';
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { 
@@ -21,7 +22,7 @@ export default function CollegeAITrends() {
     try {
       if (force) setRefreshing(true);
       const collegeId = profile?.college_id || profile?.collegeId;
-      const url = `/api/ai/college/${collegeId}${force ? '?refresh=true' : ''}`;
+      const url = `${API_BASE_URL}/api/ai/college/${collegeId}${force ? '?refresh=true' : ''}`;
       const response = await fetch(url, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });

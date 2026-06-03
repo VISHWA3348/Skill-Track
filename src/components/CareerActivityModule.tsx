@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/config/api';
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { db, logAudit, handleApiError, OperationType } from '../api/localApi';
@@ -151,7 +152,7 @@ export default function CareerActivityModule() {
   const handleStatusUpdate = async (docId: string, newStatus: string, studentId: string, activityType: string, organization: string) => {
     try {
       const idToken = localStorage.getItem('token');
-      const response = await fetch(`/api/career-activities/${docId}/status`, {
+      const response = await fetch(`${API_BASE_URL}/api/career-activities/${docId}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

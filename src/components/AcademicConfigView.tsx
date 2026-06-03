@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/config/api';
 import React, { useState, useEffect } from 'react';
 import { BookOpen, Plus, Trash2, Search, Filter, RefreshCw, Calculator, BookCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -22,8 +23,8 @@ export default function AcademicConfigView() {
       setLoading(true);
       const token = localStorage.getItem('token');
       const [deptRes, subjRes] = await Promise.all([
-        fetch('/api/admin/departments', { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch(`/api/admin/academic/subjects?department_id=${filters.department_id}&semester=${filters.semester}`, { 
+        fetch(`${API_BASE_URL}/api/admin/departments`, { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(`${API_BASE_URL}/api/admin/academic/subjects?department_id=${filters.department_id}&semester=${filters.semester}`, { 
           headers: { 'Authorization': `Bearer ${token}` } 
         })
       ]);
@@ -50,7 +51,7 @@ export default function AcademicConfigView() {
   const handleAddSubject = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch('/api/admin/academic/subjects/add', {
+      const res = await fetch(`${API_BASE_URL}/api/admin/academic/subjects/add`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -73,7 +74,7 @@ export default function AcademicConfigView() {
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this subject?")) return;
     try {
-      const res = await fetch(`/api/admin/academic/subjects/${id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/admin/academic/subjects/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });

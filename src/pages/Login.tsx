@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/config/api';
 import React, { useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -69,11 +70,11 @@ const Login: React.FC = () => {
   React.useEffect(() => {
     if (isSignup) {
       // Fetch colleges
-      fetch('/api/public/colleges').then(res => res.json()).then(data => {
+      fetch(`${API_BASE_URL}/api/public/colleges`).then(res => res.json()).then(data => {
         if (data.data) setColleges(data.data);
       });
       // Fetch departments
-      fetch('/api/public/departments').then(res => res.json()).then(data => {
+      fetch(`${API_BASE_URL}/api/public/departments`).then(res => res.json()).then(data => {
         if (data.data) setDepartments(data.data);
       });
     }
@@ -106,7 +107,7 @@ const Login: React.FC = () => {
     setError('');
     setIsSubmitting(true);
     try {
-      const response = await fetch('/api/auth/login', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
@@ -140,7 +141,7 @@ const Login: React.FC = () => {
     setError('');
     setIsSubmitting(true);
     try {
-      const response = await fetch('/api/verify-otp', {
+      const response = await fetch(`${API_BASE_URL}/api/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, otp })
@@ -170,7 +171,7 @@ const Login: React.FC = () => {
     setError('');
     try {
       // Try the new invite-code validation endpoint first (supports both CAMP-* and legacy)
-      const response = await fetch('/api/invite-codes/validate', {
+      const response = await fetch(`${API_BASE_URL}/api/invite-codes/validate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: signupCode.trim().toUpperCase() })
@@ -616,7 +617,7 @@ const Login: React.FC = () => {
                 type="button"
                 onClick={async () => {
                   try {
-                    const res = await fetch('/api/seed-users', { method: 'POST' });
+                    const res = await fetch(`${API_BASE_URL}/api/seed-users`, { method: 'POST' });
                     const data = await res.json();
                     if (res.ok) toast.success(data.message || "Test users seeded successfully!");
                     else toast.error(data.error || "Failed to seed users");

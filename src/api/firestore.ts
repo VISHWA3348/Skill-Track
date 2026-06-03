@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/config/api';
 // LOCAL SQLite API FIRESTORE
 
 export function getFirestore() {
@@ -62,7 +63,7 @@ function parseQuery(q: any) {
 
 export async function getDocs(q: any) {
   const { collectionName, conditions, orderBys, limit } = parseQuery(q);
-  const responseData = await fetchAPI(`/api/firestore/${collectionName}/query`, 'POST', { conditions, orderBys, limit });
+  const responseData = await fetchAPI(`${API_BASE_URL}/api/firestore/${collectionName}/query`, 'POST', { conditions, orderBys, limit });
   const docsData = responseData.success ? responseData.data : responseData.docs;
   
   const docs = (docsData || []).map((d: any) => ({
@@ -111,7 +112,7 @@ export function onSnapshot(q: any, onNext: (snap: any) => void, onError?: (err: 
 
 export async function getDoc(docRef: any) {
   try {
-    const data = await fetchAPI(`/api/firestore/${docRef.collection}/${docRef.id}`);
+    const data = await fetchAPI(`${API_BASE_URL}/api/firestore/${docRef.collection}/${docRef.id}`);
     const docData = data.success ? data.data : data.doc;
     return {
       id: docRef.id,
@@ -129,19 +130,19 @@ export async function getDoc(docRef: any) {
 export const getDocFromServer = getDoc;
 
 export async function setDoc(docRef: any, data: any, options: any = {}) {
-  await fetchAPI(`/api/firestore/${docRef.collection}/${docRef.id}`, 'POST', { data });
+  await fetchAPI(`${API_BASE_URL}/api/firestore/${docRef.collection}/${docRef.id}`, 'POST', { data });
 }
 
 export async function updateDoc(docRef: any, data: any) {
-  await fetchAPI(`/api/firestore/${docRef.collection}/${docRef.id}`, 'POST', { data });
+  await fetchAPI(`${API_BASE_URL}/api/firestore/${docRef.collection}/${docRef.id}`, 'POST', { data });
 }
 
 export async function deleteDoc(docRef: any) {
-  await fetchAPI(`/api/firestore/${docRef.collection}/${docRef.id}`, 'DELETE');
+  await fetchAPI(`${API_BASE_URL}/api/firestore/${docRef.collection}/${docRef.id}`, 'DELETE');
 }
 
 export async function addDoc(colRef: any, data: any) {
-  const res = await fetchAPI(`/api/firestore/${colRef.path}`, 'POST', { data });
+  const res = await fetchAPI(`${API_BASE_URL}/api/firestore/${colRef.path}`, 'POST', { data });
   return doc({}, colRef.path, res.id);
 }
 

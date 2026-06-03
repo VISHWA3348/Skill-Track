@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/config/api';
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { 
@@ -19,7 +20,7 @@ export default function DepartmentAIInsights() {
     if (!profile?.departmentId) return;
     try {
       if (force) setRefreshing(true);
-      const url = `/api/ai/department/${profile.departmentId}${force ? '?refresh=true' : ''}`;
+      const url = `${API_BASE_URL}/api/ai/department/${profile.departmentId}${force ? '?refresh=true' : ''}`;
       const response = await fetch(url, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });

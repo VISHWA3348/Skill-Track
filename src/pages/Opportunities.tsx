@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/config/api';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Plus, Trash2, ExternalLink, MapPin, Briefcase, Calendar, CheckCircle } from 'lucide-react';
@@ -43,7 +44,7 @@ const Opportunities: React.FC = () => {
   const fetchOpportunities = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/opportunities', {
+      const response = await fetch(`${API_BASE_URL}/api/opportunities`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await response.json();
@@ -61,7 +62,7 @@ const Opportunities: React.FC = () => {
     e.preventDefault();
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/opportunities', {
+      const response = await fetch(`${API_BASE_URL}/api/opportunities`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -93,7 +94,7 @@ const Opportunities: React.FC = () => {
     if (!window.confirm("Delete this opportunity?")) return;
     try {
       const token = localStorage.getItem('token');
-      await fetch(`/api/opportunities/${id}`, {
+      await fetch(`${API_BASE_URL}/api/opportunities/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });

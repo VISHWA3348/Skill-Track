@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/config/api';
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -651,7 +652,7 @@ const Certificates: React.FC = () => {
         nextStatus = 'rejected';
       }
 
-      const response = await fetch(`/api/certifications/${selectedCert.id}/status`, {
+      const response = await fetch(`${API_BASE_URL}/api/certifications/${selectedCert.id}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

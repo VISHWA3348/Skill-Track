@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/config/api';
 import React, { useState, useEffect } from 'react';
 import { db } from '../api/localApi';
 import { collection, query, where, getDocs } from '../api/localApi';
@@ -33,7 +34,7 @@ export default function Reports() {
       setLoading(true);
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch('/api/reports/ranking', {
+        const response = await fetch(`${API_BASE_URL}/api/reports/ranking`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         
@@ -65,7 +66,7 @@ export default function Reports() {
   const handleDownloadExcel = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/reports/export/excel', {
+      const response = await fetch(`${API_BASE_URL}/api/reports/export/excel`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       

@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/config/api';
 import React, { useState, useEffect } from 'react';
 import { Award, BookOpen, Calculator, Calendar, CheckCircle2, Save, TrendingUp, AlertCircle, RefreshCw } from 'lucide-react';
 import { motion } from 'motion/react';
@@ -24,7 +25,7 @@ export default function AcademicProfileView() {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const response = await fetch('/api/student/academic-profile', {
+        const response = await fetch(`${API_BASE_URL}/api/student/academic-profile`, {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         });
         if (response.ok) {
@@ -53,7 +54,7 @@ export default function AcademicProfileView() {
     e.preventDefault();
     setSaving(true);
     try {
-      const response = await fetch('/api/student/academic-profile', {
+      const response = await fetch(`${API_BASE_URL}/api/student/academic-profile`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

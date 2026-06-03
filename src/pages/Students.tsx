@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/config/api';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { db, handleApiError, OperationType, storage } from '../api/localApi';
@@ -113,7 +114,7 @@ const Students: React.FC = () => {
       let finalPhotoUrl = '';
 
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/admin/users', {
+      const response = await fetch(`${API_BASE_URL}/api/admin/users`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -257,7 +258,7 @@ const Students: React.FC = () => {
       }
 
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/admin/users/bulk', {
+      const response = await fetch(`${API_BASE_URL}/api/admin/users/bulk`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

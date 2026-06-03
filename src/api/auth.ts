@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/config/api';
 // LOCAL SQLite API AUTH
 class LocalAuth {
   currentUser: any = null;
@@ -12,7 +13,7 @@ class LocalAuth {
     const token = localStorage.getItem('token');
     if (token) {
       try {
-        const res = await fetch('/api/auth/verify', {
+        const res = await fetch(`${API_BASE_URL}/api/auth/verify`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (res.ok) {
@@ -60,7 +61,7 @@ export function onAuthStateChanged(auth: any, callback: (user: any) => void) {
 }
 
 export async function signInWithEmailAndPassword(auth: any, email: string, password: string) {
-  const res = await fetch('/api/auth/login', {
+  const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password })
@@ -78,7 +79,7 @@ export async function signInWithEmailAndPassword(auth: any, email: string, passw
 }
 
 export async function createUserWithEmailAndPassword(auth: any, email: string, password: string, extraFields: any = {}) {
-  const res = await fetch('/api/auth/register', {
+  const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password, ...extraFields })

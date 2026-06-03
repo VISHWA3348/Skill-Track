@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/config/api';
 import React, { useState, useEffect } from 'react';
 import { ShieldAlert, AlertTriangle, CheckCircle2, Search, Filter, ExternalLink, Trash2, Eye, MapPin, Clock, Fingerprint } from 'lucide-react';
 import { toast } from 'sonner';
@@ -12,7 +13,7 @@ export default function FraudDetectionPanel() {
 
   const fetchLogs = async () => {
     try {
-      const res = await fetch('/api/superadmin/fraud-logs', {
+      const res = await fetch(`${API_BASE_URL}/api/superadmin/fraud-logs`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
       const result = await res.json();

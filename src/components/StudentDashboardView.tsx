@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/config/api';
 import React, { useState, useEffect } from 'react';
 import { db } from '../api/localApi';
 import { collection, query, where, onSnapshot } from '../api/localApi';
@@ -43,10 +44,10 @@ export default function StudentDashboardView() {
     const fetchData = async () => {
       try {
         const [statsRes, oppsRes, acadRes, notifRes] = await Promise.all([
-          fetch('/api/admin/stats', { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } }),
-          fetch('/api/opportunities', { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } }),
-          fetch('/api/student/academic-profile', { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } }),
-          fetch('/api/student/notifications', { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } })
+          fetch(`${API_BASE_URL}/api/admin/stats`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } }),
+          fetch(`${API_BASE_URL}/api/opportunities`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } }),
+          fetch(`${API_BASE_URL}/api/student/academic-profile`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } }),
+          fetch(`${API_BASE_URL}/api/student/notifications`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } })
         ]);
 
         if (statsRes.ok) {
@@ -73,7 +74,7 @@ export default function StudentDashboardView() {
         }
 
         // Fetch granular academic performance
-        const perfRes = await fetch('/api/student/academic/performance', {
+        const perfRes = await fetch(`${API_BASE_URL}/api/student/academic/performance`, {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         });
         if (perfRes.ok) {

@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/config/api';
 import React, { useState, useEffect, useRef } from 'react';
 import { db, logAudit, handleApiError, OperationType, auth } from '../api/localApi';
 import { collection, onSnapshot, updateDoc, deleteDoc, doc, query, orderBy, where } from '../api/localApi';
@@ -81,7 +82,7 @@ export default function CertificationModule() {
   const fetchCerts = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('/api/certifications', {
+      const res = await fetch(`${API_BASE_URL}/api/certifications`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -96,7 +97,7 @@ export default function CertificationModule() {
   const fetchStudents = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('/api/admin/users?role=student', {
+      const res = await fetch(`${API_BASE_URL}/api/admin/users?role=student`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -281,7 +282,7 @@ export default function CertificationModule() {
         if (metadataExtracted.gpsLat) fd.append('gps_lat', String(metadataExtracted.gpsLat));
         if (metadataExtracted.gpsLng) fd.append('gps_lng', String(metadataExtracted.gpsLng));
 
-        const res = await fetch('/api/upload', {
+        const res = await fetch(`${API_BASE_URL}/api/upload`, {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}` },
           body: fd

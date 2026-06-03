@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/config/api';
 import React, { useState, useEffect } from 'react';
 import { Building2, Plus, Search, MoreVertical, MapPin, Users, Award, Shield, Trash2, Edit2, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
@@ -15,7 +16,7 @@ export default function CollegeManagement() {
 
   const fetchColleges = async () => {
     try {
-      const res = await fetch('/api/superadmin/colleges', {
+      const res = await fetch(`${API_BASE_URL}/api/superadmin/colleges`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
       const result = await res.json();
@@ -28,7 +29,7 @@ export default function CollegeManagement() {
 
   const handleAddCollege = async () => {
     try {
-      const res = await fetch('/api/superadmin/colleges', {
+      const res = await fetch(`${API_BASE_URL}/api/superadmin/colleges`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',

@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/config/api';
 import React, { useState, useEffect, useRef } from 'react';
 import { useVirtual } from '../hooks/useVirtual';
 import { useAuth } from '../context/AuthContext';
@@ -93,7 +94,7 @@ const Users: React.FC = () => {
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      const response = await fetch('/api/admin/users', {
+      const response = await fetch(`${API_BASE_URL}/api/admin/users`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -196,7 +197,7 @@ const Users: React.FC = () => {
     try {
       const token = localStorage.getItem('token');
       
-      const endpoint = isEditing ? `/api/admin/users/${editingUserId}` : '/api/admin/users';
+      const endpoint = isEditing ? `${API_BASE_URL}/api/admin/users/${editingUserId}` : `${API_BASE_URL}/api/admin/users`;
       const method = isEditing ? 'PUT' : 'POST';
       
       let body: any = {
@@ -273,7 +274,7 @@ const Users: React.FC = () => {
       onConfirm: async () => {
         try {
           const token = localStorage.getItem('token');
-          const response = await fetch(`/api/admin/users/${uid}`, {
+          const response = await fetch(`${API_BASE_URL}/api/admin/users/${uid}`, {
             method: 'DELETE',
             headers: {
               'Authorization': `Bearer ${token}`
@@ -302,7 +303,7 @@ const Users: React.FC = () => {
       onConfirm: async () => {
         try {
           const token = localStorage.getItem('token');
-          const response = await fetch(`/api/admin/users/${uid}/status`, {
+          const response = await fetch(`${API_BASE_URL}/api/admin/users/${uid}/status`, {
             method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
@@ -375,7 +376,7 @@ const Users: React.FC = () => {
       }));
 
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/admin/users/bulk', {
+      const response = await fetch(`${API_BASE_URL}/api/admin/users/bulk`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

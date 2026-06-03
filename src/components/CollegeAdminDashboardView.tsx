@@ -49,6 +49,9 @@ export default function CollegeAdminDashboardView() {
   });
   const [newDept, setNewDept] = useState({ name: '', department_id: '' });
   const [createdInviteCode, setCreatedInviteCode] = useState<string | null>(null);
+  const [viewingStudentsCode, setViewingStudentsCode] = useState<{ id: string; code: string; deptName: string } | null>(null);
+  const [codeStudents, setCodeStudents] = useState<any[]>([]);
+  const [loadingStudents, setLoadingStudents] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -156,6 +159,28 @@ export default function CollegeAdminDashboardView() {
     navigator.clipboard.writeText(text).then(() => toast.success('Invite code copied!'));
   };
 
+  const handleViewStudentsForCode = async (inviteCodeId: string, inviteCodeStr: string, deptName: string) => {
+    try {
+      setViewingStudentsCode({ id: inviteCodeId, code: inviteCodeStr, deptName });
+      setLoadingStudents(true);
+      setCodeStudents([]);
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_BASE_URL}/api/invite-codes/${inviteCodeId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setCodeStudents(data.data.registeredStudents || []);
+      } else {
+        toast.error(data.error || 'Failed to fetch registered students');
+      }
+    } catch (e) {
+      toast.error('Failed to fetch registered students');
+    } finally {
+      setLoadingStudents(false);
+    }
+  };
+
   if (loading) return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
       <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
@@ -209,6 +234,7 @@ export default function CollegeAdminDashboardView() {
           { id: 'certificates', label: 'Certifications', icon: <Award className="w-4 h-4" /> },
           { id: 'staff', label: 'Staff & HODs', icon: <UserCheck className="w-4 h-4" /> },
           { id: 'departments', label: 'Departments', icon: <Database className="w-4 h-4" /> },
+          { id: 'manage_codes', label: 'Manage Codes', icon: <Key className="w-4 h-4" /> },
           { id: 'analytics', label: 'Analytics', icon: <BarChart3 className="w-4 h-4" /> },
           { id: 'academic_config', label: 'Academic Config', icon: <Settings className="w-4 h-4" /> },
           { id: 'notifications', label: 'Broadcast History', icon: <Mail className="w-4 h-4" /> },
@@ -605,6 +631,14 @@ export default function CollegeAdminDashboardView() {
                     <span className="text-slate-500">Avg CGPA</span>
                     <span className="font-bold text-emerald-600">{d.avg_cgpa ? d.avg_cgpa.toFixed(2) : '0.00'}</span>
                   </div>
+                  {d.invite_code_id && (
+                    <button
+                      onClick={() => handleViewStudentsForCode(d.invite_code_id, d.invite_code, d.name)}
+                      className="w-full mt-2 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+                    >
+                      <Users className="w-3.5 h-3.5" /> View Registered Students
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -628,6 +662,84 @@ export default function CollegeAdminDashboardView() {
             animate={{ opacity: 1 }}
           >
             <CollegeAITrends />
+          </motion.div>
+        )}
+
+        {activeTab === 'manage_codes' && (
+          <motion.div
+            key="manage_codes"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden"
+          >
+            <div className="p-6 border-b border-slate-50 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-xl font-bold text-slate-900">Manage Department Invite Codes</h3>
+                <p className="text-slate-500 text-sm mt-1">View, copy, and regenerate invite codes for your college's departments.</p>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-[10px] tracking-wider">
+                  <tr>
+                    <th className="px-6 py-4">Department</th>
+                    <th className="px-6 py-4">Invite Code</th>
+                    <th className="px-6 py-4">Status</th>
+                    <th className="px-6 py-4 text-center">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {departments.map((d) => (
+                    <tr key={d.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="px-6 py-4 font-bold text-slate-900">{d.name}</td>
+                      <td className="px-6 py-4">
+                        {d.invite_code ? (
+                          <div className="flex items-center gap-2">
+                            <code className="bg-indigo-50 px-2 py-1 rounded text-indigo-700 font-mono font-bold text-xs uppercase">
+                              {d.invite_code}
+                            </code>
+                            <button
+                              onClick={() => copyToClipboard(d.invite_code)}
+                              className="text-slate-400 hover:text-indigo-600 transition-colors"
+                              title="Copy Invite Code"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-slate-400 italic">No active code</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700">
+                          <CheckCircle2 className="w-3 h-3" /> Active
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center justify-center gap-3">
+                          <button
+                            onClick={() => handleRegenerateCode(d.id, d.name)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-lg text-xs font-bold transition-all"
+                            title="Regenerate Invite Code"
+                          >
+                            <RefreshCw className="w-3.5 h-3.5" /> Regenerate
+                          </button>
+                          {d.invite_code_id && (
+                            <button
+                              onClick={() => handleViewStudentsForCode(d.invite_code_id, d.invite_code, d.name)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-lg text-xs font-bold transition-all"
+                              title="View registered students"
+                            >
+                              <Users className="w-3.5 h-3.5" /> View Students
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </motion.div>
         )}
 
@@ -908,6 +1020,91 @@ export default function CollegeAdminDashboardView() {
           </motion.div>
         </div>
       )}
+
+      {/* Registered Students Modal */}
+      <AnimatePresence>
+        {viewingStudentsCode && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden max-h-[85vh] flex flex-col"
+            >
+              <div className="p-6 bg-indigo-600 text-white flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Users className="w-6 h-6" />
+                  <div>
+                    <h3 className="text-xl font-bold">Students Using Code</h3>
+                    <p className="text-indigo-100 text-xs mt-0.5">
+                      Code: <span className="font-mono font-bold">{viewingStudentsCode.code}</span> ({viewingStudentsCode.deptName})
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setViewingStudentsCode(null)}
+                  className="p-1 text-indigo-100 hover:text-white hover:bg-indigo-700/50 rounded-lg transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6">
+                {loadingStudents ? (
+                  <div className="flex flex-col items-center justify-center py-12 space-y-3">
+                    <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+                    <p className="text-sm text-slate-500 font-medium">Fetching students list...</p>
+                  </div>
+                ) : codeStudents.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                      <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-[10px] tracking-wider">
+                        <tr>
+                          <th className="px-4 py-3">Student Name</th>
+                          <th className="px-4 py-3">Email</th>
+                          <th className="px-4 py-3">Roll No</th>
+                          <th className="px-4 py-3">Registered On</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                        {codeStudents.map((s: any) => (
+                          <tr key={s.uid} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="px-4 py-3 font-semibold text-slate-900">{s.name}</td>
+                            <td className="px-4 py-3 text-slate-600">{s.email}</td>
+                            <td className="px-4 py-3 text-slate-700 font-mono">{s.roll_no || 'N/A'}</td>
+                            <td className="px-4 py-3 text-slate-500 text-xs">
+                              {s.created_at ? new Date(s.created_at).toLocaleDateString() : 'N/A'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-12 space-y-2">
+                    <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto text-slate-400">
+                      <Users className="w-6 h-6" />
+                    </div>
+                    <h4 className="font-bold text-slate-800">No Registrations Yet</h4>
+                    <p className="text-slate-500 text-xs max-w-sm mx-auto">
+                      No students have registered using this invite code yet. Share the code to start registration.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end">
+                <button
+                  onClick={() => setViewingStudentsCode(null)}
+                  className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-bold transition-all"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

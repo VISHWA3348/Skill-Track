@@ -3,12 +3,14 @@ import { useAuth } from '../context/AuthContext';
 import { db, handleApiError, OperationType, logAudit } from '../api/localApi';
 import { collection, query, where, onSnapshot, addDoc, deleteDoc, doc, updateDoc, setDoc } from '../api/localApi';
 import { Department } from '../types';
-import { Network, Plus, X, AlertTriangle } from 'lucide-react';
+import { Network, Plus, X, AlertTriangle, Copy, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
+import { API_BASE_URL } from '@/config/api';
 
 const Departments: React.FC = () => {
   const { profile, isSuperAdmin } = useAuth();
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [inviteCodes, setInviteCodes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -18,6 +20,28 @@ const Departments: React.FC = () => {
   const [name, setName] = useState('');
   const [collegeId, setCollegeId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const fetchInviteCodes = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      const res = await fetch(`${API_BASE_URL}/api/invite-codes`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setInviteCodes(data.data);
+      }
+    } catch (e) {
+      console.error('Failed to fetch invite codes:', e);
+    }
+  };
+
+  useEffect(() => {
+    if (profile) {
+      fetchInviteCodes();
+    }
+  }, [profile, departments]);
 
   // Confirmation Modal State
   const [confirmModal, setConfirmModal] = useState<{
@@ -118,6 +142,25 @@ const Departments: React.FC = () => {
     }
   };
 
+  const handleRegenerateCode = async (deptId: string, deptName: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_BASE_URL}/api/admin/department/${deptId}/regenerate-code`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(`New code for ${deptName}: ${data.inviteCode}`);
+        fetchInviteCodes();
+      } else {
+        toast.error(data.error || 'Failed to regenerate invite code');
+      }
+    } catch (e) {
+      toast.error('Failed to regenerate invite code');
+    }
+  };
+
   const handleDelete = async (id: string, deptName: string, deptCollegeId: string) => {
     setConfirmModal({
       isOpen: true,
@@ -165,6 +208,7 @@ const Departments: React.FC = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dept ID</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                 {isSuperAdmin && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">College ID</th>}
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invite Code</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
@@ -173,6 +217,9 @@ const Departments: React.FC = () => {
                   const deptName = d.name || d.department_name || 'Unnamed Department';
                   const deptId = d.department_id || d.id || '-';
                   const collegeId = d.college_id || d.collegeId || '-';
+                  const deptInviteCode = inviteCodes.find(
+                    ic => ic.department_id === deptId || ic.departmentId === deptId || ic.id === deptId
+                  );
                   return (
                     <tr key={d.id}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -191,6 +238,34 @@ const Departments: React.FC = () => {
                           {collegeId}
                         </td>
                       )}
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {deptInviteCode ? (
+                          <div className="flex items-center space-x-2">
+                            <span className="font-mono bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded text-xs font-bold uppercase tracking-wider">
+                              {deptInviteCode.code}
+                            </span>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(deptInviteCode.code);
+                                toast.success('Invite code copied!');
+                              }}
+                              className="text-slate-400 hover:text-indigo-600 transition-colors p-1"
+                              title="Copy Code"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleRegenerateCode(deptId, deptName)}
+                              className="text-slate-400 hover:text-indigo-600 transition-colors p-1"
+                              title="Regenerate Invite Code"
+                            >
+                              <RefreshCw className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400 italic">No Active Code</span>
+                        )}
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <button onClick={() => handleOpenModal(d)} className="text-blue-600 hover:text-blue-900 mr-3">Edit</button>
                         <button onClick={() => handleDelete(d.id, deptName, collegeId)} className="text-red-600 hover:text-red-900">Delete</button>

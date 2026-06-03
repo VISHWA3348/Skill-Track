@@ -440,6 +440,9 @@ export function setDocument(collectionName: string, id: string, data: any) {
       (data.created_at || data.createdAt || new Date().toISOString()) ?? null
     );
   } else if (tableName === 'departments') {
+    const deptId = (data.department_id || data.departmentId || id);
+    const collegeId = (data.college_id || data.collegeId);
+    
     db.prepare(`
       INSERT INTO departments (id, department_id, college_id, name)
       VALUES (?, ?, ?, ?)
@@ -447,10 +450,28 @@ export function setDocument(collectionName: string, id: string, data: any) {
         department_id=excluded.department_id, college_id=excluded.college_id, name=excluded.name
     `).run(
       id, 
-      (data.department_id || data.departmentId || id) ?? null, 
-      (data.college_id || data.collegeId) ?? null, 
+      deptId ?? null, 
+      collegeId ?? null, 
       (data.name || data.department_name || data.departmentName) ?? 'Unknown Department'
     );
+
+    if (deptId && collegeId) {
+      const existingCode = db.prepare('SELECT id FROM department_invite_codes WHERE department_id = ?').get(deptId);
+      if (!existingCode) {
+        const random = Math.random().toString(36).substring(2, 8).toUpperCase();
+        const codePrefix = deptId.substring(0, 5).toUpperCase().replace(/[^A-Z0-9]/g, '');
+        const inviteCode = `${codePrefix}-${random}`;
+        const newCodeId = 'dic_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+        try {
+          db.prepare(`
+            INSERT INTO department_invite_codes (id, code, college_id, department_id, is_active, max_registrations, current_registrations, created_at, created_by)
+            VALUES (?, ?, ?, ?, 1, -1, 0, CURRENT_TIMESTAMP, 'system_auto')
+          `).run(newCodeId, inviteCode, collegeId, deptId);
+        } catch(e) {
+          console.error("Failed to auto-generate invite code in DB trigger:", e);
+        }
+      }
+    }
   } else {
     // Fallback for smaller/config tables
     const existing = getDocument(collectionName, id) || {};

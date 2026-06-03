@@ -15,7 +15,7 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
   max: 50,                    // max simultaneous connections tuned for 5000+ users
   idleTimeoutMillis: 10000,   // close idle connections after 10s to reclaim resources
-  connectionTimeoutMillis: 2000, // fail fast (2s) if pool exhausted
+  connectionTimeoutMillis: 10000, // allow up to 10s for connection establishment
 });
 
 const sharedBuffer = workerData.sharedBuffer;

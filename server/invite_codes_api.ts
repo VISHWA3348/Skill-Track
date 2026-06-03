@@ -162,48 +162,86 @@ export function setupInviteCodesApi(app: express.Express) {
   });
 
   // ============================================================
-  // All routes below require Super Admin authentication
+  // All routes below require Super Admin or College Admin authentication
   // ============================================================
-  router.use(authenticate, checkRole(['super_admin']));
+  router.use(authenticate, checkRole(['super_admin', 'admin']));
 
   // ============================================================
   // GET /api/invite-codes/stats/summary  — Stats dashboard
   // ============================================================
   router.get('/stats/summary', (req, res) => {
     try {
-      const total = (db.prepare('SELECT COUNT(*) as count FROM department_invite_codes').get() as any).count;
-      const active = (db.prepare('SELECT COUNT(*) as count FROM department_invite_codes WHERE is_active = 1').get() as any).count;
-      const inactive = (db.prepare('SELECT COUNT(*) as count FROM department_invite_codes WHERE is_active = 0').get() as any).count;
+      const user = (req as any).userData;
+      const isCollegeAdmin = user.role === 'admin';
+      const cId = user.collegeId || user.college_id;
 
-      const now = new Date().toISOString();
-      const expired = (db.prepare(
-        'SELECT COUNT(*) as count FROM department_invite_codes WHERE expires_at IS NOT NULL AND expires_at < ?'
-      ).get(now) as any).count;
+      let totalQuery = 'SELECT COUNT(*) as count FROM department_invite_codes';
+      let activeQuery = 'SELECT COUNT(*) as count FROM department_invite_codes WHERE is_active = 1';
+      let inactiveQuery = 'SELECT COUNT(*) as count FROM department_invite_codes WHERE is_active = 0';
+      let expiredQuery = 'SELECT COUNT(*) as count FROM department_invite_codes WHERE expires_at IS NOT NULL AND expires_at < ?';
+      
+      const paramsTotal: any[] = [];
+      const paramsActive: any[] = [];
+      const paramsInactive: any[] = [];
+      const paramsExpired: any[] = [new Date().toISOString()];
+
+      if (isCollegeAdmin) {
+        totalQuery += ' WHERE college_id = ?';
+        activeQuery += ' AND college_id = ?';
+        inactiveQuery += ' AND college_id = ?';
+        expiredQuery += ' AND college_id = ?';
+        paramsTotal.push(cId);
+        paramsActive.push(cId);
+        paramsInactive.push(cId);
+        paramsExpired.push(cId);
+      }
+
+      const total = (db.prepare(totalQuery).get(...paramsTotal) as any).count;
+      const active = (db.prepare(activeQuery).get(...paramsActive) as any).count;
+      const inactive = (db.prepare(inactiveQuery).get(...paramsInactive) as any).count;
+      const expired = (db.prepare(expiredQuery).get(...paramsExpired) as any).count;
 
       // Registrations today
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
-      const regToday = (db.prepare(`
+      let regTodayQuery = `
         SELECT COUNT(*) as count FROM audit_logs
         WHERE action = 'INVITE_CODE_USED' AND timestamp >= ?
-      `).get(todayStart.toISOString()) as any).count;
+      `;
+      const regTodayParams: any[] = [todayStart.toISOString()];
+      if (isCollegeAdmin) {
+        regTodayQuery += ' AND college_id = ?';
+        regTodayParams.push(cId);
+      }
+      const regToday = (db.prepare(regTodayQuery).get(...regTodayParams) as any).count;
 
       // Registrations by department
-      const byDept = db.prepare(`
+      let byDeptQuery = `
         SELECT d.department_id, dep.name as department_name, d.current_registrations
         FROM department_invite_codes d
         LEFT JOIN departments dep ON d.department_id = dep.id
-        ORDER BY d.current_registrations DESC
-      `).all();
+      `;
+      const byDeptParams: any[] = [];
+      if (isCollegeAdmin) {
+        byDeptQuery += ' WHERE d.college_id = ?';
+        byDeptParams.push(cId);
+      }
+      byDeptQuery += ' ORDER BY d.current_registrations DESC';
+      const byDept = db.prepare(byDeptQuery).all(...byDeptParams);
 
       // Registrations by college
-      const byCollege = db.prepare(`
+      let byCollegeQuery = `
         SELECT d.college_id, c.name as college_name, SUM(d.current_registrations) as total_registrations
         FROM department_invite_codes d
         LEFT JOIN colleges c ON d.college_id = c.id
-        GROUP BY d.college_id
-        ORDER BY total_registrations DESC
-      `).all();
+      `;
+      const byCollegeParams: any[] = [];
+      if (isCollegeAdmin) {
+        byCollegeQuery += ' WHERE d.college_id = ?';
+        byCollegeParams.push(cId);
+      }
+      byCollegeQuery += ' GROUP BY d.college_id ORDER BY total_registrations DESC';
+      const byCollege = db.prepare(byCollegeQuery).all(...byCollegeParams);
 
       res.json({
         success: true,
@@ -228,6 +266,13 @@ export function setupInviteCodesApi(app: express.Express) {
   router.get('/', (req, res) => {
     try {
       const { collegeId, departmentId, active } = req.query;
+      const user = (req as any).userData;
+      
+      let targetCollegeId = collegeId;
+      if (user.role === 'admin') {
+        targetCollegeId = user.collegeId || user.college_id;
+      }
+
       let sql = `
         SELECT d.*, c.name as college_name, dep.name as department_name
         FROM department_invite_codes d
@@ -237,7 +282,7 @@ export function setupInviteCodesApi(app: express.Express) {
       `;
       const params: any[] = [];
 
-      if (collegeId) { sql += ' AND d.college_id = ?'; params.push(collegeId); }
+      if (targetCollegeId) { sql += ' AND d.college_id = ?'; params.push(targetCollegeId); }
       if (departmentId) { sql += ' AND d.department_id = ?'; params.push(departmentId); }
       if (active !== undefined) { sql += ' AND d.is_active = ?'; params.push(active === '1' || active === 'true' ? 1 : 0); }
 
@@ -256,6 +301,8 @@ export function setupInviteCodesApi(app: express.Express) {
   router.get('/:id', (req, res) => {
     try {
       const { id } = req.params;
+      const user = (req as any).userData;
+
       const code = db.prepare(`
         SELECT d.*, c.name as college_name, dep.name as department_name
         FROM department_invite_codes d
@@ -265,6 +312,11 @@ export function setupInviteCodesApi(app: express.Express) {
       `).get(id) as any;
 
       if (!code) return res.status(404).json({ error: 'Invite code not found' });
+
+      // Enforce data isolation: college admin can only see their own college's codes
+      if (user.role === 'admin' && code.college_id !== (user.collegeId || user.college_id)) {
+        return res.status(403).json({ error: 'Forbidden: Access to another college\'s invite codes is denied' });
+      }
 
       // Get students who registered using this code via audit logs
       const registeredStudents = db.prepare(`
@@ -296,13 +348,25 @@ export function setupInviteCodesApi(app: express.Express) {
       const adminUser = (req as any).userData;
       const ip = getClientIp(req);
 
-      if (!collegeId || !departmentId) {
+      let targetCollegeId = collegeId;
+      if (adminUser.role === 'admin') {
+        targetCollegeId = adminUser.collegeId || adminUser.college_id;
+      }
+
+      if (!targetCollegeId || !departmentId) {
         return res.status(400).json({ error: 'collegeId and departmentId are required' });
       }
 
-      // Look up department name for the code prefix
-      const dept = db.prepare('SELECT name FROM departments WHERE id = ?').get(departmentId) as any;
-      const deptCode = dept?.name || departmentId;
+      // Verify department belongs to the target college
+      const deptRow = db.prepare('SELECT college_id, name FROM departments WHERE id = ?').get(departmentId) as any;
+      if (!deptRow) {
+        return res.status(404).json({ error: 'Department not found' });
+      }
+      if (deptRow.college_id !== targetCollegeId) {
+        return res.status(403).json({ error: 'Forbidden: Department does not belong to your college' });
+      }
+
+      const deptCode = deptRow.name || departmentId;
 
       const finalCode = customCode
         ? String(customCode).toUpperCase().trim()
@@ -324,18 +388,18 @@ export function setupInviteCodesApi(app: express.Express) {
       `).run(
         id,
         finalCode,
-        collegeId,
+        targetCollegeId,
         departmentId,
         maxRegistrations !== undefined ? Number(maxRegistrations) : -1,
         expiresAt || null,
-        adminUser?.uid || 'super_admin'
+        adminUser?.uid || 'admin'
       );
 
       writeAuditLog(
         'INVITE_CODE_CREATED',
-        `Created invite code ${finalCode} for dept ${departmentId} in college ${collegeId}`,
-        adminUser?.uid || 'super_admin',
-        collegeId,
+        `Created invite code ${finalCode} for dept ${departmentId} in college ${targetCollegeId}`,
+        adminUser?.uid || 'admin',
+        targetCollegeId,
         ip
       );
 
@@ -361,6 +425,11 @@ export function setupInviteCodesApi(app: express.Express) {
       const existing = db.prepare('SELECT * FROM department_invite_codes WHERE id = ?').get(id) as any;
       if (!existing) return res.status(404).json({ error: 'Invite code not found' });
 
+      // Enforce data isolation: college admin can only edit their own college's codes
+      if (adminUser.role === 'admin' && existing.college_id !== (adminUser.collegeId || adminUser.college_id)) {
+        return res.status(403).json({ error: 'Forbidden: Access to another college\'s invite codes is denied' });
+      }
+
       let newCode = existing.code;
 
       if (regenerate === true) {
@@ -379,7 +448,7 @@ export function setupInviteCodesApi(app: express.Express) {
         writeAuditLog(
           'INVITE_CODE_REGENERATED',
           `Regenerated invite code ${existing.code} → ${newCode} for dept ${existing.department_id}`,
-          adminUser?.uid || 'super_admin',
+          adminUser?.uid || 'admin',
           existing.college_id,
           ip
         );
@@ -400,7 +469,7 @@ export function setupInviteCodesApi(app: express.Express) {
         writeAuditLog(
           actionLabel,
           `${finalActive ? 'Enabled' : 'Disabled'} invite code ${existing.code}`,
-          adminUser?.uid || 'super_admin',
+          adminUser?.uid || 'admin',
           existing.college_id,
           ip
         );
@@ -428,12 +497,17 @@ export function setupInviteCodesApi(app: express.Express) {
       const existing = db.prepare('SELECT * FROM department_invite_codes WHERE id = ?').get(id) as any;
       if (!existing) return res.status(404).json({ error: 'Invite code not found' });
 
+      // Enforce data isolation: college admin can only delete their own college's codes
+      if (adminUser.role === 'admin' && existing.college_id !== (adminUser.collegeId || adminUser.college_id)) {
+        return res.status(403).json({ error: 'Forbidden: Access to another college\'s invite codes is denied' });
+      }
+
       db.prepare('DELETE FROM department_invite_codes WHERE id = ?').run(id);
 
       writeAuditLog(
         'INVITE_CODE_DELETED',
         `Deleted invite code ${existing.code} (dept: ${existing.department_id}, college: ${existing.college_id})`,
-        adminUser?.uid || 'super_admin',
+        adminUser?.uid || 'admin',
         existing.college_id,
         ip
       );

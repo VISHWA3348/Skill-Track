@@ -150,19 +150,16 @@ export function setupApi(app: express.Express) {
 
       const uppercaseCode = providedCode.toUpperCase();
 
-      if (uppercaseCode.startsWith('CAMP-')) {
-        // Try new department_invite_codes table
-        const inviteRow = db.prepare(`
-          SELECT d.*, c.name as college_name, dep.name as department_name
-          FROM department_invite_codes d
-          LEFT JOIN colleges c ON d.college_id = c.id
-          LEFT JOIN departments dep ON d.department_id = dep.id
-          WHERE d.code = ?
-        `).get(uppercaseCode) as any;
+      // Try new department_invite_codes table first
+      const inviteRow = db.prepare(`
+        SELECT d.*, c.name as college_name, dep.name as department_name
+        FROM department_invite_codes d
+        LEFT JOIN colleges c ON d.college_id = c.id
+        LEFT JOIN departments dep ON d.department_id = dep.id
+        WHERE d.code = ?
+      `).get(uppercaseCode) as any;
 
-        if (!inviteRow) {
-          return res.status(403).json({ error: 'auth/invalid-code', message: 'Invalid or unrecognized Department Invite Code' });
-        }
+      if (inviteRow) {
         if (!inviteRow.is_active || inviteRow.is_active === 0) {
           return res.status(403).json({ error: 'auth/code-inactive', message: 'This Department Invite Code has been deactivated' });
         }
@@ -761,8 +758,23 @@ export function setupApi(app: express.Express) {
       let college = getDocument('colleges', 'COL001');
       if (!college) setDocument('colleges', 'COL001', { id: 'COL001', name: 'Test Engineering College', location: 'Test City', createdAt: new Date().toISOString() });
       
-      let department = getDocument('departments', 'CSE');
-      if (!department) setDocument('departments', 'CSE', { id: 'CSE', collegeId: 'COL001', name: 'Computer Science & Engineering' });
+      // Clean up previous CSE & BIOTECH departments & invite codes to ensure trigger/endpoints generate fresh active codes
+      try {
+        db.prepare("DELETE FROM departments WHERE id = 'CSE' OR department_id = 'BIOTECH' OR id = 'BIOTECH'").run();
+        db.prepare("DELETE FROM department_invite_codes WHERE department_id = 'CSE' OR department_id = 'BIOTECH' OR department_id = 'dept_biotech'").run();
+        
+        // Clean up previous integration test students and users to prevent duplicate roll_no
+        const testStudents = db.prepare("SELECT user_id FROM students WHERE roll_no = 'BIO999' OR roll_no = 'STU001'").all() as any[];
+        for (const ts of testStudents) {
+          db.prepare('DELETE FROM users WHERE uid = ?').run(ts.user_id);
+          db.prepare('DELETE FROM students WHERE user_id = ?').run(ts.user_id);
+          db.prepare('DELETE FROM student_academic_profile WHERE student_id = ?').run(ts.user_id);
+          db.prepare('DELETE FROM ai_career_insights WHERE student_id = ?').run(ts.user_id);
+        }
+        db.prepare("DELETE FROM users WHERE email LIKE 'student_biotech_%'").run();
+      } catch (err) {}
+      
+      setDocument('departments', 'CSE', { id: 'CSE', collegeId: 'COL001', name: 'Computer Science & Engineering' });
 
       const superadminExamplePass = process.env.SEED_SUPERADMIN_PASSWORD || 'password123';
       const superadminCerttrackPass = process.env.SEED_SUPERADMIN_PASSWORD || 'SuperAdminPassword123!';
@@ -786,6 +798,15 @@ export function setupApi(app: express.Express) {
       let skipped = 0;
       
       for (const u of seedUsers) {
+        if (u.rollNo) {
+          const existingRoll = db.prepare('SELECT user_id FROM students WHERE roll_no = ?').get(u.rollNo) as any;
+          if (existingRoll) {
+            db.prepare('DELETE FROM users WHERE uid = ?').run(existingRoll.user_id);
+            db.prepare('DELETE FROM students WHERE user_id = ?').run(existingRoll.user_id);
+            db.prepare('DELETE FROM student_academic_profile WHERE student_id = ?').run(existingRoll.user_id);
+            db.prepare('DELETE FROM ai_career_insights WHERE student_id = ?').run(existingRoll.user_id);
+          }
+        }
         const existing = db.prepare('SELECT uid FROM users WHERE email = ?').get(u.email) as any;
         if (existing) {
           db.prepare('DELETE FROM users WHERE uid = ?').run(existing.uid);

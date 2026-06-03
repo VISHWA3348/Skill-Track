@@ -25,27 +25,29 @@ const Navbar: React.FC = () => {
     features: {
       label: 'Features',
       items: [
-        { name: 'Certificate Management', desc: 'Securely issue and track digital credentials.', icon: Shield, href: '#features' },
-        { name: 'Academic Tracking', desc: 'Monitor student progress in real-time.', icon: BookOpen, href: '#about' },
-        { name: 'Advanced Analytics', desc: 'Data-driven insights for departments.', icon: BarChart2, href: '#career-insights' },
-        { name: 'Broadcast System', desc: 'Seamless communication across the campus.', icon: Bell, href: '#notifications' },
+        { name: 'Certificate Management', desc: 'Securely issue and track digital credentials.', icon: Shield, href: '/features' },
+        { name: 'Academic Tracking', desc: 'Monitor student progress in real-time.', icon: BookOpen, href: '/about' },
+        { name: 'Advanced Analytics', desc: 'Data-driven insights for departments.', icon: BarChart2, href: '/enterprise' },
+        { name: 'Broadcast System', desc: 'Seamless communication across the campus.', icon: Bell, href: '/features' },
       ]
     },
     solutions: {
       label: 'Solutions',
       items: [
-        { name: 'For Students', desc: 'Build your professional digital portfolio.', icon: Users, href: '#how-it-works' },
-        { name: 'For Staff & HODs', desc: 'Streamline approvals and tracking.', icon: Building, href: '#team' },
-        { name: 'For College Admin', desc: 'Enterprise-grade institution management.', icon: Layout, href: '#stats' },
-        { name: 'AI Fraud Detection', desc: 'Tamper-proof record verification.', icon: Cpu, href: '#security' },
+        { name: 'For Students', desc: 'Build your professional digital portfolio.', icon: Users, href: '/solutions' },
+        { name: 'For Staff & HODs', desc: 'Streamline approvals and tracking.', icon: Building, href: '/solutions' },
+        { name: 'For College Admin', desc: 'Enterprise-grade institution management.', icon: Layout, href: '/enterprise' },
+        { name: 'AI Fraud Detection', desc: 'Tamper-proof record verification.', icon: Cpu, href: '/security' },
       ]
     },
     resources: {
       label: 'Resources',
       items: [
-        { name: 'Documentation', desc: 'Learn how to integrate and use.', icon: BookOpen, href: '#faq' },
-        { name: 'API Reference', desc: 'Build on top of our platform.', icon: Cpu, href: '#contact' },
-        { name: 'Help Center', desc: 'Get support and find answers.', icon: HelpCircle, href: '#faq' },
+        { name: 'Documentation', desc: 'Learn how to integrate and use.', icon: BookOpen, href: '/docs' },
+        { name: 'API Reference', desc: 'Build on top of our platform.', icon: Cpu, href: '/api-docs' },
+        { name: 'Help Center', desc: 'Get support and find answers.', icon: HelpCircle, href: '/help-center' },
+        { name: 'Careers', desc: 'Join our growing team.', icon: Users, href: '/careers' },
+        { name: 'System Status', desc: 'View current system operation metrics.', icon: Shield, href: '/status' },
       ]
     }
   };
@@ -77,15 +79,11 @@ const Navbar: React.FC = () => {
           >
             <div className="grid gap-4">
               {items.map((item) => (
-                <a
+                <Link
                   key={item.name}
-                  href={item.href}
+                  to={item.href}
                   className="flex items-start space-x-4 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group/item"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    document.querySelector(item.href)?.scrollIntoView({ behavior: 'smooth' });
-                    setActiveDropdown(null);
-                  }}
+                  onClick={() => setActiveDropdown(null)}
                 >
                   <div className="p-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg group-hover/item:bg-indigo-600 group-hover/item:text-white transition-colors">
                     {React.createElement(item.icon, { className: "w-5 h-5" })}
@@ -94,7 +92,7 @@ const Navbar: React.FC = () => {
                     <p className="text-sm font-semibold text-gray-900 dark:text-white">{item.name}</p>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{item.desc}</p>
                   </div>
-                </a>
+                </Link>
               ))}
             </div>
           </motion.div>
@@ -229,20 +227,17 @@ const Navbar: React.FC = () => {
                     <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest px-2">{section.label}</h3>
                     <div className="grid gap-1">
                       {section.items.map((item) => (
-                        <a
+                        <Link
                           key={item.name}
-                          href={item.href}
+                          to={item.href}
                           className="flex items-center space-x-4 p-3 rounded-xl hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
-                          onClick={() => {
-                            setMobileMenuOpen(false);
-                            document.querySelector(item.href)?.scrollIntoView({ behavior: 'smooth' });
-                          }}
+                          onClick={() => setMobileMenuOpen(false)}
                         >
                           <div className="p-2 bg-gray-100 dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 rounded-lg">
                             {React.createElement(item.icon, { className: "w-5 h-5" })}
                           </div>
                           <span className="text-base font-medium text-gray-700 dark:text-gray-200">{item.name}</span>
-                        </a>
+                        </Link>
                       ))}
                     </div>
                   </div>

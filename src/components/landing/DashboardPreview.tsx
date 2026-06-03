@@ -1,28 +1,42 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ChevronLeft, ChevronRight, Layout, Users, Shield } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Layout, Users, Shield, GraduationCap } from 'lucide-react';
 
 const previews = [
   {
-    title: 'Student Portfolio',
-    desc: 'Manage certificates, track skill growth, and showcase achievements with a professional digital portfolio.',
+    title: 'Student Dashboard',
+    desc: 'Manage your certifications, track skill growth, construct a resume, and showcase achievements with a unique portfolio QR code.',
     image: '/screenshots/student-dash.png',
     icon: Users,
     color: 'bg-indigo-600'
   },
   {
     title: 'Staff Dashboard',
-    desc: 'Easily approve certificates, track department progress, and communicate with students.',
+    desc: 'Review submitted certifications, save student marks and attendance, and verify student records under a secure workflow.',
     image: '/screenshots/staff-dash.png',
     icon: Layout,
     color: 'bg-blue-600'
   },
   {
-    title: 'Admin Analytics',
-    desc: 'Gain institution-wide insights with advanced reporting, security logs, and trend analysis.',
+    title: 'HOD Dashboard',
+    desc: 'Approve department-wide certificates, view student performance indexes, and access AI-driven academic analysis.',
+    image: '/screenshots/hod-dash.png',
+    icon: GraduationCap,
+    color: 'bg-teal-600'
+  },
+  {
+    title: 'Admin Dashboard',
+    desc: 'Onboard departments, list staff members, manage internship placements, and export spreadsheet academic reports.',
     image: '/screenshots/admin-dash.png',
     icon: Shield,
     color: 'bg-purple-600'
+  },
+  {
+    title: 'Super Admin Dashboard',
+    desc: 'Configure multi-campus colleges, manage system roles, track fraud logs, and perform full database backups.',
+    image: '/screenshots/super-admin-dash.png',
+    icon: Shield,
+    color: 'bg-slate-900'
   }
 ];
 
@@ -59,7 +73,7 @@ const DashboardPreview: React.FC = () => {
                     {React.createElement(previews[current].icon, { className: "w-6 h-6" })}
                   </div>
                   <h3 className="text-3xl font-bold text-gray-900 dark:text-white">{previews[current].title}</h3>
-                  <p className="text-lg text-gray-600 dark:text-gray-400 leading-relaxed">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
                     {previews[current].desc}
                   </p>
                   

@@ -33,6 +33,17 @@ const Terms               = React.lazy(() => import('./pages/Terms'));
 const Cookies             = React.lazy(() => import('./pages/Cookies'));
 const ResumePublicView    = React.lazy(() => import('./pages/ResumePublicView'));
 const ResumeBuilderView   = React.lazy(() => import('./components/ResumeBuilderView'));
+const AboutSkillTrack     = React.lazy(() => import('./pages/AboutSkillTrack'));
+const ContactUs           = React.lazy(() => import('./pages/ContactUs'));
+const FeaturesPage        = React.lazy(() => import('./pages/FeaturesPage'));
+const SolutionsPage       = React.lazy(() => import('./pages/SolutionsPage'));
+const SecurityPage        = React.lazy(() => import('./pages/SecurityPage'));
+const HelpCenter          = React.lazy(() => import('./pages/HelpCenter'));
+const Documentation       = React.lazy(() => import('./pages/Documentation'));
+const ApiDocumentation    = React.lazy(() => import('./pages/ApiDocumentation'));
+const Careers             = React.lazy(() => import('./pages/Careers'));
+const SystemStatus        = React.lazy(() => import('./pages/SystemStatus'));
+const EnterpriseSolutions = React.lazy(() => import('./pages/EnterpriseSolutions'));
 
 // Shared page-level loading spinner
 const PageLoader: React.FC = () => (
@@ -73,6 +84,17 @@ const App: React.FC = () => {
               <Route path="/terms" element={<Terms />} />
               <Route path="/cookies" element={<Cookies />} />
               <Route path="/resume/:id" element={<ResumePublicView />} />
+              <Route path="/about" element={<AboutSkillTrack />} />
+              <Route path="/contact" element={<ContactUs />} />
+              <Route path="/features" element={<FeaturesPage />} />
+              <Route path="/solutions" element={<SolutionsPage />} />
+              <Route path="/security" element={<SecurityPage />} />
+              <Route path="/help-center" element={<HelpCenter />} />
+              <Route path="/docs" element={<Documentation />} />
+              <Route path="/api-docs" element={<ApiDocumentation />} />
+              <Route path="/careers" element={<Careers />} />
+              <Route path="/status" element={<SystemStatus />} />
+              <Route path="/enterprise" element={<EnterpriseSolutions />} />
               
               <Route path="/dashboard" element={
                 <AuthGuard>

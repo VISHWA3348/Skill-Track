@@ -8,20 +8,20 @@ const Footer: React.FC = () => {
 
   const footerLinks = {
     platform: [
-      { name: 'Features', href: '#features' },
-      { name: 'Solutions', href: '#solutions' },
-      { name: 'Security', href: '#security' },
-      { name: 'Enterprise', href: '#stats' },
+      { name: 'Features', href: '/features' },
+      { name: 'Solutions', href: '/solutions' },
+      { name: 'Security', href: '/security' },
+      { name: 'Enterprise', href: '/enterprise' },
     ],
     resources: [
-      { name: 'Documentation', href: '#' },
-      { name: 'API Reference', href: '#' },
-      { name: 'Help Center', href: '#faq' },
-      { name: 'System Status', href: '#', tag: 'Live' },
+      { name: 'Documentation', href: '/docs' },
+      { name: 'API Reference', href: '/api-docs' },
+      { name: 'Help Center', href: '/help-center' },
+      { name: 'System Status', href: '/status', tag: 'Live' },
     ],
     company: [
-      { name: 'About Us', href: '#about' },
-      { name: 'Careers', href: '#' },
+      { name: 'About Us', href: '/about' },
+      { name: 'Careers', href: '/careers' },
       { name: 'Privacy Policy', href: '/privacy' },
       { name: 'Terms of Service', href: '/terms' },
     ],

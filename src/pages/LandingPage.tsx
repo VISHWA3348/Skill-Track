@@ -14,6 +14,12 @@ import FAQ from '../components/landing/FAQ';
 import Contact from '../components/landing/Contact';
 import CTABanner from '../components/landing/CTABanner';
 import Footer from '../components/landing/Footer';
+import TrustedPartners from '../components/landing/TrustedPartners';
+import WhyChoose from '../components/landing/WhyChoose';
+import PlacementSuccess from '../components/landing/PlacementSuccess';
+import VideoDemo from '../components/landing/VideoDemo';
+import SecurityBadges from '../components/landing/SecurityBadges';
+import ConversionWidgets from '../components/landing/ConversionWidgets';
 import { motion, useScroll, useSpring } from 'motion/react';
 
 const LandingPage: React.FC = () => {
@@ -41,10 +47,14 @@ const LandingPage: React.FC = () => {
       
       <main>
         <Hero />
+        <TrustedPartners />
         <Stats />
         <About />
+        <WhyChoose />
         <SmartFeatures />
+        <PlacementSuccess />
         <DashboardPreview />
+        <VideoDemo />
         <HowToUse />
         <Features />
         <Security />
@@ -53,9 +63,11 @@ const LandingPage: React.FC = () => {
         <FAQ />
         <Contact />
         <CTABanner />
+        <SecurityBadges />
       </main>
 
       <Footer />
+      <ConversionWidgets />
 
       {/* Modern Gradient Overlays for smoother transitions */}
       <div className="fixed bottom-0 left-0 w-full h-32 bg-gradient-to-t from-white dark:from-gray-950 to-transparent pointer-events-none z-40 opacity-20 transition-colors duration-500"></div>

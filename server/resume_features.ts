@@ -2,6 +2,197 @@ import express from 'express';
 import { db } from './db';
 import { authenticate, checkRole } from './middleware';
 
+export function calculateResumeScore(studentId: string) {
+  try {
+    const user = db.prepare('SELECT name, email, phone_number, city, class, year, section FROM users WHERE uid = ?').get(studentId) as any;
+    const profile = db.prepare('SELECT * FROM resume_profiles WHERE student_id = ?').get(studentId) as any;
+    const skills = db.prepare('SELECT count(*) as count FROM resume_skills WHERE student_id = ?').get(studentId) as any;
+    const projects = db.prepare('SELECT count(*) as count FROM resume_projects WHERE student_id = ?').get(studentId) as any;
+    const experience = db.prepare('SELECT count(*) as count FROM resume_experience WHERE student_id = ?').get(studentId) as any;
+    const certs = db.prepare("SELECT count(*) as count FROM certifications WHERE user_id = ? AND status = 'approved'").get(studentId) as any;
+
+    let score = 0;
+    const suggestions = [];
+
+    // 1. Personal Information = 15%
+    let nameVal = user?.name || '';
+    let emailVal = user?.email || '';
+    let phoneVal = user?.phone_number || '';
+    let cityVal = user?.city || '';
+    let classVal = user?.class || '';
+    let yearVal = user?.year || '';
+    let sectionVal = user?.section || '';
+
+    if (nameVal && nameVal.trim() !== '') {
+      score += 3;
+    } else {
+      suggestions.push("Add your name to your profile");
+    }
+
+    if (emailVal && emailVal.trim() !== '') {
+      score += 3;
+    } else {
+      suggestions.push("Add your email to your profile");
+    }
+
+    if (phoneVal && phoneVal.trim() !== '') {
+      score += 3;
+    } else {
+      suggestions.push("Add your phone number");
+    }
+
+    if (cityVal && cityVal.trim() !== '') {
+      score += 2;
+    } else {
+      suggestions.push("Add your city");
+    }
+
+    if (classVal && classVal.trim() !== '') {
+      score += 2;
+    } else {
+      suggestions.push("Add your class");
+    }
+
+    if (yearVal && yearVal.trim() !== '') {
+      score += 1;
+    } else {
+      suggestions.push("Add your year");
+    }
+
+    if (sectionVal && sectionVal.trim() !== '') {
+      score += 1;
+    } else {
+      suggestions.push("Add your section");
+    }
+
+    // 2. Professional Headline = 10%
+    let headlineVal = profile?.headline || '';
+    if (headlineVal && headlineVal.trim() !== '' && headlineVal !== 'Aspiring Professional') {
+      score += 10;
+    } else {
+      suggestions.push("Add a professional headline");
+    }
+
+    // 3. Professional Summary = 15%
+    let summaryVal = profile?.summary || '';
+    if (summaryVal && summaryVal.trim() !== '') {
+      score += 15;
+    } else {
+      suggestions.push("Add a professional summary");
+    }
+
+    // 4. LinkedIn URL = 5%
+    let linkedinVal = profile?.linkedin_url || '';
+    if (linkedinVal && linkedinVal.trim() !== '') {
+      score += 5;
+    } else {
+      suggestions.push("Add your LinkedIn profile");
+    }
+
+    // 5. GitHub URL = 5%
+    let githubVal = profile?.github_url || '';
+    if (githubVal && githubVal.trim() !== '') {
+      score += 5;
+    } else {
+      suggestions.push("Add your GitHub profile");
+    }
+
+    // 6. Portfolio Website = 5%
+    let portfolioVal = profile?.portfolio_url || '';
+    if (portfolioVal && portfolioVal.trim() !== '') {
+      score += 5;
+    } else {
+      suggestions.push("Add your portfolio website");
+    }
+
+    // 7. Skills (minimum 5) = 15%
+    const skillsCount = skills?.count || 0;
+    if (skillsCount >= 5) {
+      score += 15;
+    } else {
+      score += skillsCount * 3;
+      suggestions.push("Add at least 5 skills");
+    }
+
+    // 8. Projects = 10%
+    const projectsCount = projects?.count || 0;
+    if (projectsCount >= 2) {
+      score += 10;
+    } else {
+      score += projectsCount * 5;
+      suggestions.push("Add key projects (minimum 2)");
+    }
+
+    // 9. Work Experience = 10%
+    const experienceCount = experience?.count || 0;
+    if (experienceCount >= 2) {
+      score += 10;
+    } else {
+      score += experienceCount * 5;
+      suggestions.push("Add work experience (minimum 2)");
+    }
+
+    // 10. Certifications = 10%
+    const certsCount = certs?.count || 0;
+    if (certsCount >= 2) {
+      score += 10;
+    } else {
+      score += certsCount * 5;
+      suggestions.push("Get certifications approved (minimum 2)");
+    }
+
+    const finalScore = Math.min(Math.max(score, 0), 100);
+
+    // Sync to database tables
+    // student_academic_profile
+    const academicExists = db.prepare('SELECT id FROM student_academic_profile WHERE student_id = ?').get(studentId) as any;
+    if (academicExists) {
+      db.prepare(`
+        UPDATE student_academic_profile 
+        SET placement_readiness_score = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE student_id = ?
+      `).run(finalScore, studentId);
+    } else {
+      const u = db.prepare('SELECT name, roll_no, department_id, class, year, college_id FROM users WHERE uid = ?').get(studentId) as any;
+      if (u) {
+        db.prepare(`
+          INSERT INTO student_academic_profile (id, student_id, student_name, roll_no, department_id, class, year, college_id, cgpa, arrears, attendance_percentage, placement_readiness_score)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          'ap_' + studentId, studentId, u.name || 'Student', u.roll_no || null,
+          u.department_id || null, u.class || null, u.year || null,
+          u.college_id || null, 0.0, 0, 0.0, finalScore
+        );
+      }
+    }
+
+    // ai_career_insights
+    const insightExists = db.prepare('SELECT id FROM ai_career_insights WHERE student_id = ?').get(studentId) as any;
+    if (insightExists) {
+      db.prepare(`
+        UPDATE ai_career_insights 
+        SET placement_readiness_score = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE student_id = ?
+      `).run(finalScore, studentId);
+    } else {
+      db.prepare(`
+        INSERT INTO ai_career_insights (id, student_id, placement_readiness_score, recommended_skills, missing_skills, suggested_certifications, suggested_internships, career_path_suggestions, course_recommendations, smart_alerts, analysis_summary)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        'ci_' + studentId, studentId, finalScore,
+        JSON.stringify([]), JSON.stringify([]), JSON.stringify([]), JSON.stringify([]),
+        JSON.stringify([]), JSON.stringify([]), JSON.stringify([]),
+        'Profile scoring initialized.'
+      );
+    }
+
+    return { score: finalScore, suggestions };
+  } catch (err) {
+    console.error("Error calculating resume score:", err);
+    return { score: 0, suggestions: [] };
+  }
+}
+
 export function setupResumeFeatures(app: express.Express) {
 
   // ============================================
@@ -48,6 +239,8 @@ export function setupResumeFeatures(app: express.Express) {
         student_id
       );
 
+      calculateResumeScore(student_id);
+
       res.json({ success: true, message: 'Resume profile updated' });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
@@ -79,6 +272,8 @@ export function setupResumeFeatures(app: express.Express) {
         VALUES (?, ?, ?, ?, ?, ?, ?)
       `).run(id, student_id, project_name, description, technologies, github_url, live_url);
 
+      calculateResumeScore(student_id);
+
       res.json({ success: true, data: { id, project_name } });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
@@ -88,6 +283,7 @@ export function setupResumeFeatures(app: express.Express) {
   app.delete('/api/resume/projects/:id', authenticate, (req: any, res) => {
     try {
       db.prepare('DELETE FROM resume_projects WHERE id = ? AND student_id = ?').run(req.params.id, req.user.uid);
+      calculateResumeScore(req.user.uid);
       res.json({ success: true });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
@@ -119,6 +315,8 @@ export function setupResumeFeatures(app: express.Express) {
         VALUES (?, ?, ?, ?, ?, ?)
       `).run(id, student_id, company_name, role, duration, description);
 
+      calculateResumeScore(student_id);
+
       res.json({ success: true, data: { id, company_name } });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
@@ -128,6 +326,7 @@ export function setupResumeFeatures(app: express.Express) {
   app.delete('/api/resume/experience/:id', authenticate, (req: any, res) => {
     try {
       db.prepare('DELETE FROM resume_experience WHERE id = ? AND student_id = ?').run(req.params.id, req.user.uid);
+      calculateResumeScore(req.user.uid);
       res.json({ success: true });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
@@ -157,6 +356,7 @@ export function setupResumeFeatures(app: express.Express) {
       const existing = db.prepare('SELECT id FROM resume_skills WHERE student_id = ? AND skill_name = ?').get(student_id, skill_name);
       if (existing) {
         db.prepare('UPDATE resume_skills SET skill_level = ? WHERE id = ?').run(skill_level, (existing as any).id);
+        calculateResumeScore(student_id);
         return res.json({ success: true, message: 'Skill updated' });
       }
 
@@ -165,6 +365,8 @@ export function setupResumeFeatures(app: express.Express) {
         INSERT INTO resume_skills (id, student_id, skill_name, skill_level, auto_detected)
         VALUES (?, ?, ?, ?, ?)
       `).run(id, student_id, skill_name, skill_level, auto_detected ? 1 : 0);
+
+      calculateResumeScore(student_id);
 
       res.json({ success: true, data: { id, skill_name } });
     } catch (e: any) {
@@ -175,6 +377,7 @@ export function setupResumeFeatures(app: express.Express) {
   app.delete('/api/resume/skills/:id', authenticate, (req: any, res) => {
     try {
       db.prepare('DELETE FROM resume_skills WHERE id = ? AND student_id = ?').run(req.params.id, req.user.uid);
+      calculateResumeScore(req.user.uid);
       res.json({ success: true });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
@@ -244,6 +447,8 @@ export function setupResumeFeatures(app: express.Express) {
         }
       });
 
+      calculateResumeScore(student_id);
+
       res.json({ success: true, data: Array.from(detectedSkills), added });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
@@ -287,26 +492,8 @@ export function setupResumeFeatures(app: express.Express) {
   app.get('/api/resume/score', authenticate, (req: any, res) => {
     try {
       const student_id = req.user.uid;
-      
-      const profile = db.prepare('SELECT * FROM resume_profiles WHERE student_id = ?').get(student_id) as any;
-      const skills = db.prepare('SELECT count(*) as count FROM resume_skills WHERE student_id = ?').get(student_id) as any;
-      const projects = db.prepare('SELECT count(*) as count FROM resume_projects WHERE student_id = ?').get(student_id) as any;
-      const experience = db.prepare('SELECT count(*) as count FROM resume_experience WHERE student_id = ?').get(student_id) as any;
-      const certs = db.prepare("SELECT count(*) as count FROM certifications WHERE user_id = ? AND status = 'approved'").get(student_id) as any;
-
-      let score = 20; // Base score for having an account
-      const suggestions = [];
-
-      if (profile?.summary) score += 15; else suggestions.push("Add a professional summary");
-      if (profile?.linkedin_url) score += 5; else suggestions.push("Add your LinkedIn profile");
-      if (profile?.github_url) score += 5; else suggestions.push("Add your GitHub profile");
-      
-      if (skills.count >= 5) score += 15; else if (skills.count > 0) score += 10; else suggestions.push("Add at least 5 skills");
-      if (projects.count >= 2) score += 20; else if (projects.count > 0) score += 10; else suggestions.push("Add technical projects");
-      if (experience.count > 0) score += 10; else suggestions.push("Add internship or work experience");
-      if (certs.count > 0) score += 10; else suggestions.push("Get more certifications approved");
-
-      res.json({ success: true, score: Math.min(score, 100), suggestions });
+      const scoreData = calculateResumeScore(student_id);
+      res.json({ success: true, score: scoreData.score, suggestions: scoreData.suggestions });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
@@ -337,23 +524,8 @@ export function setupResumeFeatures(app: express.Express) {
       // 4. Get skills
       const skills = db.prepare('SELECT * FROM resume_skills WHERE student_id = ? ORDER BY skill_name ASC').all(student_id);
 
-      // 5. Get score and suggestions
-      const skillsCount = skills.length;
-      const projectsCount = projects.length;
-      const experienceCount = experience.length;
-      const certs = db.prepare("SELECT count(*) as count FROM certifications WHERE user_id = ? AND status = 'approved'").get(student_id) as any;
-      const certsCount = certs.count;
-
-      let score = 20;
-      const suggestions = [];
-
-      if (profile?.summary) score += 15; else suggestions.push("Add a professional summary");
-      if (profile?.linkedin_url) score += 5; else suggestions.push("Add your LinkedIn profile");
-      if (profile?.github_url) score += 5; else suggestions.push("Add your GitHub profile");
-      if (skillsCount >= 5) score += 15; else if (skillsCount > 0) score += 10; else suggestions.push("Add at least 5 skills");
-      if (projectsCount >= 2) score += 20; else if (projectsCount > 0) score += 10; else suggestions.push("Add technical projects");
-      if (experienceCount > 0) score += 10; else suggestions.push("Add internship or work experience");
-      if (certsCount > 0) score += 10; else suggestions.push("Get more certifications approved");
+      // 5. Get score and suggestions dynamically
+      const scoreData = calculateResumeScore(student_id);
 
       res.json({
         success: true,
@@ -362,7 +534,7 @@ export function setupResumeFeatures(app: express.Express) {
           projects,
           experience,
           skills,
-          scoreInfo: { score: Math.min(score, 100), suggestions }
+          scoreInfo: { score: scoreData.score, suggestions: scoreData.suggestions }
         }
       });
     } catch (e: any) {

@@ -8,34 +8,36 @@ generator client {
 }
 
 model User {
-  uid           String    @id
-  name          String
-  email         String    @unique
-  password_hash String?
-  role          String?   @default("student")
-  college_id    String?
-  department_id String?
-  roll_no       String?
-  class         String?
-  year          String?
-  section       String?
-  city          String?
-  phone_number  String?
-  photo_url     String?
-  college_name  String?
-  is_active     Int?      @default(1)
-  status        String?   @default("active")
-  login_attempts Int?     @default(0)
-  last_login    DateTime?
-  created_at    DateTime? @default(now())
-  score         Float?    @default(0)
-  otp           String?
-  otp_expiry    DateTime?
-  preferences   String?   @default("{}")
-  social_links  String?   @default("{}")
-  skills        String?
-  bio           String?
-  profile_photo String?
+  uid                     String    @id
+  name                    String
+  email                   String    @unique
+  password_hash           String?
+  role                    String?   @default("student")
+  college_id              String?
+  department_id           String?
+  roll_no                 String?
+  class                   String?
+  year                    String?
+  section                 String?
+  city                    String?
+  phone_number            String?
+  photo_url               String?
+  college_name            String?
+  is_active               Int?      @default(1)
+  status                  String?   @default("active")
+  login_attempts          Int?      @default(0)
+  last_login              DateTime?
+  created_at              DateTime? @default(now())
+  score                   Float?    @default(0)
+  otp                     String?
+  otp_expiry              DateTime?
+  preferences             String?   @default("{}")
+  social_links            String?   @default("{}")
+  skills                  String?
+  bio                     String?
+  profile_photo           String?
+  profile_photo_url       String?
+  profile_photo_public_id String?
 
   @@map("users")
   @@index([college_id])
@@ -84,45 +86,75 @@ model Department {
 }
 
 model Certification {
-  id                    String    @id
-  user_id               String?
-  student_name          String?
-  roll_no               String?
-  class                 String?
-  year                  String?
-  phone_number          String?
-  city                  String?
-  college_name          String?
-  college_id            String?
-  department_id         String?
-  event_name            String?
-  event_college_name    String?
-  event_location        String?
-  date                  DateTime?
-  type                  String?
-  file_url              String?
-  photo_url             String?
-  gps_lat               Float?
-  gps_lng               Float?
-  prize_position        String?
-  custom_prize_position String?
-  prize_type            String?
-  cash_prize_amount     Float?
-  prize_description     String?
-  gps_photo_url         String?
-  gps_photo_lat         Float?
-  gps_photo_lng         Float?
-  gps_photo_timestamp   DateTime?
-  gps_verified          Int?      @default(0)
-  fraud_flag            Int?      @default(0)
-  fraud_reason          String?
-  file_hash             String?
-  status                String?   @default("pending")
-  remarks               String?
-  is_deleted            Int?      @default(0)
-  created_at            DateTime? @default(now())
-  updated_at            DateTime? @default(now())
-  verification_slug     String?
+  id                      String    @id
+  user_id                 String?
+  student_name            String?
+  roll_no                 String?
+  register_no             String?
+  class                   String?
+  year                    String?
+  section                 String?
+  department              String?
+  phone_number            String?
+  city                    String?
+  college_name            String?
+  college_id              String?
+  department_id           String?
+  event_name              String?
+  event_college_name      String?
+  event_location          String?
+  date                    DateTime?
+  type                    String?
+  file_url                String?
+  photo_url               String?
+  gps_lat                 Float?
+  gps_lng                 Float?
+  prize_position          String?
+  custom_prize_position   String?
+  prize_type              String?
+  cash_prize_amount       Float?
+  prize_description       String?
+  gps_photo_url           String?
+  gps_photo_lat           Float?
+  gps_photo_lng           Float?
+  gps_photo_timestamp     DateTime?
+  gps_verified            Int?      @default(0)
+  fraud_flag              Int?      @default(0)
+  fraud_reason            String?
+  file_hash               String?
+  status                  String?   @default("pending")
+  remarks                 String?
+  is_deleted              Int?      @default(0)
+  created_at              DateTime? @default(now())
+  updated_at              DateTime? @default(now())
+  verification_slug       String?
+  certificate_url         String?
+  certificate_public_id   String?
+  certificate_file_type   String?
+  certificate_file_name   String?
+  certificate_uploaded_at DateTime?
+  proof_photo_url         String?
+  proof_photo_public_id   String?
+  profile_photo_url       String?
+  profile_photo_public_id String?
+  upload_timestamp        DateTime?
+  altitude                Float?
+  accuracy                Float?
+  street                  String?
+  area                    String?
+  locality                String?
+  district                String?
+  state                   String?
+  country                 String?
+  postal_code             String?
+  timezone                String?
+  device_timestamp        DateTime?
+  browser_timestamp       DateTime?
+  google_maps_url         String?
+  exif_latitude           Float?
+  exif_longitude          Float?
+  exif_timestamp          DateTime?
+  verification_status     String?
 
   @@map("certifications")
   @@index([user_id])

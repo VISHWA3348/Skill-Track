@@ -6,10 +6,11 @@ import crypto from 'crypto';
 import { db, getCollection, getDocument, setDocument, deleteDocument, queryDocuments } from './db';
 import { hashPassword, comparePassword, generateToken, verifyToken, validatePassword } from './auth';
 import { authenticate, checkRole, getDataIsolationFilters, rateLimiter } from './middleware';
-import { uploadMediaFile } from './cloudinary_helper';
+import { uploadMediaFile, uploadMediaFileWithMetadata } from './cloudinary_helper';
 import { cacheService } from './redis_cache';
 import { queueService } from './queue';
 import { sendEmail, initEmailLogsTable } from './services/email.service';
+import { calculateResumeScore } from './resume_features';
 
 // Initialize email-related tables on startup
 initEmailLogsTable();
@@ -498,7 +499,7 @@ export function setupApi(app: express.Express) {
       const decoded = verifyToken(token);
       if (!decoded) return res.status(401).json({ error: 'auth/invalid-token', message: 'Invalid token' });
 
-      const user = db.prepare('SELECT uid, name, email, role, phone_number as phone, profile_photo, bio, college_id as collegeId, department_id as departmentId, roll_no as rollNo, class, year, preferences, social_links, skills FROM users WHERE uid = ?').get(decoded.uid) as any;
+      const user = db.prepare('SELECT uid, name, email, role, phone_number as phone, profile_photo, bio, college_id as collegeId, department_id as departmentId, roll_no as rollNo, class, year, section, city, college_name as collegeName, preferences, social_links, skills FROM users WHERE uid = ?').get(decoded.uid) as any;
       if (!user) return res.status(401).json({ error: 'auth/user-not-found', message: 'User not found' });
 
       res.json({ user: { 
@@ -513,6 +514,9 @@ export function setupApi(app: express.Express) {
         rollNo: user.rollNo,
         class: user.class,
         year: user.year,
+        section: user.section,
+        city: user.city,
+        collegeName: user.collegeName,
         skills: user.skills ? user.skills : '',
         bio: user.bio || '',
         preferences: user.preferences ? JSON.parse(user.preferences) : {},
@@ -534,17 +538,25 @@ export function setupApi(app: express.Express) {
       const userData = db.prepare('SELECT role FROM users WHERE uid = ?').get(uid) as any;
       if (!userData) return res.status(404).json({ error: 'User not found' });
 
+      const isStudent = userData.role === 'student';
+
       // Update common fields
-      const commonFields: any = { name, phone_number: phone, profile_photo: profilePhoto, city, university: collegeName, skills, bio };
+      const commonFields: any = { name, phone_number: phone, profile_photo: profilePhoto, city, skills, bio };
       if (preferences !== undefined) commonFields.preferences = JSON.stringify(preferences);
       if (socialLinks !== undefined) commonFields.social_links = JSON.stringify(socialLinks);
-      if (collegeId !== undefined) commonFields.college_id = collegeId;
-      if (departmentId !== undefined) commonFields.department_id = departmentId;
-      if (rollNo !== undefined) commonFields.roll_no = rollNo;
+      
+      if (!isStudent) {
+        if (collegeId !== undefined) commonFields.college_id = collegeId;
+        if (departmentId !== undefined) commonFields.department_id = departmentId;
+        if (rollNo !== undefined) commonFields.roll_no = rollNo;
+        if (collegeName !== undefined) {
+          commonFields.college_name = collegeName;
+        }
+      }
+
       if (className !== undefined) commonFields.class = className;
       if (year !== undefined) commonFields.year = year;
       if (section !== undefined) commonFields.section = section;
-      if (collegeName !== undefined) commonFields.college_name = collegeName;
 
       // Update users table
       Object.keys(commonFields).forEach(key => {
@@ -554,17 +566,30 @@ export function setupApi(app: express.Express) {
       });
       
       // Update student-specific fields in students table
-      if (userData.role === 'student') {
+      if (isStudent) {
         db.prepare(`
           UPDATE students 
-          SET roll_no = COALESCE(?, roll_no), 
-              class = COALESCE(?, class), 
+          SET class = COALESCE(?, class), 
               year = COALESCE(?, year),
-              section = COALESCE(?, section),
-              department_id = COALESCE(?, department_id),
-              college_id = COALESCE(?, college_id)
+              section = COALESCE(?, section)
           WHERE user_id = ?
-        `).run(rollNo || null, className || null, year || null, section || null, departmentId || null, collegeId || null, uid);
+        `).run(className || null, year || null, section || null, uid);
+
+        // Also update student_academic_profile table if it exists
+        const academicExists = db.prepare('SELECT id FROM student_academic_profile WHERE student_id = ?').get(uid) as any;
+        if (academicExists) {
+          db.prepare(`
+            UPDATE student_academic_profile
+            SET class = COALESCE(?, class),
+                year = COALESCE(?, year),
+                section = COALESCE(?, section),
+                updated_at = CURRENT_TIMESTAMP
+            WHERE student_id = ?
+          `).run(className || null, year || null, section || null, uid);
+        }
+
+        // Recalculate and persist resume score
+        calculateResumeScore(uid);
       }
 
       const updatedUser = db.prepare(`
@@ -776,8 +801,8 @@ export function setupApi(app: express.Express) {
       
       setDocument('departments', 'CSE', { id: 'CSE', collegeId: 'COL001', name: 'Computer Science & Engineering' });
 
-      const superadminExamplePass = process.env.SEED_SUPERADMIN_PASSWORD || 'password123';
-      const superadminCerttrackPass = process.env.SEED_SUPERADMIN_PASSWORD || 'SuperAdminPassword123!';
+      const superadminExamplePass = 'password123';
+      const superadminCerttrackPass = 'SuperAdminPassword123!';
       const zinoinPass = process.env.SEED_ZINOIN_PASSWORD || 'Vishwa@8105';
       const adminPass = process.env.SEED_ADMIN_PASSWORD || 'Admin@123';
       const hodPass = process.env.SEED_HOD_PASSWORD || 'Hod@123';
@@ -1134,8 +1159,39 @@ export function setupApi(app: express.Express) {
     const type = req.query.type === 'photo' ? 'photos' : 'certificates';
     const localUrl = `/uploads/${type}/${req.file.filename}`;
     try {
-      const finalUrl = await uploadMediaFile(req.file.path, type, localUrl);
-      res.json({ url: finalUrl, path: req.file.path });
+      const uploadResult = await uploadMediaFileWithMetadata(req.file.path, type, localUrl);
+
+      // Attempt EXIF extraction for image files
+      let exifLat: number | null = null;
+      let exifLng: number | null = null;
+      let exifTimestamp: string | null = null;
+      const imageExts = ['.jpg', '.jpeg', '.png'];
+      const fileExt = path.extname(req.file.originalname).toLowerCase();
+      if (imageExts.includes(fileExt)) {
+        try {
+          const exifr = await import('exifr');
+          const exifData = await exifr.default.parse(req.file.path).catch(() => null);
+          if (exifData) {
+            exifLat = exifData.latitude ?? exifData.GPSLatitude ?? null;
+            exifLng = exifData.longitude ?? exifData.GPSLongitude ?? null;
+            if (exifData.DateTimeOriginal) exifTimestamp = new Date(exifData.DateTimeOriginal).toISOString();
+            else if (exifData.CreateDate) exifTimestamp = new Date(exifData.CreateDate).toISOString();
+          }
+        } catch (exErr: any) {
+          console.warn('EXIF extraction skipped:', exErr.message);
+        }
+      }
+
+      res.json({
+        url: uploadResult.url,
+        public_id: uploadResult.public_id,
+        file_type: uploadResult.file_type,
+        file_name: uploadResult.file_name,
+        file_size: uploadResult.file_size,
+        uploaded_at: uploadResult.uploaded_at,
+        source: uploadResult.source,
+        exif: { lat: exifLat, lng: exifLng, timestamp: exifTimestamp }
+      });
     } catch (e: any) {
       res.status(500).json({ error: e.message || 'Upload failed' });
     }
@@ -1150,22 +1206,105 @@ export function setupApi(app: express.Express) {
       const certificateFile = files['certificate']?.[0];
       const photoFile = files['photo']?.[0];
 
-      const { studentName, rollNo, class: className, year, phoneNumber, city, collegeName, collegeId, departmentId, eventName, eventCollegeName, type, date, gpsLat, gpsLng } = req.body;
+      const {
+        studentName, rollNo, class: className, year, phoneNumber, city, collegeName,
+        collegeId, departmentId, eventName, eventCollegeName, eventLocation, type, date,
+        gpsLat, gpsLng, prizePosition, customPrizePosition, prizeType, cashPrizeAmount, prizeDescription
+      } = req.body;
 
-      let certUrl = req.body.fileUrl;
+      // ── Upload certificate file ────────────────────────────────────────────
+      let certUpload: any = { url: req.body.fileUrl || null, public_id: null, file_type: null, file_name: null };
       if (certificateFile) {
         const localCertUrl = `/uploads/certificates/${certificateFile.filename}`;
-        certUrl = await uploadMediaFile(certificateFile.path, 'certificates', localCertUrl);
+        certUpload = await uploadMediaFileWithMetadata(certificateFile.path, 'certificates', localCertUrl);
       }
 
-      let photoUrl = req.body.photoUrl;
+      // ── Upload proof photo + extract EXIF ─────────────────────────────────
+      let photoUpload: any = { url: req.body.photoUrl || null, public_id: null };
+      let exifLat: number | null = null;
+      let exifLng: number | null = null;
+      let exifTimestamp: string | null = null;
+      const uploadedPhotoPath = photoFile ? photoFile.path : null;
+
       if (photoFile) {
         const localPhotoUrl = `/uploads/photos/${photoFile.filename}`;
-        photoUrl = await uploadMediaFile(photoFile.path, 'photos', localPhotoUrl);
+        photoUpload = await uploadMediaFileWithMetadata(photoFile.path, 'photos', localPhotoUrl);
+
+        // Extract EXIF from the proof photo before it is potentially deleted
+        try {
+          const exifr = await import('exifr');
+          const exifData = await exifr.default.parse(photoFile.path).catch(() => null);
+          if (exifData) {
+            exifLat = exifData.latitude ?? exifData.GPSLatitude ?? null;
+            exifLng = exifData.longitude ?? exifData.GPSLongitude ?? null;
+            if (exifData.DateTimeOriginal) exifTimestamp = new Date(exifData.DateTimeOriginal).toISOString();
+            else if (exifData.CreateDate) exifTimestamp = new Date(exifData.CreateDate).toISOString();
+          }
+        } catch (_) {}
+      }
+
+      // ── GPS → Address via Nominatim (reverse geocoding) ───────────────────
+      const finalLat: number | null = (gpsLat && !isNaN(parseFloat(gpsLat))) ? parseFloat(gpsLat) : exifLat;
+      const finalLng: number | null = (gpsLng && !isNaN(parseFloat(gpsLng))) ? parseFloat(gpsLng) : exifLng;
+
+      let street: string | null = null, area: string | null = null, locality: string | null = null;
+      let district: string | null = null, state: string | null = null, country: string | null = null, postalCode: string | null = null;
+      let googleMapsUrl: string | null = null;
+
+      if (finalLat && finalLng) {
+        googleMapsUrl = `https://www.google.com/maps?q=${finalLat},${finalLng}`;
+        try {
+          const geoRes = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${finalLat}&lon=${finalLng}`,
+            { headers: { 'User-Agent': 'SkillTrack/1.0 (skill-track-cert-system)' } }
+          );
+          if (geoRes.ok) {
+            const geoJson: any = await geoRes.json();
+            const addr = geoJson.address || {};
+            street = addr.road || addr.street || null;
+            area = addr.suburb || addr.neighbourhood || null;
+            locality = addr.city || addr.town || addr.village || null;
+            district = addr.county || addr.district || null;
+            state = addr.state || null;
+            country = addr.country || null;
+            postalCode = addr.postcode || null;
+          }
+        } catch (geoErr: any) {
+          console.warn('Reverse geocoding failed:', geoErr.message);
+        }
+      }
+
+      // ── Fraud detection: GPS distance check ───────────────────────────────
+      let gpsVerified = 0;
+      let fraudFlag = 0;
+      let fraudReason: string | null = null;
+      if (finalLat && finalLng && exifLat && exifLng) {
+        const distKm = Math.sqrt(
+          Math.pow((finalLat - exifLat) * 111, 2) +
+          Math.pow((finalLng - exifLng) * 111 * Math.cos(finalLat * Math.PI / 180), 2)
+        );
+        if (distKm > 5) {
+          fraudFlag = 1;
+          fraudReason = `GPS mismatch: browser GPS and EXIF location differ by ${distKm.toFixed(1)} km`;
+        } else {
+          gpsVerified = 1;
+        }
+      }
+
+      // ── File hash (SHA-256) for duplicate/tamper detection ────────────────
+      let fileHash: string | null = null;
+      if (certificateFile) {
+        try {
+          const fileBuffer = fs.readFileSync(certificateFile.path);
+          fileHash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
+        } catch (_) {
+          // File may be deleted by Cloudinary helper already; skip gracefully
+        }
       }
 
       const id = 'cert_' + Date.now() + Math.random().toString(36).substring(2, 9);
-      
+      const now = new Date().toISOString();
+
       const dataToSave = {
         userId: req.userData.uid,
         studentName,
@@ -1179,32 +1318,61 @@ export function setupApi(app: express.Express) {
         departmentId,
         eventName,
         eventCollegeName,
+        eventLocation: eventLocation || null,
         type,
         date,
-        fileUrl: certUrl,
-        photoUrl: photoUrl,
-        gps: {
-          lat: (gpsLat && !isNaN(parseFloat(gpsLat))) ? parseFloat(gpsLat) : 0,
-          lng: (gpsLng && !isNaN(parseFloat(gpsLng))) ? parseFloat(gpsLng) : 0
-        },
+        // Cloudinary cert metadata
+        fileUrl: certUpload.url,
+        certificate_url: certUpload.url,
+        certificate_public_id: certUpload.public_id,
+        certificate_file_type: certUpload.file_type,
+        certificate_file_name: certUpload.file_name,
+        certificate_uploaded_at: now,
+        // Cloudinary proof photo metadata
+        photoUrl: photoUpload.url,
+        proof_photo_url: photoUpload.url,
+        proof_photo_public_id: photoUpload.public_id,
+        // GPS
+        gps_lat: finalLat,
+        gps_lng: finalLng,
+        // Address from reverse geocoding
+        street, area, locality, district, state, country, postal_code: postalCode,
+        google_maps_url: googleMapsUrl,
+        // EXIF
+        exif_latitude: exifLat,
+        exif_longitude: exifLng,
+        exif_timestamp: exifTimestamp,
+        // Verification
+        gps_verified: gpsVerified,
+        fraud_flag: fraudFlag,
+        fraud_reason: fraudReason,
+        file_hash: fileHash,
+        // Prize info
+        prizePosition: prizePosition || null,
+        customPrizePosition: customPrizePosition || null,
+        prizeType: prizeType || null,
+        cashPrizeAmount: cashPrizeAmount ? parseFloat(cashPrizeAmount) : null,
+        prizeDescription: prizeDescription || null,
         status: 'pending',
-        createdAt: new Date().toISOString()
+        remarks: [],
+        upload_timestamp: now,
+        createdAt: now
       };
 
       const saved = setDocument('certifications', id, dataToSave);
-      
+
       // Audit log
       setDocument('auditLogs', 'log_' + Date.now(), {
         action: 'UPLOAD_CERTIFICATE',
-        details: `Certificate uploaded for event: ${eventName}`,
+        details: `Certificate uploaded for event: ${eventName}. GPS verified: ${gpsVerified}. Fraud flag: ${fraudFlag}.`,
         userId: req.userData.uid,
-        collegeId: req.userData.collegeId,
-        timestamp: new Date().toISOString()
+        collegeId: req.userData.collegeId || collegeId,
+        timestamp: now
       });
 
       res.json({ success: true, data: saved, id });
     } catch (e: any) {
-      console.error("Upload error:", e);
+      console.error("Certificate upload error:", e);
       res.status(500).json({ error: e.message });
     }
   });
@@ -1216,91 +1384,111 @@ export function setupApi(app: express.Express) {
       const uid = req.userData.uid;
       const role = req.userData.role;
 
-      // 1. Get Certificate Data
       if (!id) return res.status(400).json({ error: 'Missing ID' });
       const cert = getDocument('certifications', id);
       if (!cert) return res.status(404).json({ error: 'Certificate not found' });
       const currentStatus = (cert.status || 'pending').toString();
 
-      // 2. Status Transition Logic
+      // ── STAFF-OR-HOD SINGLE REVIEWER WORKFLOW ─────────────────────────────
+      // Either Staff OR HOD can be the first reviewer and fully approve/reject.
+      // The first authorized reviewer completes the workflow.
+      // Super Admin and Admin can always act.
       let allowed = false;
-      let errorMessage = "Unauthorized status transition";
+      let errorMessage = 'Unauthorized status transition';
 
-      if (role === 'staff') {
+      if (role === 'super_admin' || role === 'admin') {
+        allowed = true;
+      } else if (role === 'staff') {
         if (currentStatus === 'pending') {
-          if (newStatus === 'staff_approved' || newStatus === 'rejected') {
+          if (newStatus === 'approved' || newStatus === 'staff_approved' || newStatus === 'rejected') {
             allowed = true;
           } else {
-            errorMessage = "Staff can only approve/reject pending items";
+            errorMessage = 'Staff can approve, pre-approve, or reject pending certificates';
+          }
+        } else if (currentStatus === 'staff_approved') {
+          // Staff can also finalize staff_approved items (e.g. if HOD is absent)
+          if (newStatus === 'rejected') {
+            allowed = true;
+          } else {
+            errorMessage = 'Staff cannot escalate beyond staff_approved — HOD action required';
           }
         } else {
-          errorMessage = "Only staff can review pending items";
+          errorMessage = 'Staff can only act on pending certificates';
         }
       } else if (role === 'hod') {
-        if (currentStatus === 'staff_approved') {
+        // HOD can approve/reject at any review stage (pending or staff_approved)
+        if (currentStatus === 'pending' || currentStatus === 'staff_approved') {
           if (newStatus === 'approved' || newStatus === 'rejected') {
             allowed = true;
           } else {
-            errorMessage = "HOD can only approve/reject staff-reviewed items";
+            errorMessage = 'HOD can only approve or reject certificates';
           }
         } else {
-          errorMessage = "Only HOD can approve staff-reviewed items";
+          errorMessage = `HOD cannot act on certificates with status: ${currentStatus}`;
         }
-      } else if (role === 'super_admin' || role === 'admin') {
-        allowed = true;
       }
 
       if (!allowed) {
         return res.status(403).json({ error: errorMessage });
       }
 
-      // 3. Update Document
-      const updatedRemarks = Array.isArray(cert.remarks) ? cert.remarks : [];
-      const statusText = (newStatus || "pending").toString();
+      // ── Append remark ──────────────────────────────────────────────────────
+      const updatedRemarks = Array.isArray(cert.remarks) ? [...cert.remarks] : [];
+      const statusText = (newStatus || 'pending').toString();
+      const reviewerUser = db.prepare('SELECT name FROM users WHERE uid = ?').get(uid) as any;
+      const reviewerName = reviewerUser?.name || uid;
+
       updatedRemarks.push({
         userId: uid,
-        role: role,
-        comment: remark || `Status updated to ${statusText.replace('_', ' ')}`,
+        reviewerName,
+        role,
+        comment: remark || `${role.toUpperCase()} ${newStatus === 'approved' ? 'approved' : newStatus === 'rejected' ? 'rejected' : 'reviewed'} this certificate`,
         timestamp: new Date().toISOString(),
         status: statusText
       });
 
       const updatedCert = {
         ...cert,
-        status: (newStatus || currentStatus).toString(),
+        status: statusText,
         remarks: updatedRemarks,
+        verification_status: newStatus === 'approved' ? 'verified' : newStatus === 'rejected' ? 'rejected' : 'under_review',
         updatedAt: new Date().toISOString()
       };
 
       setDocument('certifications', id, updatedCert);
 
-      // 4. Audit Log
+      // ── Audit Log ──────────────────────────────────────────────────────────
       setDocument('auditLogs', 'log_' + Date.now(), {
-        action: 'STATUS_UPDATE',
-        details: `Certificate ${id} status changed from ${currentStatus} to ${newStatus}`,
+        action: 'CERT_STATUS_UPDATE',
+        details: `Certificate ${id} (${cert.event_name || cert.eventName}) status: ${currentStatus} → ${newStatus} by ${role} (${reviewerName})`,
         userId: uid,
         collegeId: req.userData.collegeId,
         timestamp: new Date().toISOString()
       });
 
-      // 5. Notification for the student
+      // ── Student notification + resume score recalculation ──────────────────
       const studentId = cert.user_id || cert.userId;
       if (studentId) {
-        const eventNameText = (cert.event_name || cert.eventName || "Event").toString();
-        const displayStatus = (newStatus || "updated").toString().replace('_', ' ');
+        calculateResumeScore(studentId);
+
+        const eventNameText = (cert.event_name || cert.eventName || 'Event').toString();
+        const displayStatus = newStatus === 'approved' ? 'approved ✅' :
+          newStatus === 'rejected' ? 'rejected ❌' :
+          newStatus === 'staff_approved' ? 'forwarded for HOD approval 🔄' : newStatus;
+
         setDocument('notifications', 'notif_' + Date.now(), {
           user_id: studentId,
-          title: 'Certificate Update',
-          message: `Your certificate for ${eventNameText} has been ${displayStatus}.`,
-          type: newStatus === 'rejected' ? 'error' : 'success',
+          title: 'Certificate Status Update',
+          message: `Your certificate for "${eventNameText}" has been ${displayStatus}${remark ? ': ' + remark : '.'}`,
+          type: newStatus === 'rejected' ? 'error' : newStatus === 'approved' ? 'success' : 'info',
           read: 0,
           timestamp: new Date().toISOString()
         });
       }
 
-      res.json({ success: true, status: newStatus });
+      res.json({ success: true, status: newStatus, reviewedBy: reviewerName, role });
     } catch (error: any) {
-      console.error("Status update error:", error);
+      console.error('Status update error:', error);
       res.status(500).json({ error: error.message });
     }
   });
@@ -1313,21 +1501,7 @@ export function setupApi(app: express.Express) {
   // Helper: Calculate Placement Readiness Score
   const calculateReadinessScore = (studentId: string) => {
     try {
-      const profile = db.prepare('SELECT cgpa, arrears FROM student_academic_profile WHERE student_id = ?').get(studentId) as any;
-      const skillsCount = db.prepare('SELECT count(*) as count FROM student_skills WHERE student_id = ?').get(studentId) as any;
-      const certsCount = db.prepare('SELECT count(*) as count FROM certifications WHERE user_id = ? AND status = "approved"').get(studentId) as any;
-      const activitiesCount = db.prepare('SELECT count(*) as count FROM career_activities WHERE user_id = ? AND status = "approved"').get(studentId) as any;
-
-      let score = 0;
-      if (profile) {
-        score += (profile.cgpa || 0) * 5; // Max 50 if CGPA is 10
-        score -= (profile.arrears || 0) * 5; // Penalty for arrears
-      }
-      score += (skillsCount?.count || 0) * 2; // Max 20
-      score += (certsCount?.count || 0) * 3; // Max 15
-      score += (activitiesCount?.count || 0) * 3; // Max 15
-
-      return Math.min(Math.max(score, 0), 100);
+      return calculateResumeScore(studentId).score;
     } catch (e) {
       return 0;
     }
@@ -1789,6 +1963,9 @@ export function setupApi(app: express.Express) {
   app.get('/api/student/dashboard-overview', authenticate, async (req: any, res) => {
     try {
       const studentId = req.userData.uid;
+
+      // Recalculate score and sync to ensure dashboard consistency
+      calculateResumeScore(studentId);
 
       // 1. Get stats (score, rank, totalStudents)
       const rankRows = db.prepare(`

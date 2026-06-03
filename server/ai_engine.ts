@@ -1,5 +1,6 @@
 import { db } from './db';
 import crypto from 'crypto';
+import { calculateResumeScore } from './resume_features';
 
 interface CareerPath {
   name: string;
@@ -94,29 +95,9 @@ export async function analyzeStudentGap(studentId: string) {
     !studentActivityTypes.some(sa => sa.includes(i.toLowerCase()))
   ).slice(0, 2);
 
-  // 4. Placement Readiness Scoring
-  let readinessScore = 0;
-
-  // Academic (max 25)
-  if (academic) {
-    const cgpa = academic.cgpa || 0;
-    readinessScore += Math.min((cgpa / 10) * 25, 25);
-    if (academic.arrears > 0) readinessScore -= academic.arrears * 5;
-  } else if (user.score) {
-    readinessScore += Math.min((user.score / 100) * 25, 25);
-  }
-
-  // Skills (max 30)
-  readinessScore += Math.min(studentSkills.length * 5, 30);
-
-  // Certifications (max 20)
-  readinessScore += Math.min(certs.length * 5, 20);
-
-  // Practical Experience (max 25)
-  readinessScore += Math.min(activities.length * 5, 25);
-  if (internships.length > 0) readinessScore += 10; // Bonus for internship
-
-  readinessScore = Math.max(0, Math.min(100, readinessScore));
+  // 4. Placement Readiness Scoring (Unified with Resume Score)
+  const scoreData = calculateResumeScore(studentId);
+  const readinessScore = scoreData.score;
 
   // 5. Smart Alerts
   const alerts: string[] = [];

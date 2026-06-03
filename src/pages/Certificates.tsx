@@ -645,9 +645,8 @@ const Certificates: React.FC = () => {
     try {
       let nextStatus = selectedCert.status;
       if (actionType === 'approve') {
-        if (isStaff) nextStatus = 'staff_approved';
-        else if (isHOD) nextStatus = 'approved';
-        else if (isSuperAdmin || isAdmin) nextStatus = 'approved';
+        // Single-reviewer model: Staff OR HOD can fully approve
+        nextStatus = 'approved';
       } else if (actionType === 'reject') {
         nextStatus = 'rejected';
       }
@@ -669,10 +668,12 @@ const Certificates: React.FC = () => {
         throw new Error(errorData.error || 'Failed to update status');
       }
 
+      const result = await response.json();
       setShowActionModal(false);
       setSelectedCert(null);
       setRemark('');
-      toast.success(`Certificate ${actionType}ed successfully!`);
+      setRefreshTrigger(prev => prev + 1);
+      toast.success(`Certificate ${actionType === 'approve' ? 'approved ✅' : 'rejected ❌'} by ${result.reviewedBy || profile.name || profile.role}`);
     } catch (error: any) {
       toast.error(error.message);
     }
@@ -1115,15 +1116,38 @@ const Certificates: React.FC = () => {
                           <QrCode className="w-4 h-4" /> QR
                         </button>
                       )}
-                      {((hasPermission('certificates_review') || hasPermission('certificates_approve')) && cert.status === 'staff_approved') && <button onClick={() => handleActionClick(cert, 'approve')} className="text-purple-600 hover:text-purple-900 mr-3">Approve</button>}
-                      {hasPermission('certificates_verify') && cert.status === 'hod_approved' && <button onClick={() => handleActionClick(cert, 'verify')} className="text-green-600 hover:text-green-900 mr-3">Verify</button>}
-                      {isSuperAdmin && cert.status === 'rejected' && <button onClick={() => handleActionClick(cert, 'verify')} className="text-emerald-600 hover:text-emerald-900 mr-3 font-semibold">Override & Verify</button>}
-                      {(
-                        ((hasPermission('certificates_review') || hasPermission('certificates_approve')) && cert.status === 'staff_approved') ||
-                        (hasPermission('certificates_verify') && cert.status === 'hod_approved') ||
-                        (isSuperAdmin && cert.status !== 'verified' && cert.status !== 'rejected')
-                      ) && (
-                        <button onClick={() => handleActionClick(cert, 'reject')} className="text-red-600 hover:text-red-900">Reject</button>
+                      {/* Staff can approve/reject pending items directly */}
+                      {isStaff && cert.status === 'pending' && (
+                        <>
+                          <button onClick={() => handleActionClick(cert, 'approve')} className="text-green-600 hover:text-green-900 mr-2 font-semibold inline-flex items-center gap-1">
+                            <CheckCircle className="w-3.5 h-3.5"/> Approve
+                          </button>
+                          <button onClick={() => handleActionClick(cert, 'reject')} className="text-red-600 hover:text-red-900 mr-2 inline-flex items-center gap-1">
+                            <XCircle className="w-3.5 h-3.5"/> Reject
+                          </button>
+                        </>
+                      )}
+                      {/* HOD can approve/reject pending or staff_approved items */}
+                      {isHOD && (cert.status === 'pending' || cert.status === 'staff_approved') && (
+                        <>
+                          <button onClick={() => handleActionClick(cert, 'approve')} className="text-purple-600 hover:text-purple-900 mr-2 font-semibold inline-flex items-center gap-1">
+                            <CheckCircle className="w-3.5 h-3.5"/> Approve
+                          </button>
+                          <button onClick={() => handleActionClick(cert, 'reject')} className="text-red-600 hover:text-red-900 mr-2 inline-flex items-center gap-1">
+                            <XCircle className="w-3.5 h-3.5"/> Reject
+                          </button>
+                        </>
+                      )}
+                      {/* Admin/Super admin can act on any cert */}
+                      {(isAdmin || isSuperAdmin) && cert.status !== 'approved' && cert.status !== 'verified' && (
+                        <>
+                          <button onClick={() => handleActionClick(cert, 'approve')} className="text-green-600 hover:text-green-900 mr-2 font-semibold inline-flex items-center gap-1">
+                            <CheckCircle className="w-3.5 h-3.5"/> Approve
+                          </button>
+                          <button onClick={() => handleActionClick(cert, 'reject')} className="text-red-600 hover:text-red-900 mr-2 inline-flex items-center gap-1">
+                            <XCircle className="w-3.5 h-3.5"/> Reject
+                          </button>
+                        </>
                       )}
                     </td>
                   </tr>
@@ -1504,66 +1528,125 @@ const Certificates: React.FC = () => {
         </div>
       )}
 
-      {/* Action Modal */}
+      {/* Action Modal - Full Evidence Review */}
       {showActionModal && selectedCert && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white p-6 rounded-lg w-full max-w-md">
-            <h3 className="text-lg font-bold mb-4 capitalize">{actionType} Certificate</h3>
-            <div className="mb-4">
-              <p className="text-sm text-gray-600"><strong>Student:</strong> {selectedCert.studentName} {selectedCert.rollNo && <span className="text-xs text-gray-400 ml-1">({selectedCert.rollNo})</span>}</p>
-              <p className="text-sm text-gray-600"><strong>Event:</strong> {selectedCert.eventName}</p>
-            </div>
-            <form onSubmit={handleActionSubmit} className="space-y-4">
+        <div className="fixed inset-0 bg-black/70 flex items-start justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl w-full max-w-3xl my-4 shadow-2xl overflow-hidden">
+            <div className="px-6 py-4 flex justify-between items-center bg-indigo-700 text-white">
               <div>
-                <label className="block text-sm font-medium text-gray-700">Remarks (Required)</label>
-                <textarea 
-                  value={remark}
-                  onChange={(e) => setRemark(e.target.value)}
-                  required={true}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" 
-                  rows={3}
-                  placeholder="Add your remarks here..."
-                />
+                <h3 className="text-lg font-bold">🔍 Evidence Review — {selectedCert.eventName}</h3>
+                <p className="text-xs opacity-80 mt-0.5">{selectedCert.studentName} · {selectedCert.rollNo} · {selectedCert.class} {selectedCert.year}</p>
+              </div>
+              <button onClick={() => setShowActionModal(false)} className="text-white/80 hover:text-white"><XCircle className="w-6 h-6"/></button>
+            </div>
+
+            <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
+              {/* Student Info Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {[{label:'College',val:selectedCert.collegeName},{label:'Date',val:selectedCert.date?new Date(selectedCert.date).toLocaleDateString():'—'},{label:'Type',val:selectedCert.type},{label:'Phone',val:(selectedCert as any).phone_number||selectedCert.phoneNumber||'—'}].map(f=>(
+                  <div key={f.label} className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">{f.label}</p>
+                    <p className="font-medium text-gray-800 text-sm truncate capitalize">{f.val||'—'}</p>
+                  </div>
+                ))}
               </div>
 
-              {/* Manual Fraud Flagging */}
-              <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-100 rounded-lg">
-                <input 
-                  type="checkbox" 
-                  id="manualFraud"
-                  checked={manualFraud}
-                  onChange={(e) => setManualFraud(e.target.checked)}
-                  className="w-4 h-4 text-red-600 rounded focus:ring-red-500"
-                />
-                <label htmlFor="manualFraud" className="text-sm font-bold text-red-700 flex items-center gap-1">
-                  <AlertTriangle className="w-4 h-4" /> Mark as Fraudulent
-                </label>
+              {/* Badges */}
+              <div className="flex flex-wrap gap-2">
+                {getStatusBadge(selectedCert.status)}
+                {selectedCert.fraudFlag && <span className="flex items-center gap-1 px-2.5 py-1 bg-red-100 text-red-700 border border-red-200 rounded-full text-[11px] font-bold"><AlertTriangle className="w-3 h-3 animate-pulse"/> Fraud Flagged</span>}
+                {selectedCert.gpsVerified && !selectedCert.fraudFlag && <span className="flex items-center gap-1 px-2.5 py-1 bg-green-100 text-green-700 border border-green-200 rounded-full text-[11px] font-bold"><ShieldCheck className="w-3 h-3"/> GPS Verified</span>}
               </div>
 
-              {manualFraud && (
+              {/* Certificate Document */}
+              {(selectedCert.fileUrl || (selectedCert as any).certificate_url) && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Fraud Reason</label>
-                  <input 
-                    type="text"
-                    value={manualFraudReason}
-                    onChange={(e) => setManualFraudReason(e.target.value)}
-                    required={manualFraud}
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm"
-                    placeholder="Why is this certificate fraudulent?"
-                  />
+                  <p className="text-xs font-bold text-gray-500 uppercase mb-2 flex items-center gap-1"><FileText className="w-3.5 h-3.5"/> Certificate Document</p>
+                  {((selectedCert.fileUrl || (selectedCert as any).certificate_url)||'').toLowerCase().includes('.pdf') ? (
+                    <iframe src={selectedCert.fileUrl||(selectedCert as any).certificate_url} className="w-full h-64 rounded-xl border border-gray-200" title="Certificate"/>
+                  ) : (
+                    <img src={selectedCert.fileUrl||(selectedCert as any).certificate_url} alt="Certificate" className="w-full max-h-64 object-contain rounded-xl border border-gray-200 bg-gray-50 cursor-zoom-in"
+                      onClick={()=>{setSelectedPhotoUrl(selectedCert.fileUrl||(selectedCert as any).certificate_url);setShowPhotoModal(true);}}/>
+                  )}
+                  {(selectedCert as any).certificate_file_name && <p className="text-[10px] text-gray-400 mt-1">📄 {(selectedCert as any).certificate_file_name} · {((selectedCert as any).certificate_file_type||'').toUpperCase()}</p>}
                 </div>
               )}
 
-              <div className="flex justify-end space-x-3 mt-6">
-                <button type="button" onClick={() => setShowActionModal(false)} className="px-4 py-2 border rounded text-gray-600 hover:bg-gray-50">Cancel</button>
-                <button 
-                  type="submit" 
-                  className={`px-4 py-2 text-white rounded capitalize ${actionType === 'reject' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}
-                >
-                  Confirm {actionType}
-                </button>
+              {/* Proof Photo + GPS/EXIF */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {(selectedCert.photoUrl||(selectedCert as any).proof_photo_url) && (
+                  <div>
+                    <p className="text-xs font-bold text-gray-500 uppercase mb-2 flex items-center gap-1"><ImageIcon className="w-3.5 h-3.5"/> Proof Photo</p>
+                    <img src={selectedCert.photoUrl||(selectedCert as any).proof_photo_url} alt="Proof" className="w-full max-h-52 object-contain rounded-xl border border-gray-200 bg-gray-50 cursor-zoom-in"
+                      onClick={()=>{setSelectedPhotoUrl(selectedCert.photoUrl||(selectedCert as any).proof_photo_url);setShowPhotoModal(true);}}/>
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <p className="text-xs font-bold text-gray-500 uppercase flex items-center gap-1"><MapPin className="w-3.5 h-3.5"/> GPS / EXIF</p>
+                  <div className="bg-slate-50 rounded-xl p-3 space-y-1.5 text-xs font-mono border border-slate-100">
+                    {(selectedCert as any).gps_lat ? <p>📍 GPS: {Number((selectedCert as any).gps_lat).toFixed(5)}, {Number((selectedCert as any).gps_lng).toFixed(5)}</p> : null}
+                    {(selectedCert as any).exif_latitude ? <p className="text-blue-600">📷 EXIF: {Number((selectedCert as any).exif_latitude).toFixed(5)}, {Number((selectedCert as any).exif_longitude).toFixed(5)}</p> : null}
+                    {(selectedCert as any).exif_timestamp ? <p className="text-gray-600">🕐 {new Date((selectedCert as any).exif_timestamp).toLocaleString()}</p> : null}
+                    {(selectedCert as any).street ? <p>🏠 {[(selectedCert as any).street,(selectedCert as any).locality,(selectedCert as any).district,(selectedCert as any).state].filter(Boolean).join(', ')}</p> : null}
+                    {(selectedCert as any).postal_code ? <p>📮 {(selectedCert as any).postal_code}{(selectedCert as any).country?` · ${(selectedCert as any).country}`:''}</p> : null}
+                    {!(selectedCert as any).gps_lat && !(selectedCert as any).exif_latitude && <p className="text-gray-400 italic">No GPS/EXIF data recorded</p>}
+                    {selectedCert.fraudReason ? <p className="text-red-600 font-bold">⚠️ {selectedCert.fraudReason}</p> : null}
+                  </div>
+                  {(selectedCert as any).gps_lat && (
+                    <a href={`https://www.google.com/maps?q=${(selectedCert as any).gps_lat},${(selectedCert as any).gps_lng}`} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline flex items-center gap-1"><MapPin className="w-3 h-3"/> Google Maps ↗</a>
+                  )}
+                </div>
               </div>
-            </form>
+
+              {/* OSM Map */}
+              {(selectedCert as any).gps_lat && (selectedCert as any).gps_lng && (
+                <div>
+                  <p className="text-xs font-bold text-gray-500 uppercase mb-2">📍 Location Map</p>
+                  <iframe className="w-full h-44 rounded-xl border border-gray-200" loading="lazy" title="Event Location"
+                    src={`https://www.openstreetmap.org/export/embed.html?bbox=${Number((selectedCert as any).gps_lng)-0.01},${Number((selectedCert as any).gps_lat)-0.01},${Number((selectedCert as any).gps_lng)+0.01},${Number((selectedCert as any).gps_lat)+0.01}&layer=mapnik&marker=${(selectedCert as any).gps_lat},${(selectedCert as any).gps_lng}`}/>
+                </div>
+              )}
+
+              {/* Reviewer History */}
+              {Array.isArray(selectedCert.remarks) && selectedCert.remarks.length > 0 && (
+                <div>
+                  <p className="text-xs font-bold text-gray-500 uppercase mb-2">📝 Reviewer History</p>
+                  <div className="space-y-2 max-h-28 overflow-y-auto">
+                    {selectedCert.remarks.map((r: any, i: number) => (
+                      <div key={i} className="bg-gray-50 rounded-xl p-2.5 text-xs border border-gray-100">
+                        <span className="font-bold text-gray-700">{r.reviewerName||r.userId}</span>
+                        <span className="text-indigo-600 ml-1">[{r.role}]</span>
+                        <span className="text-gray-400 ml-2 text-[10px]">{r.timestamp?new Date(r.timestamp).toLocaleString():''}</span>
+                        <p className="text-gray-600 mt-1">{r.comment}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Review Form */}
+              <form onSubmit={handleActionSubmit} className="space-y-3 border-t pt-4">
+                <textarea value={remark} onChange={e=>setRemark(e.target.value)} className="w-full border border-gray-300 rounded-xl p-3 text-sm focus:ring-2 focus:ring-indigo-500/30 outline-none resize-none" rows={3} placeholder="Add review remarks (optional)..."/>
+                <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-100 rounded-xl">
+                  <input type="checkbox" id="mfCheck" checked={manualFraud} onChange={e=>setManualFraud(e.target.checked)} className="w-4 h-4 text-red-600 rounded"/>
+                  <label htmlFor="mfCheck" className="text-sm font-bold text-red-700 flex items-center gap-1 cursor-pointer"><AlertTriangle className="w-4 h-4"/> Flag as Fraudulent</label>
+                </div>
+                {manualFraud && <input type="text" value={manualFraudReason} onChange={e=>setManualFraudReason(e.target.value)} required={manualFraud} className="w-full border border-gray-300 rounded-xl p-2 text-sm" placeholder="Reason for fraud flag..."/>}
+                <div className="flex justify-between items-center pt-1">
+                  <button type="button" onClick={()=>setShowActionModal(false)} className="px-4 py-2.5 border rounded-xl text-gray-600 hover:bg-gray-50 text-sm font-medium">Cancel</button>
+                  <div className="flex gap-3">
+                    <button type="button" onClick={()=>{setActionType('reject');handleActionSubmit({preventDefault:()=>{}} as React.FormEvent);}}
+                      className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold flex items-center gap-1.5 transition-colors">
+                      <XCircle className="w-4 h-4"/> Reject
+                    </button>
+                    <button type="submit" onClick={()=>setActionType('approve')}
+                      className="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-bold flex items-center gap-1.5 transition-colors">
+                      <CheckCircle className="w-4 h-4"/> Approve
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}

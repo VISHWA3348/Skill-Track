@@ -8,7 +8,8 @@ import {
   ShieldAlert, ShieldCheck, Send, Download, Plus, Trash2, PieChart as PieIcon,
   ChevronRight, Calendar, GraduationCap, MapPin, Mail, Phone,
   ExternalLink, Camera, MapPinOff, Eye, History, User, Check, X,
-  Key, Copy, RefreshCw
+  Key, Copy, RefreshCw,
+  Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
@@ -243,8 +244,8 @@ export default function CollegeAdminDashboardView() {
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={`flex items-center gap-2 px-6 py-3 rounded-t-xl font-bold text-sm transition-all whitespace-nowrap ${activeTab === tab.id
-                ? 'bg-indigo-50 text-indigo-600 border-b-2 border-indigo-600'
-                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+              ? 'bg-indigo-50 text-indigo-600 border-b-2 border-indigo-600'
+              : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
               }`}
           >
             {tab.icon}
@@ -434,7 +435,7 @@ export default function CollegeAdminDashboardView() {
                       </td>
                       <td className="px-6 py-4">
                         <span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${s.readiness > 75 ? 'bg-emerald-100 text-emerald-600' :
-                            s.readiness > 50 ? 'bg-amber-100 text-amber-600' : 'bg-red-100 text-red-600'
+                          s.readiness > 50 ? 'bg-amber-100 text-amber-600' : 'bg-red-100 text-red-600'
                           }`}>
                           {s.readiness}% Ready
                         </span>
@@ -575,74 +576,74 @@ export default function CollegeAdminDashboardView() {
             animate={{ opacity: 1, y: 0 }}
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
           >
-          {departments.map((d) => (
-            <div key={d.id} className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden group">
-              <div className="p-6 bg-gradient-to-br from-indigo-600 to-indigo-800 text-white">
-                <div className="flex items-center justify-between mb-4">
-                  <Building2 className="w-6 h-6 text-indigo-100" />
-                  <button
-                    onClick={() => handleRegenerateCode(d.id, d.name)}
-                    title="Regenerate Invite Code"
-                    className="p-2 bg-white/10 rounded-xl hover:bg-white/20 transition-colors"
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                  </button>
-                </div>
-                <h4 className="text-xl font-bold">{d.name}</h4>
-                <p className="text-indigo-100 text-xs mt-1">ID: {d.department_id}</p>
-              </div>
-              <div className="p-6 space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-3 bg-slate-50 rounded-2xl text-center">
-                    <p className="text-[10px] font-black text-slate-400 uppercase">Students</p>
-                    <p className="text-lg font-black text-slate-900">{d.student_count}</p>
-                  </div>
-                  <div className="p-3 bg-slate-50 rounded-2xl text-center">
-                    <p className="text-[10px] font-black text-slate-400 uppercase">Staff</p>
-                    <p className="text-lg font-black text-slate-900">{d.staff_count}</p>
-                  </div>
-                </div>
-                {/* Invite Code Section */}
-                <div className="bg-indigo-50 rounded-2xl p-3 border border-indigo-100">
-                  <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-1">
-                    <Key className="w-3 h-3" /> Invite Code
-                  </p>
-                  {d.invite_code ? (
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-mono font-bold text-indigo-700 text-sm tracking-wider">{d.invite_code}</span>
-                      <button
-                        onClick={() => copyToClipboard(d.invite_code)}
-                        title="Copy invite code"
-                        className="p-1.5 bg-indigo-100 text-indigo-600 rounded-lg hover:bg-indigo-200 transition-colors"
-                      >
-                        <Copy className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-slate-400 italic">No active code — click ↻ to generate</p>
-                  )}
-                </div>
-                <div className="pt-2 space-y-3">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-500">HOD</span>
-                    <span className="font-bold text-slate-900">{d.hod_name || 'Not Assigned'}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-500">Avg CGPA</span>
-                    <span className="font-bold text-emerald-600">{d.avg_cgpa ? d.avg_cgpa.toFixed(2) : '0.00'}</span>
-                  </div>
-                  {d.invite_code_id && (
+            {departments.map((d) => (
+              <div key={d.id} className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden group">
+                <div className="p-6 bg-gradient-to-br from-indigo-600 to-indigo-800 text-white">
+                  <div className="flex items-center justify-between mb-4">
+                    <Building2 className="w-6 h-6 text-indigo-100" />
                     <button
-                      onClick={() => handleViewStudentsForCode(d.invite_code_id, d.invite_code, d.name)}
-                      className="w-full mt-2 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+                      onClick={() => handleRegenerateCode(d.id, d.name)}
+                      title="Regenerate Invite Code"
+                      className="p-2 bg-white/10 rounded-xl hover:bg-white/20 transition-colors"
                     >
-                      <Users className="w-3.5 h-3.5" /> View Registered Students
+                      <RefreshCw className="w-4 h-4" />
                     </button>
-                  )}
+                  </div>
+                  <h4 className="text-xl font-bold">{d.name}</h4>
+                  <p className="text-indigo-100 text-xs mt-1">ID: {d.department_id}</p>
+                </div>
+                <div className="p-6 space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-3 bg-slate-50 rounded-2xl text-center">
+                      <p className="text-[10px] font-black text-slate-400 uppercase">Students</p>
+                      <p className="text-lg font-black text-slate-900">{d.student_count}</p>
+                    </div>
+                    <div className="p-3 bg-slate-50 rounded-2xl text-center">
+                      <p className="text-[10px] font-black text-slate-400 uppercase">Staff</p>
+                      <p className="text-lg font-black text-slate-900">{d.staff_count}</p>
+                    </div>
+                  </div>
+                  {/* Invite Code Section */}
+                  <div className="bg-indigo-50 rounded-2xl p-3 border border-indigo-100">
+                    <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-1">
+                      <Key className="w-3 h-3" /> Invite Code
+                    </p>
+                    {d.invite_code ? (
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono font-bold text-indigo-700 text-sm tracking-wider">{d.invite_code}</span>
+                        <button
+                          onClick={() => copyToClipboard(d.invite_code)}
+                          title="Copy invite code"
+                          className="p-1.5 bg-indigo-100 text-indigo-600 rounded-lg hover:bg-indigo-200 transition-colors"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-400 italic">No active code — click ↻ to generate</p>
+                    )}
+                  </div>
+                  <div className="pt-2 space-y-3">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-500">HOD</span>
+                      <span className="font-bold text-slate-900">{d.hod_name || 'Not Assigned'}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-500">Avg CGPA</span>
+                      <span className="font-bold text-emerald-600">{d.avg_cgpa ? d.avg_cgpa.toFixed(2) : '0.00'}</span>
+                    </div>
+                    {d.invite_code_id && (
+                      <button
+                        onClick={() => handleViewStudentsForCode(d.invite_code_id, d.invite_code, d.name)}
+                        className="w-full mt-2 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+                      >
+                        <Users className="w-3.5 h-3.5" /> View Registered Students
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
             <button
               onClick={() => setShowAddDeptModal(true)}
               className="bg-white border-2 border-dashed border-slate-200 rounded-3xl p-8 flex flex-col items-center justify-center gap-3 text-slate-400 hover:border-indigo-600 hover:text-indigo-600 hover:bg-indigo-50/10 transition-all group"

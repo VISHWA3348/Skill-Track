@@ -533,7 +533,8 @@ const Settings: React.FC = () => {
                     type="text" 
                     value={rollNo} 
                     onChange={(e) => setRollNo(e.target.value)} 
-                    className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                    disabled={isStudent}
+                    className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                   />
                 </div>
                 <div>
@@ -541,8 +542,8 @@ const Settings: React.FC = () => {
                   <select 
                     value={departmentId} 
                     onChange={(e) => setDepartmentId(e.target.value)} 
-                    className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none bg-white"
-                    disabled={!collegeId}
+                    className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none bg-white disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                    disabled={!collegeId || isStudent}
                   >
                     <option value="">Select Department</option>
                     {filteredDepts.map(d => (
@@ -554,30 +555,79 @@ const Settings: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Class</label>
-                  <input 
-                    type="text" 
-                    value={className} 
-                    onChange={(e) => setClassName(e.target.value)} 
-                    className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-                  />
+                  {isStudent ? (
+                    <select
+                      value={className}
+                      onChange={(e) => setClassName(e.target.value)}
+                      className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                    >
+                      <option value="">Select Class</option>
+                      <option value="Diploma">Diploma</option>
+                      <option value="B.E">B.E</option>
+                      <option value="B.Tech">B.Tech</option>
+                      <option value="M.E">M.E</option>
+                      <option value="M.Tech">M.Tech</option>
+                      <option value="MBA">MBA</option>
+                      <option value="MCA">MCA</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  ) : (
+                    <input 
+                      type="text" 
+                      value={className} 
+                      onChange={(e) => setClassName(e.target.value)} 
+                      className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
-                  <input 
-                    type="text" 
-                    value={year} 
-                    onChange={(e) => setYear(e.target.value)} 
-                    className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-                  />
+                  {isStudent ? (
+                    <select
+                      value={year}
+                      onChange={(e) => setYear(e.target.value)}
+                      className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                    >
+                      <option value="">Select Year</option>
+                      <option value="I">I</option>
+                      <option value="II">II</option>
+                      <option value="III">III</option>
+                      <option value="IV">IV</option>
+                      <option value="V">V</option>
+                    </select>
+                  ) : (
+                    <input 
+                      type="text" 
+                      value={year} 
+                      onChange={(e) => setYear(e.target.value)} 
+                      className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Section</label>
-                  <input 
-                    type="text" 
-                    value={section} 
-                    onChange={(e) => setSection(e.target.value)} 
-                    className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-                  />
+                  {isStudent ? (
+                    <select
+                      value={section}
+                      onChange={(e) => setSection(e.target.value)}
+                      className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                    >
+                      <option value="">Select Section</option>
+                      <option value="A">A</option>
+                      <option value="B">B</option>
+                      <option value="C">C</option>
+                      <option value="D">D</option>
+                      <option value="E">E</option>
+                      <option value="F">F</option>
+                    </select>
+                  ) : (
+                    <input 
+                      type="text" 
+                      value={section} 
+                      onChange={(e) => setSection(e.target.value)} 
+                      className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  )}
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -587,7 +637,8 @@ const Settings: React.FC = () => {
                     type="text" 
                     value={collegeName} 
                     onChange={(e) => setCollegeName(e.target.value)} 
-                    className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                    disabled={isStudent}
+                    className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                   />
                 </div>
                 <div>
@@ -599,8 +650,8 @@ const Settings: React.FC = () => {
                       const selectedCol = allColleges.find(c => c.college_id === e.target.value);
                       if (selectedCol) setCollegeName(selectedCol.name || selectedCol.college_name);
                     }} 
-                    className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none bg-white"
-                    disabled={!isSuperAdmin}
+                    className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none bg-white disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                    disabled={!isSuperAdmin || isStudent}
                   >
                     <option value="">Select College</option>
                     {allColleges.map(c => (

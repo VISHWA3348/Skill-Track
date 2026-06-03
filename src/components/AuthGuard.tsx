@@ -17,7 +17,7 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children, allowedRoles }) => {
   // Enterprise Session Timeout Logic
   React.useEffect(() => {
     if (!user) return;
-    
+
     let timeout: any;
     const resetTimer = () => {
       if (timeout) clearTimeout(timeout);
@@ -25,7 +25,7 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children, allowedRoles }) => {
       timeout = setTimeout(() => {
         logout();
         toast.error("Session expired due to inactivity");
-      }, 30 * 60 * 1000); 
+      }, 30 * 60 * 1000);
     };
 
     window.addEventListener('mousemove', resetTimer);
@@ -56,7 +56,7 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children, allowedRoles }) => {
     // If trying to access a root-level path or something they shouldn't, 
     // redirect to their dashboard instead of a 403 page.
     const dashboardPath = `/dashboard/${(profile.role || "student").replace('_', '-')}-dashboard`;
-    
+
     // Avoid infinite redirect loop if dashboard is also restricted (which shouldn't happen)
     if (location.pathname !== dashboardPath) {
       return <Navigate to={dashboardPath} replace />;

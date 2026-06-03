@@ -20,6 +20,16 @@ const getClientIp = (req: any): string => {
 
 const limiterCache = new Map<string, { count: number; windowStart: number }>();
 
+// Periodic cleanup of rate-limiter entries older than 5 minutes to prevent memory leaks
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, record] of limiterCache.entries()) {
+    if (now - record.windowStart > 5 * 60 * 1000) {
+      limiterCache.delete(key);
+    }
+  }
+}, 5 * 60 * 1000);
+
 export const createLimiter = (limit: number, windowMs: number, errorMessage: string = 'Too many requests. Please try again later.') => {
   return (req: any, res: any, next: any) => {
     const ip = getClientIp(req);

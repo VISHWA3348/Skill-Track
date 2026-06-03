@@ -35,11 +35,14 @@ const initBullMQ = async () => {
     new BullWorker('skill-track-jobs', async (job) => {
       const handler = handlers.get(job.name);
       if (handler) {
-        const result = await handler(job.data);
-        if (result !== undefined) {
-          await cacheService.set(`job:result:${job.id}`, result, 120); // Keep results for 120s
+        try {
+          const result = await handler(job.data);
+          await cacheService.set(`job:result:${job.id}`, { status: 'completed', result }, 120);
+          return result;
+        } catch (err: any) {
+          await cacheService.set(`job:result:${job.id}`, { status: 'failed', error: err.message || 'Job execution failed' }, 120);
+          throw err;
         }
-        return result;
       }
       throw new Error(`No handler registered for job type: ${job.name}`);
     }, { connection, concurrency: 5 });
@@ -79,9 +82,7 @@ const startInMemoryWorker = () => {
 
     try {
       const result = await handler(job.data);
-      if (result !== undefined) {
-        await cacheService.set(`job:result:${job.id}`, result, 120); // Keep results for 120s
-      }
+      await cacheService.set(`job:result:${job.id}`, { status: 'completed', result }, 120);
     } catch (err: any) {
       console.error(`❌ Background job ${job.id} failed:`, err.message);
       if (job.retries > 0) {
@@ -90,6 +91,9 @@ const startInMemoryWorker = () => {
         setTimeout(() => {
           inMemoryQueue.push(job);
         }, 2000);
+      } else {
+        // Out of retries, mark as failed
+        await cacheService.set(`job:result:${job.id}`, { status: 'failed', error: err.message || 'Job execution failed' }, 120);
       }
     }
 
@@ -140,15 +144,19 @@ export const queueService = {
     return jobId;
   },
 
-  /**
-   * Waits for a job to complete and return its cached result.
-   */
   async waitForJobResult(jobId: string, timeoutMs: number = 30000): Promise<any> {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
-      const result = await cacheService.get(`job:result:${jobId}`);
-      if (result !== null) {
-        return result;
+      const entry = await cacheService.get(`job:result:${jobId}`);
+      if (entry !== null) {
+        if (entry && typeof entry === 'object' && entry.status === 'completed') {
+          return entry.result;
+        }
+        if (entry && typeof entry === 'object' && entry.status === 'failed') {
+          throw new Error(entry.error || "Job execution failed");
+        }
+        // Legacy fallback in case raw result was stored directly
+        return entry;
       }
       await new Promise(resolve => setTimeout(resolve, 100)); // Poll every 100ms
     }

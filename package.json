@@ -12,7 +12,8 @@
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
     "migrate": "ts-node scripts/migrate_sqlite_to_postgres.ts",
-    "dbpush": "prisma db push"
+    "dbpush": "prisma db push",
+    "test:e2e": "node --import tsx test_e2e_all_features.ts"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",

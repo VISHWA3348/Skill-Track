@@ -1,5 +1,5 @@
 import { db } from './db';
-import { v4 as uuidv4 } from 'uuid';
+import crypto from 'crypto';
 
 interface CareerPath {
   name: string;
@@ -136,7 +136,7 @@ export async function analyzeStudentGap(studentId: string) {
   }
 
   // 6. Persist Results
-  const insightId = uuidv4();
+  const insightId = crypto.randomUUID();
   const existing = db.prepare('SELECT id FROM ai_career_insights WHERE student_id = ?').get(studentId) as any;
 
   if (existing) {
@@ -238,7 +238,7 @@ export async function aggregateDepartmentAnalytics(departmentId: string) {
     total_students: students.length
   };
 
-  const id = uuidv4();
+  const id = crypto.randomUUID();
   db.prepare(`
     INSERT INTO ai_analytics_summary (id, scope_type, scope_id, skill_gaps, readiness_stats, updated_at)
     VALUES (?, 'department', ?, ?, ?, CURRENT_TIMESTAMP)

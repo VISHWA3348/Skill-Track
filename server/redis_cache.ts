@@ -6,6 +6,16 @@ let useRedis = false;
 // High-performance in-memory fallback cache
 const memoryCache = new Map<string, { value: any; expiry: number }>();
 
+// Periodic cleanup of expired fallback memory cache entries to prevent memory leaks
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of memoryCache.entries()) {
+    if (now >= entry.expiry) {
+      memoryCache.delete(key);
+    }
+  }
+}, 5 * 60 * 1000);
+
 // Try to initialize Redis connection if env variable is set
 const initRedis = async () => {
   const redisUrl = process.env.REDIS_URL;

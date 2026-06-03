@@ -3,6 +3,7 @@ import { db, queryDocuments, getDocument, setDocument } from './db';
 import { authenticate, checkRole, getDataIsolationFilters } from './middleware';
 import bcrypt from 'bcryptjs';
 import { cacheService } from './redis_cache';
+import { queueService } from './queue';
 
 export function setupCollegeAdminEnhancements(app: express.Express) {
 
@@ -278,7 +279,7 @@ export function setupCollegeAdminEnhancements(app: express.Express) {
   // 6. BROADCAST SYSTEM
   // ============================================
 
-  app.post("/api/admin/broadcast/send", authenticate, checkRole(["admin", "super_admin"]), (req: any, res) => {
+  app.post("/api/admin/broadcast/send", authenticate, checkRole(["admin", "super_admin"]), async (req: any, res) => {
     try {
       const { title, message, target_role, target_department, target_year } = req.body;
       const collegeId = req.userData.collegeId || req.userData.college_id;
@@ -290,31 +291,17 @@ export function setupCollegeAdminEnhancements(app: express.Express) {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `).run(id, collegeId, adminId, title, message, target_role || 'all', target_department || null, target_year || null);
 
-      // Also create individual notifications for target users
-      let userQuery = "SELECT uid FROM users WHERE (college_id = ? OR ? = 'super_admin')";
-      const params: any[] = [collegeId, req.userData.role];
-
-      if (target_role && target_role !== 'all') {
-        userQuery += " AND role = ?";
-        params.push(target_role);
-      }
-      if (target_department) {
-        userQuery += " AND department_id = ?";
-        params.push(target_department);
-      }
-      if (target_year) {
-        userQuery += " AND year = ?";
-        params.push(target_year);
-      }
-
-      const users = db.prepare(userQuery).all(...params) as any[];
-      const noteStmt = db.prepare("INSERT INTO notifications (id, user_id, title, message, type) VALUES (?, ?, ?, ?, ?)");
-      
-      users.forEach(u => {
-        noteStmt.run('note_' + Date.now() + Math.random().toString(36).substring(7), u.uid, title, message, 'announcement');
+      // Enqueue the notification broadcast to background job
+      await queueService.addJob('send-broadcast-notification', {
+        title,
+        message,
+        targetRole: target_role,
+        targetCollege: collegeId,
+        targetDept: target_department,
+        targetYear: target_year
       });
 
-      res.json({ success: true, id, reached: users.length });
+      res.json({ success: true, id, message: 'Broadcast initiated in background' });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

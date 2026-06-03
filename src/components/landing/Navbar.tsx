@@ -118,7 +118,7 @@ const Navbar: React.FC = () => {
             className="flex items-center space-x-2.5 cursor-pointer group" 
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
             role="button"
-            aria-label="ZinoinTech Home"
+            aria-label="Skill Track Home"
             tabIndex={0}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
@@ -130,7 +130,7 @@ const Navbar: React.FC = () => {
               <GraduationCap className="w-6 h-6" />
             </div>
             <span className={`text-2xl font-bold tracking-tight ${isScrolled ? 'text-gray-900 dark:text-white' : 'text-gray-900 dark:text-white'}`}>
-              Zinoin<span className="text-indigo-600 dark:text-indigo-400">Tech</span>
+              Skill <span className="text-indigo-600 dark:text-indigo-400">Track</span>
             </span>
           </div>
 
@@ -212,7 +212,7 @@ const Navbar: React.FC = () => {
                   <div className="p-2 bg-indigo-600 rounded-lg text-white">
                     <GraduationCap className="w-6 h-6" />
                   </div>
-                  <span className="text-xl font-bold dark:text-white text-gray-900">ZinoinTech</span>
+                  <span className="text-xl font-bold dark:text-white text-gray-900">Skill Track</span>
                 </div>
                 <button
                   onClick={() => setMobileMenuOpen(false)}

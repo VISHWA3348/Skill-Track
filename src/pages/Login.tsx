@@ -7,25 +7,7 @@ import { ShieldCheck, LogIn, Mail, Lock, User, GraduationCap, Phone, MapPin, Bui
 import { UserRole } from '../types';
 import { toast } from 'sonner';
 
-const UserRoleSelect: React.FC<{ role: UserRole; onChange: (role: UserRole) => void }> = ({ role, onChange }) => {
-  return (
-    <div className="relative">
-      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-        <GraduationCap className="h-5 w-5 text-gray-400" />
-      </div>
-      <select
-        value={role}
-        onChange={(e) => onChange(e.target.value as UserRole)}
-        className="appearance-none rounded-md relative block w-full px-3 py-2 pl-10 border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-      >
-        <option value="student">Student</option>
-        <option value="staff">Staff</option>
-        <option value="hod">HOD</option>
-        <option value="admin">Admin</option>
-      </select>
-    </div>
-  );
-};
+
 
 const Login: React.FC = () => {
   const { user, profile, loading } = useAuth();
@@ -66,6 +48,10 @@ const Login: React.FC = () => {
   const [colleges, setColleges] = React.useState<any[]>([]);
   const [departments, setDepartments] = React.useState<any[]>([]);
   const [filteredDepts, setFilteredDepts] = React.useState<any[]>([]);
+
+  React.useEffect(() => {
+    document.title = isSignup ? 'Skill Track | Signup' : 'Skill Track | Login';
+  }, [isSignup]);
 
   React.useEffect(() => {
     if (isSignup) {
@@ -491,12 +477,7 @@ const Login: React.FC = () => {
                         onChange={(e) => setCollegeName(e.target.value)}
                       />
                     </div>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <UserRoleSelect role={role} onChange={setRole} />
-                      </div>
-                      {isCodeVerified && <div className="absolute inset-0 bg-transparent cursor-not-allowed" title="Role locked by signup code" />}
-                    </div>
+
                     <div className="md:col-span-2 relative">
                       <textarea
                         className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
@@ -606,31 +587,13 @@ const Login: React.FC = () => {
               </button>
             )}
             
-            <div className="pt-4 border-t border-gray-100 flex flex-col gap-4">
-              {loginType === 'admin' && (
+            {loginType === 'admin' && (
+              <div className="pt-4 border-t border-gray-100">
                 <p className="mt-2 text-[10px] text-gray-400 italic">
                   Note: Admin accounts are managed by the Super Admin.
                 </p>
-              )}
-              
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    const res = await fetch(`${API_BASE_URL}/api/seed-users`, { method: 'POST' });
-                    const data = await res.json();
-                    if (res.ok) toast.success(data.message || "Test users seeded successfully!");
-                    else toast.error(data.error || "Failed to seed users");
-                  } catch (err) {
-                    toast.error("Network error while seeding");
-                  }
-                }}
-                className="w-full py-2 px-4 border border-blue-200 text-blue-600 rounded-md text-xs font-semibold hover:bg-blue-50 transition-colors flex items-center justify-center gap-2"
-              >
-                <Building className="w-3.5 h-3.5" />
-                Seed Test Users (One-time)
-              </button>
-            </div>
+              </div>
+            )}
           </div>
 
           </form>

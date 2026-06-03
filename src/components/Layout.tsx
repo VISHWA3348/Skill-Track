@@ -74,7 +74,7 @@ const Layout: React.FC = () => {
       `}>
         <div className="p-6 border-b border-slate-100 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight">CertTrack</h1>
+            <h1 className="text-2xl font-black text-slate-900 tracking-tight">Skill Track</h1>
             <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mt-0.5">{(profile?.role || "").replace('_', ' ')} Portal</p>
           </div>
           <button 

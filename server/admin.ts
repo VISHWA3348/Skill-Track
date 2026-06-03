@@ -40,6 +40,24 @@ export function setupAdmin(app: express.Express) {
         });
         console.log("Super admin seeded: superadmin@certtrack.com | SuperAdmin@123");
       }
+
+      // Seed zinointech@gmail.com as super admin
+      const zinoinUser = queryDocuments('users', [{ field: 'email', operator: '==', value: 'zinointech@gmail.com' }]);
+      if (zinoinUser.length === 0) {
+        const hashedPassword = await bcrypt.hash('Vishwa@8105', 10);
+        setDocument('users', 'user_zinoin_super_admin', {
+          uid: 'user_zinoin_super_admin',
+          email: 'zinointech@gmail.com',
+          passwordHash: hashedPassword,
+          role: 'super_admin',
+          name: 'Skill Track Super Admin',
+          displayName: 'Skill Track Super Admin',
+          status: 'active',
+          isActive: true,
+          createdAt: new Date().toISOString()
+        });
+        console.log("Super admin seeded: zinointech@gmail.com | Vishwa@8105");
+      }
     } catch (e) {
       console.error("Error seeding:", e);
     }

@@ -40,23 +40,18 @@ export default function StaffDashboardView() {
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      const [statsRes, studentsRes, analyticsRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/staff/dashboard-stats`, { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch(`${API_BASE_URL}/api/staff/students`, { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch(`${API_BASE_URL}/api/staff/analytics`, { headers: { 'Authorization': `Bearer ${token}` } })
-      ]);
+      const res = await fetch(`${API_BASE_URL}/api/staff/dashboard-overview`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
 
-      if (statsRes.ok) {
-        const res = await statsRes.json();
-        setStats(res.data || {});
-      }
-      if (studentsRes.ok) {
-        const res = await studentsRes.json();
-        setStudents(res.data || []);
-      }
-      if (analyticsRes.ok) {
-        const res = await analyticsRes.json();
-        setAnalytics(res.data || { cgpaDist: [], certTrends: [] });
+      if (res.ok) {
+        const result = await res.json();
+        if (result.success && result.data) {
+          const { stats, students, analytics } = result.data;
+          setStats(stats || {});
+          setStudents(students || []);
+          setAnalytics(analytics || { cgpaDist: [], certTrends: [] });
+        }
       }
     } catch (error) {
       console.error("Error fetching data:", error);

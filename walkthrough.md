@@ -1,6 +1,6 @@
-# CampusBridge E2E Verification Walkthrough
+# Skill Track E2E Verification Walkthrough
 
-We have successfully executed a comprehensive, sequential End-to-End (E2E) testing harness validating **every single feature** and **role workflow** (Student, Staff, HOD, College Admin, Super Admin) in the CampusBridge System. 
+We have successfully executed a comprehensive, sequential End-to-End (E2E) testing harness validating **every single feature** and **role workflow** (Student, Staff, HOD, College Admin, Super Admin) in the Skill Track System. 
 
 ## Key Improvements & Bug Fixes
 
@@ -25,7 +25,7 @@ Below is the verified test run log demonstrating 100% success across all compone
 
 ```text
 ==============================================================
-   CAMPUSBRIDGE SYSTEM - ALL ROLES & ALL FEATURES E2E TESTS   
+   SKILL TRACK SYSTEM - ALL ROLES & ALL FEATURES E2E TESTS   
 ==============================================================
 
 --- STEP 1: DATABASE SEEDING ---

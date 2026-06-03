@@ -35,8 +35,8 @@ async function assertResponse(response: Response, expectedStatus: number = 200, 
 }
 
 async function runE2ETests() {
-  console.log("\n==============================================================");
-  console.log("   CAMPUSBRIDGE SYSTEM - ALL ROLES & ALL FEATURES E2E TESTS   ");
+  console.log("==============================================================");
+  console.log("   SKILL TRACK SYSTEM - ALL ROLES & ALL FEATURES E2E TESTS   ");
   console.log("==============================================================\n");
 
   try {

@@ -7,6 +7,7 @@ import { motion } from 'motion/react';
 const Cookies: React.FC = () => {
   useEffect(() => {
     window.scrollTo(0, 0);
+    document.title = 'Skill Track | Cookie Settings';
   }, []);
 
   return (
@@ -37,7 +38,7 @@ const Cookies: React.FC = () => {
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Cookie Usage</h2>
               </div>
               <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
-                ZinoinTech uses cookies and similar tracking technologies to track the activity on our service and hold certain information. Cookies are files with small amount of data which may include an anonymous unique identifier.
+                Skill Track uses cookies and similar tracking technologies to track the activity on our service and hold certain information. Cookies are files with small amount of data which may include an anonymous unique identifier.
               </p>
             </section>
 

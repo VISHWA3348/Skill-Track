@@ -43,43 +43,22 @@ export default function StudentDashboardView() {
 
     const fetchData = async () => {
       try {
-        const [statsRes, oppsRes, acadRes, notifRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/api/admin/stats`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } }),
-          fetch(`${API_BASE_URL}/api/opportunities`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } }),
-          fetch(`${API_BASE_URL}/api/student/academic-profile`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } }),
-          fetch(`${API_BASE_URL}/api/student/notifications`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } })
-        ]);
-
-        if (statsRes.ok) {
-          const result = await statsRes.json();
-          const data = result.success ? result.data : result;
-          setStats(data || {});
-          setRank(data?.studentRank || null);
-          setTotalStudents(data?.totalStudents || 0);
-        }
-
-        if (oppsRes.ok) {
-          const result = await oppsRes.json();
-          setOpportunities(result.data || []);
-        }
-
-        if (acadRes.ok) {
-          const result = await acadRes.json();
-          setAcademicProfile(result.data);
-        }
-
-        if (notifRes.ok) {
-          const result = await notifRes.json();
-          setNotifications(result.data || []);
-        }
-
-        // Fetch granular academic performance
-        const perfRes = await fetch(`${API_BASE_URL}/api/student/academic/performance`, {
+        const res = await fetch(`${API_BASE_URL}/api/student/dashboard-overview`, {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         });
-        if (perfRes.ok) {
-          const result = await perfRes.json();
-          setAcademicPerformance(result.data);
+
+        if (res.ok) {
+          const result = await res.json();
+          if (result.success && result.data) {
+            const { stats, opportunities, academicProfile, notifications, academicPerformance } = result.data;
+            setStats(stats || {});
+            setRank(stats?.studentRank || null);
+            setTotalStudents(stats?.totalStudents || 0);
+            setOpportunities(opportunities || []);
+            setAcademicProfile(academicProfile);
+            setNotifications(notifications || []);
+            setAcademicPerformance(academicPerformance);
+          }
         }
       } catch (error) {
         console.error("Error fetching dashboard data:", error);

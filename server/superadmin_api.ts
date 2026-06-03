@@ -4,6 +4,7 @@ import { db } from './db';
 import { authenticate, checkRole } from './middleware';
 import fs from 'fs';
 import path from 'path';
+import { queueService } from './queue';
 
 // ============================================================
 // UTILITY: Generate cryptographically secure CAMP-DEPT-XXXXXX invite code
@@ -337,35 +338,19 @@ export function setupSuperAdminApi(app: express.Express) {
   // ============================================
   // 8. BROADCAST
   // ============================================
-  router.post('/broadcast', (req, res) => {
+  router.post('/broadcast', async (req, res) => {
     try {
       const { title, message, targetRole, targetCollege, targetDept } = req.body;
       
-      let query = "SELECT uid FROM users WHERE 1=1";
-      const params: any[] = [];
-
-      if (targetRole && targetRole !== 'all') {
-        query += " AND role = ?";
-        params.push(targetRole);
-      }
-      if (targetCollege && targetCollege !== 'all') {
-        query += " AND college_id = ?";
-        params.push(targetCollege);
-      }
-      if (targetDept && targetDept !== 'all') {
-        query += " AND department_id = ?";
-        params.push(targetDept);
-      }
-
-      const targetUsers = db.prepare(query).all(...params) as any[];
-      
-      const insertNotification = db.prepare('INSERT INTO notifications (id, user_id, title, message, type) VALUES (?, ?, ?, ?, ?)');
-      
-      targetUsers.forEach(u => {
-        insertNotification.run('notif_' + Date.now() + Math.random().toString(36).substring(7), u.uid, title, message, 'broadcast');
+      const jobId = await queueService.addJob('send-broadcast-notification', {
+        title,
+        message,
+        targetRole,
+        targetCollege,
+        targetDept
       });
 
-      res.json({ success: true, message: `Broadcast sent to ${targetUsers.length} users` });
+      res.json({ success: true, jobId, message: 'Broadcast notification initiated in the background' });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

@@ -7,6 +7,7 @@ import { motion } from 'motion/react';
 const Privacy: React.FC = () => {
   useEffect(() => {
     window.scrollTo(0, 0);
+    document.title = 'Skill Track | Privacy Policy';
   }, []);
 
   return (
@@ -24,7 +25,7 @@ const Privacy: React.FC = () => {
               Privacy Policy
             </h1>
             <p className="text-lg text-gray-600 dark:text-gray-400">
-              Your privacy is our priority. Learn how we handle and protect your data at ZinoinTech.
+              Your privacy is our priority. Learn how we handle and protect your data at Skill Track.
             </p>
           </motion.div>
 
@@ -73,7 +74,7 @@ const Privacy: React.FC = () => {
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Security Statement</h2>
               </div>
               <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
-                ZinoinTech employs industry-standard security measures, including SSL encryption, multi-factor authentication, and regular security audits. We are committed to protecting your data against unauthorized access, alteration, or destruction.
+                Skill Track employs industry-standard security measures, including SSL encryption, multi-factor authentication, and regular security audits. We are committed to protecting your data against unauthorized access, alteration, or destruction.
               </p>
             </section>
 

@@ -1,6 +1,13 @@
 import { Express } from 'express';
 import { db } from './db';
 import { analyzeStudentGap, aggregateDepartmentAnalytics } from './ai_engine';
+import { queueService } from './queue';
+
+// Register AI Gap Analysis background worker handler
+queueService.registerHandler('ai-analysis', async (jobData: any) => {
+  const { studentId } = jobData;
+  return await analyzeStudentGap(studentId);
+});
 
 export function setupAiApi(app: Express) {
   // Get AI insights for a student
@@ -11,9 +18,10 @@ export function setupAiApi(app: Express) {
       // Try to get existing insights
       let insights = db.prepare('SELECT * FROM ai_career_insights WHERE student_id = ?').get(studentId) as any;
       
-      // If not exists or force refresh, recalculate
+      // If not exists or force refresh, recalculate in background worker
       if (!insights || req.query.refresh === 'true') {
-        await analyzeStudentGap(studentId);
+        const jobId = await queueService.addJob('ai-analysis', { studentId });
+        await queueService.waitForJobResult(jobId);
         insights = db.prepare('SELECT * FROM ai_career_insights WHERE student_id = ?').get(studentId) as any;
       }
 
@@ -39,11 +47,12 @@ export function setupAiApi(app: Express) {
     }
   });
 
-  // Force recalculate insights
+  // Force recalculate insights in background worker
   app.post('/api/ai/recalculate/:studentId', async (req, res) => {
     try {
       const { studentId } = req.params;
-      const result = await analyzeStudentGap(studentId);
+      const jobId = await queueService.addJob('ai-analysis', { studentId });
+      const result = await queueService.waitForJobResult(jobId);
       res.json({ success: true, data: result });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
@@ -83,9 +92,19 @@ export function setupAiApi(app: Express) {
       
       // Get all departments in this college
       const depts = db.prepare('SELECT id FROM departments WHERE college_id = ?').all() as any[];
+      if (depts.length === 0) {
+        return res.json({ success: true, data: { departments: [], globalGaps: [], overallReadiness: 0 } });
+      }
       
+      const deptIds = depts.map(d => d.id);
+      const placeholders = deptIds.map(() => '?').join(',');
+      const analyticsRows = db.prepare(`
+        SELECT * FROM ai_analytics_summary 
+        WHERE scope_type = 'department' AND scope_id IN (${placeholders})
+      `).all(...deptIds) as any[];
+
       const deptAnalytics = depts.map(d => {
-        const a = db.prepare("SELECT * FROM ai_analytics_summary WHERE scope_type = 'department' AND scope_id = ?").get(d.id) as any;
+        const a = analyticsRows.find(row => row.scope_id === d.id);
         if (!a) return null;
         return {
           deptId: d.id,

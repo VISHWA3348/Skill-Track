@@ -7,6 +7,7 @@ import { hashPassword, comparePassword, generateToken, verifyToken, validatePass
 import { authenticate, checkRole, getDataIsolationFilters, rateLimiter } from './middleware';
 import { uploadMediaFile } from './cloudinary_helper';
 import { cacheService } from './redis_cache';
+import { queueService } from './queue';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-jwt-key-change-in-production';
 
@@ -612,6 +613,7 @@ export function setupApi(app: express.Express) {
       const seedUsers = [
         { email: 'superadmin@example.com', password: 'password123', role: 'super_admin', name: 'Super Admin' },
         { email: 'superadmin@certtrack.com', password: 'SuperAdminPassword123!', role: 'super_admin', name: 'Super Admin' },
+        { email: 'zinointech@gmail.com', password: 'Vishwa@8105', role: 'super_admin', name: 'Skill Track Super Admin' },
         { email: 'admin@test.com', password: 'Admin@123', role: 'admin', name: 'College Admin', collegeId: 'COL001' },
         { email: 'hod@test.com', password: 'Hod@123', role: 'hod', name: 'HOD User', collegeId: 'COL001', departmentId: 'CSE' },
         { email: 'staff@test.com', password: 'Staff@123', role: 'staff', name: 'Staff User', collegeId: 'COL001', departmentId: 'CSE' },
@@ -1594,6 +1596,215 @@ export function setupApi(app: express.Express) {
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
+  });
+
+  // ============================================
+  // CONSOLIDATED SYSTEM API ENDPOINTS [NEW]
+  // ============================================
+
+  // Consolidated Student Dashboard Overview endpoint
+  app.get('/api/student/dashboard-overview', authenticate, async (req: any, res) => {
+    try {
+      const studentId = req.userData.uid;
+
+      // 1. Get stats (score, rank, totalStudents)
+      const rankRows = db.prepare(`
+        SELECT uid,
+          (COALESCE(cert_counts.cnt,0)*10 + COALESCE(career_counts.cnt,0)*5) as score
+        FROM users u
+        LEFT JOIN (
+          SELECT user_id, COUNT(*) as cnt FROM certifications
+          WHERE status IN ('verified','approved') AND (is_deleted IS NOT TRUE) GROUP BY user_id
+        ) cert_counts ON cert_counts.user_id = u.uid
+        LEFT JOIN (
+          SELECT user_id, COUNT(*) as cnt FROM career_activities
+          WHERE status='approved' AND (is_deleted IS NOT TRUE) GROUP BY user_id
+        ) career_counts ON career_counts.user_id = u.uid
+        WHERE u.role = 'student'
+        ORDER BY score DESC
+      `).all() as any[];
+
+      const rankIdx = rankRows.findIndex((r: any) => r.uid === studentId);
+      const studentRank = rankIdx !== -1 ? rankIdx + 1 : null;
+      const studentScore = rankIdx !== -1 ? rankRows[rankIdx].score : 0;
+      const totalStudents = rankRows.length;
+
+      // 2. Get opportunities
+      const opportunities = db.prepare("SELECT * FROM opportunities WHERE status = 'open' ORDER BY created_at DESC LIMIT 50").all();
+
+      // 3. Get academic profile
+      const academicProfile = db.prepare('SELECT * FROM student_academic_profile WHERE student_id = ?').get(studentId) as any;
+
+      // 4. Get notifications (from student_notifications table)
+      const notifications = db.prepare(`
+        SELECT * FROM student_notifications 
+        WHERE student_id = ? 
+        ORDER BY created_at DESC LIMIT 20
+      `).all(studentId);
+
+      // 5. Get academic performance (semesters, summary, records)
+      const semesters = db.prepare("SELECT * FROM student_semester_summary WHERE student_id = ? ORDER BY semester ASC").all(studentId);
+      const cgpaSummary = db.prepare("SELECT * FROM student_cgpa_summary WHERE student_id = ?").get(studentId);
+      const records = db.prepare(`
+        SELECT r.*, s.subject_name, s.subject_code, s.credits
+        FROM student_academic_records r
+        JOIN academic_subjects s ON r.subject_id = s.id
+        WHERE r.student_id = ?
+        ORDER BY r.semester DESC, s.subject_name ASC
+      `).all(studentId);
+
+      res.json({
+        success: true,
+        data: {
+          stats: {
+            studentRank,
+            studentScore,
+            totalStudents,
+            systemHealth: "Operational",
+            timestamp: new Date().toISOString()
+          },
+          opportunities,
+          academicProfile: academicProfile || { student_id: studentId, cgpa: 0, arrears: 0, placement_readiness_score: 0 },
+          notifications,
+          academicPerformance: {
+            semesters,
+            summary: cgpaSummary || { cgpa: 0, total_arrears: 0, total_semesters: 0 },
+            records
+          }
+        }
+      });
+    } catch (error: any) {
+      console.error("Consolidated student dashboard fetch failed:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Consolidated Staff Dashboard Overview endpoint
+  app.get('/api/staff/dashboard-overview', authenticate, checkRole(['staff', 'hod', 'admin']), async (req: any, res) => {
+    try {
+      const { college_id, department_id, uid } = req.userData;
+      const cacheKey = `staff:dashboard-overview:${college_id || 'any'}:${department_id || 'any'}:${uid}`;
+      
+      const cached = await cacheService.get(cacheKey);
+      if (cached) {
+        return res.json({ success: true, data: cached, _cached: true });
+      }
+
+      // 1. Fetch dashboard-stats
+      const stats = db.prepare(`
+        SELECT 
+          (SELECT count(*) FROM users WHERE role='student' AND college_id = ? AND department_id = ?) as totalStudents,
+          (SELECT count(*) FROM certifications WHERE college_id = ? AND department_id = ? AND status = 'pending') as pendingCerts,
+          (SELECT count(*) FROM certifications WHERE college_id = ? AND department_id = ? AND status = 'approved') as approvedCerts,
+          (SELECT count(*) FROM student_academic_profile WHERE college_id = ? AND department_id = ? AND arrears > 0) as studentsWithArrears,
+          (SELECT avg(cgpa) FROM student_academic_profile WHERE college_id = ? AND department_id = ?) as avgCGPA,
+          (SELECT avg(attendance_percentage) FROM student_academic_profile WHERE college_id = ? AND department_id = ?) as avgAttendance
+      `).get(college_id, department_id, college_id, department_id, college_id, department_id, college_id, department_id, college_id, department_id, college_id, department_id) as any;
+
+      // 2. Fetch students list
+      const students = db.prepare(`
+        SELECT 
+          u.uid, u.name, u.roll_no, u.class, u.year, u.section,
+          sap.cgpa, sap.attendance_percentage, sap.arrears, sap.placement_readiness_score,
+          (SELECT count(*) FROM certifications WHERE user_id = u.uid) as certCount,
+          (SELECT count(*) FROM career_activities WHERE user_id = u.uid) as activityCount,
+          u.last_login, u.status
+        FROM users u
+        LEFT JOIN student_academic_profile sap ON u.uid = sap.student_id
+        WHERE u.role = 'student' AND u.college_id = ? AND u.department_id = ?
+        ORDER BY u.name ASC
+      `).all(college_id, department_id);
+
+      // 3. Fetch analytics (cgpaDist and certTrends)
+      const cgpaDist = db.prepare(`
+        SELECT 
+          CASE 
+            WHEN cgpa >= 9 THEN '9-10'
+            WHEN cgpa >= 8 THEN '8-9'
+            WHEN cgpa >= 7 THEN '7-8'
+            WHEN cgpa >= 6 THEN '6-7'
+            ELSE '< 6'
+          END as range,
+          count(*) as count
+        FROM student_academic_profile
+        WHERE college_id = ? AND department_id = ?
+        GROUP BY range
+      `).all(college_id, department_id);
+
+      const certTrends = db.prepare(`
+        SELECT to_char(created_at, 'YYYY-MM') as month, count(*) as count
+        FROM certifications
+        WHERE college_id = ? AND department_id = ?
+        GROUP BY month
+        ORDER BY month DESC
+        LIMIT 6
+      `).all(college_id, department_id);
+
+      const responseData = {
+        stats,
+        students,
+        analytics: { cgpaDist, certTrends }
+      };
+
+      await cacheService.set(cacheKey, responseData, 60);
+      res.json({ success: true, data: responseData });
+    } catch (error: any) {
+      console.error("Consolidated staff dashboard fetch failed:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Register broadcast notification queue worker
+  queueService.registerHandler('send-broadcast-notification', async (jobData: any) => {
+    const { title, message, targetRole, targetCollege, targetDept, targetYear, targetSection } = jobData;
+    let query = "SELECT uid FROM users WHERE 1=1";
+    const params: any[] = [];
+
+    if (targetRole && targetRole !== 'all') {
+      query += " AND role = ?";
+      params.push(targetRole);
+    }
+    if (targetCollege && targetCollege !== 'all' && targetCollege !== 'super_admin') {
+      query += " AND college_id = ?";
+      params.push(targetCollege);
+    }
+    if (targetDept && targetDept !== 'all') {
+      query += " AND department_id = ?";
+      params.push(targetDept);
+    }
+    if (targetYear && targetYear !== 'all') {
+      query += " AND year = ?";
+      params.push(targetYear);
+    }
+    if (targetSection && targetSection !== 'all') {
+      query += " AND section = ?";
+      params.push(targetSection);
+    }
+
+    const targetUsers = db.prepare(query).all(...params) as any[];
+    
+    // Batch inserts of 100 to prevent event loop block or query issues
+    const batchSize = 100;
+    for (let i = 0; i < targetUsers.length; i += batchSize) {
+      const batch = targetUsers.slice(i, i + batchSize);
+      const placeholders = batch.map(() => "(?, ?, ?, ?, ?)").join(", ");
+      const sql = `INSERT INTO notifications (id, user_id, title, message, type) VALUES ${placeholders}`;
+      const values: any[] = [];
+      
+      batch.forEach(u => {
+        values.push(
+          'note_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+          u.uid,
+          title,
+          message,
+          'announcement'
+        );
+      });
+      
+      db.prepare(sql).run(...values);
+      await new Promise(resolve => setImmediate(resolve));
+    }
+    return { reached: targetUsers.length };
   });
 
   app.use((err: any, req: any, res: any, next: any) => {

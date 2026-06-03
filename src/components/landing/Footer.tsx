@@ -49,7 +49,7 @@ const Footer: React.FC = () => {
                 <GraduationCap className="w-6 h-6" />
               </div>
               <span className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-                Zinoin<span className="text-indigo-600 dark:text-indigo-400">Tech</span>
+                Skill Track
               </span>
             </a>
             <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-sm leading-relaxed">
@@ -140,7 +140,7 @@ const Footer: React.FC = () => {
         {/* Bottom Bar */}
         <div className="flex flex-col md:flex-row justify-between items-center text-sm text-gray-500 dark:text-gray-400">
           <div className="flex flex-col md:flex-row items-center md:space-x-4 space-y-2 md:space-y-0 text-center md:text-left">
-            <p>© 2026 ZinoinTech. All rights reserved.</p>
+            <p>© 2026 Skill Track. All rights reserved.</p>
             <a 
               href="https://zinoin.in" 
               target="_blank" 

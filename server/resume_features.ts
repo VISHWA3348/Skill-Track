@@ -312,6 +312,64 @@ export function setupResumeFeatures(app: express.Express) {
     }
   });
 
+  // Consolidated Resume Profile endpoint
+  app.get('/api/resume/full-profile', authenticate, (req: any, res) => {
+    try {
+      const student_id = req.user.uid;
+
+      // 1. Get profile
+      let profile = db.prepare('SELECT * FROM resume_profiles WHERE student_id = ?').get(student_id) as any;
+      if (!profile) {
+        const id = 'res_prof_' + Date.now();
+        db.prepare(`
+          INSERT INTO resume_profiles (id, student_id, headline, summary, languages, interests)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `).run(id, student_id, 'Aspiring Professional', '', '[]', '[]');
+        profile = db.prepare('SELECT * FROM resume_profiles WHERE student_id = ?').get(student_id);
+      }
+
+      // 2. Get projects
+      const projects = db.prepare('SELECT * FROM resume_projects WHERE student_id = ? ORDER BY created_at DESC').all(student_id);
+
+      // 3. Get experience
+      const experience = db.prepare('SELECT * FROM resume_experience WHERE student_id = ? ORDER BY created_at DESC').all(student_id);
+
+      // 4. Get skills
+      const skills = db.prepare('SELECT * FROM resume_skills WHERE student_id = ? ORDER BY skill_name ASC').all(student_id);
+
+      // 5. Get score and suggestions
+      const skillsCount = skills.length;
+      const projectsCount = projects.length;
+      const experienceCount = experience.length;
+      const certs = db.prepare("SELECT count(*) as count FROM certifications WHERE user_id = ? AND status = 'approved'").get(student_id) as any;
+      const certsCount = certs.count;
+
+      let score = 20;
+      const suggestions = [];
+
+      if (profile?.summary) score += 15; else suggestions.push("Add a professional summary");
+      if (profile?.linkedin_url) score += 5; else suggestions.push("Add your LinkedIn profile");
+      if (profile?.github_url) score += 5; else suggestions.push("Add your GitHub profile");
+      if (skillsCount >= 5) score += 15; else if (skillsCount > 0) score += 10; else suggestions.push("Add at least 5 skills");
+      if (projectsCount >= 2) score += 20; else if (projectsCount > 0) score += 10; else suggestions.push("Add technical projects");
+      if (experienceCount > 0) score += 10; else suggestions.push("Add internship or work experience");
+      if (certsCount > 0) score += 10; else suggestions.push("Get more certifications approved");
+
+      res.json({
+        success: true,
+        data: {
+          profile,
+          projects,
+          experience,
+          skills,
+          scoreInfo: { score: Math.min(score, 100), suggestions }
+        }
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   // ============================================
   // PUBLIC VIEW
   // ============================================

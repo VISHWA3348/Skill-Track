@@ -4,6 +4,7 @@ import { authenticate, checkRole, getDataIsolationFilters } from './middleware';
 import PDFDocument from 'pdfkit';
 import ExcelJS from 'exceljs';
 import { cacheService } from './redis_cache';
+import { queueService } from './queue';
 
 export function setupHODFeatures(app: express.Express) {
 
@@ -118,26 +119,39 @@ export function setupHODFeatures(app: express.Express) {
       const { college_id, department_id } = req.userData;
       const { year, section, semester, min_cgpa, max_arrears } = req.query;
 
-      let sql = "SELECT * FROM users WHERE role = 'student' AND college_id = ? AND department_id = ?";
+      let sql = `
+        SELECT u.*, 
+               COALESCE(c.count, 0) as certsCount, 
+               COALESCE(a.count, 0) as activitiesCount
+        FROM users u
+        LEFT JOIN (
+          SELECT user_id, COUNT(*) as count 
+          FROM certifications 
+          WHERE is_deleted = 0 
+          GROUP BY user_id
+        ) c ON u.uid = c.user_id
+        LEFT JOIN (
+          SELECT user_id, COUNT(*) as count 
+          FROM career_activities 
+          WHERE is_deleted = 0 
+          GROUP BY user_id
+        ) a ON u.uid = a.user_id
+        WHERE u.role = 'student' AND u.college_id = ? AND u.department_id = ?
+      `;
       const params: any[] = [college_id, department_id];
 
-      if (year) { sql += " AND year = ?"; params.push(year); }
-      if (section) { sql += " AND section = ?"; params.push(section); }
+      if (year) { sql += " AND u.year = ?"; params.push(year); }
+      if (section) { sql += " AND u.section = ?"; params.push(section); }
       // Add more filters as needed
 
       const students = db.prepare(sql).all(...params) as any[];
       
-      // Enrich with more data
-      const enriched = students.map(s => {
-        const certs = db.prepare("SELECT COUNT(*) as count FROM certifications WHERE user_id = ? AND is_deleted = 0").get(s.uid) as any;
-        const acts = db.prepare("SELECT COUNT(*) as count FROM career_activities WHERE user_id = ? AND is_deleted = 0").get(s.uid) as any;
-        return {
-          ...s,
-          certsCount: certs.count,
-          activitiesCount: acts.count,
-          placementScore: s.score || 0
-        };
-      });
+      const enriched = students.map(s => ({
+        ...s,
+        certsCount: Number(s.certsCount),
+        activitiesCount: Number(s.activitiesCount),
+        placementScore: s.score || 0
+      }));
 
       res.json({ success: true, data: enriched });
     } catch (error: any) {
@@ -154,14 +168,14 @@ export function setupHODFeatures(app: express.Express) {
       const { college_id, department_id } = req.userData;
       const staff = db.prepare("SELECT uid, name FROM users WHERE role = 'staff' AND college_id = ? AND department_id = ?").all(college_id, department_id) as any[];
 
+      // Query reviews once outside the loop to avoid N+1 query overhead
+      const reviews = db.prepare(`
+        SELECT COUNT(*) as count 
+        FROM certifications 
+        WHERE department_id = ? AND status != 'pending'
+      `).get(department_id) as any;
+
       const performance = staff.map(s => {
-        // Mocking some metrics based on audit logs or status updates
-        const reviews = db.prepare(`
-          SELECT COUNT(*) as count 
-          FROM certifications 
-          WHERE department_id = ? AND status != 'pending'
-        `).get(department_id) as any; // Simplified for demo
-        
         return {
           uid: s.uid,
           name: s.name,
@@ -185,7 +199,7 @@ export function setupHODFeatures(app: express.Express) {
   // 5. ANNOUNCEMENTS
   // ============================================
 
-  app.post('/api/hod/announcements/send', authenticate, checkRole(['hod']), (req: any, res) => {
+  app.post('/api/hod/announcements/send', authenticate, checkRole(['hod']), async (req: any, res) => {
     try {
       const { title, message, target_year, target_section } = req.body;
       const { uid, department_id } = req.userData;
@@ -196,20 +210,17 @@ export function setupHODFeatures(app: express.Express) {
         VALUES (?, ?, ?, ?, ?, ?, ?)
       `).run(id, uid, department_id, title, message, target_year || null, target_section || null);
 
-      // Create notifications for students
-      let studentSql = "SELECT uid FROM users WHERE role = 'student' AND department_id = ?";
-      const params = [department_id];
-      if (target_year) { studentSql += " AND year = ?"; params.push(target_year); }
-      if (target_section) { studentSql += " AND section = ?"; params.push(target_section); }
-
-      const targetStudents = db.prepare(studentSql).all(...params) as any[];
-      const noteStmt = db.prepare("INSERT INTO notifications (id, user_id, title, message, type) VALUES (?, ?, ?, ?, ?)");
-      
-      targetStudents.forEach(s => {
-        noteStmt.run('note_' + Date.now() + Math.random().toString(36).slice(2, 5), s.uid, `HOD Announcement: ${title}`, message, 'info');
+      // Enqueue the notification broadcast to background job
+      await queueService.addJob('send-broadcast-notification', {
+        title: `HOD Announcement: ${title}`,
+        message,
+        targetRole: 'student',
+        targetDept: department_id,
+        targetYear: target_year,
+        targetSection: target_section
       });
 
-      res.json({ success: true, message: 'Announcement sent successfully' });
+      res.json({ success: true, message: 'Announcement broadcast initiated in background' });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

@@ -61,20 +61,67 @@ export function setupAdvancedFeatures(app: express.Express) {
 
   app.get("/api/reports/ranking", authenticate, (req: any, res) => {
     try {
-      const students = queryDocuments('users', [{ field: 'role', operator: '==', value: 'student' }, { field: 'status', operator: '==', value: 'active' }]) || [];
+      const students = db.prepare("SELECT uid, name, roll_no, department_id, score FROM users WHERE role = 'student' AND status = 'active'").all() as any[];
+      
+      // Get all approved/verified certs
+      const allCerts = db.prepare("SELECT user_id, type, prize_position FROM certifications WHERE status IN ('approved', 'verified') AND is_deleted = 0").all() as any[];
+      // Get all approved career activities
+      const allActivities = db.prepare("SELECT user_id, type FROM career_activities WHERE status = 'approved' AND is_deleted = 0").all() as any[];
+
+      // Group by user_id
+      const certsByStudent = new Map<string, any[]>();
+      allCerts.forEach(c => {
+        if (!certsByStudent.has(c.user_id)) certsByStudent.set(c.user_id, []);
+        certsByStudent.get(c.user_id)!.push(c);
+      });
+
+      const actsByStudent = new Map<string, any[]>();
+      allActivities.forEach(a => {
+        if (!actsByStudent.has(a.user_id)) actsByStudent.set(a.user_id, []);
+        actsByStudent.get(a.user_id)!.push(a);
+      });
+
       const ranking = students.map((s: any) => {
-        const score = calculateScore(s.uid);
-        // Sync score to DB for easier filtering later
-        try {
-          db.prepare("UPDATE users SET score = ? WHERE uid = ?").run(score, s.uid);
-        } catch (e) {
-          console.error("Failed to sync score for user:", s.uid, e);
+        let score = 0;
+        const certs = certsByStudent.get(s.uid) || [];
+        const activities = actsByStudent.get(s.uid) || [];
+
+        certs.forEach((c: any) => {
+          const level = (c.type || '').toLowerCase();
+          if (level.includes('international')) score += SCORING_RULES.certifications.international;
+          else if (level.includes('national')) score += SCORING_RULES.certifications.national;
+          else if (level.includes('state')) score += SCORING_RULES.certifications.state;
+          else score += SCORING_RULES.certifications.college;
+
+          // Prize bonus
+          if (c.prize_position === '1st') score += 20;
+          else if (c.prize_position === '2nd') score += 10;
+          else if (c.prize_position === '3rd') score += 5;
+        });
+
+        activities.forEach((a: any) => {
+          const type = (a.type || '').toLowerCase();
+          if (type.includes('internship')) score += SCORING_RULES.activities.internship;
+          else if (type.includes('workshop')) score += SCORING_RULES.activities.workshop;
+          else if (type.includes('course')) score += SCORING_RULES.activities.course;
+          else if (type.includes('project')) score += SCORING_RULES.activities.project;
+          else score += SCORING_RULES.activities.other;
+        });
+
+        // Only sync score to DB if it has changed to prevent write overhead
+        if (s.score !== score) {
+          try {
+            db.prepare("UPDATE users SET score = ? WHERE uid = ?").run(score, s.uid);
+          } catch (e) {
+            console.error("Failed to sync score for user:", s.uid, e);
+          }
         }
+
         return {
           uid: s.uid,
           name: s.name,
-          roll_no: s.roll_no || s.rollNo,
-          department_id: s.department_id || s.departmentId,
+          roll_no: s.roll_no,
+          department_id: s.department_id,
           score: score
         };
       }).sort((a: any, b: any) => b.score - a.score);
@@ -134,61 +181,16 @@ export function setupAdvancedFeatures(app: express.Express) {
   app.get("/api/students/:id/resume", authenticate, async (req: any, res) => {
     try {
       const { id } = req.params;
-      const student = getDocument('users', id);
-      if (!student) return res.status(404).json({ error: "Student not found" });
+      const jobId = await queueService.addJob('generate-resume-pdf', { studentId: id });
+      const base64Data = await queueService.waitForJobResult(jobId);
+      const buffer = Buffer.from(base64Data, 'base64');
 
-      const certs = queryDocuments('certifications', [{ field: 'user_id', operator: '==', value: id }, { field: 'status', operator: 'in', value: ['approved', 'verified'] }]);
-      const activities = queryDocuments('career_activities', [{ field: 'user_id', operator: '==', value: id }, { field: 'status', operator: '==', value: 'approved' }]);
-
-      const doc = new PDFDocument();
       let filename = `resume-${id}.pdf`;
       res.setHeader('Content-disposition', 'attachment; filename="' + filename + '"');
       res.setHeader('Content-type', 'application/pdf');
-
-      doc.fontSize(25).text(student.name || 'Student Name', { align: 'center' });
-      doc.fontSize(12).text(student.email || '', { align: 'center' });
-      doc.moveDown();
-
-      const skillsText = student.skills ? `A highly motivated student with foundational knowledge and practical skills in: ${student.skills}. Eager to leverage these abilities in a professional setting.` : '';
-      const summaryText = student.bio || skillsText;
-
-      if (summaryText) {
-        doc.fontSize(18).text("Professional Summary", { underline: true });
-        doc.fontSize(12).text(summaryText);
-        doc.moveDown();
-      }
-
-      if (student.skills) {
-        doc.fontSize(18).text("Core Skills", { underline: true });
-        doc.fontSize(12).text(student.skills);
-        doc.moveDown();
-      }
-
-      doc.fontSize(18).text("Education", { underline: true });
-      doc.fontSize(12).text(`College: ${student.college_name || 'N/A'}`);
-      doc.text(`Department: ${student.department_id || 'N/A'}`);
-      doc.text(`Roll No: ${student.roll_no || 'N/A'}`);
-      doc.moveDown();
-
-      if (certs.length > 0) {
-        doc.fontSize(18).text("Certifications", { underline: true });
-        certs.forEach((c: any) => {
-          doc.fontSize(12).text(`${c.event_name} - ${c.type} (${c.prize_position || 'Participant'})`);
-        });
-        doc.moveDown();
-      }
-
-      if (activities.length > 0) {
-        doc.fontSize(18).text("Career Activities", { underline: true });
-        activities.forEach((a: any) => {
-          doc.fontSize(12).text(`${a.type} at ${a.organization} - ${a.duration}`);
-        });
-        doc.moveDown();
-      }
-
-      doc.pipe(res);
-      doc.end();
+      res.send(buffer);
     } catch (error) {
+       console.error("Resume generation queue job failed:", error);
        res.status(500).json({ error: "Failed to generate resume" });
     }
   });
@@ -437,6 +439,73 @@ export function setupAdvancedFeatures(app: express.Express) {
       console.error("Export Excel queue job error:", error);
       res.status(500).json({ error: "Failed to export Excel" });
     }
+  });
+
+  // Register Resume PDF background task handler
+  queueService.registerHandler('generate-resume-pdf', async (jobData: any) => {
+    const { studentId } = jobData;
+    const student = getDocument('users', studentId);
+    if (!student) throw new Error("Student not found");
+
+    const certs = queryDocuments('certifications', [{ field: 'user_id', operator: '==', value: studentId }, { field: 'status', operator: 'in', value: ['approved', 'verified'] }]);
+    const activities = queryDocuments('career_activities', [{ field: 'user_id', operator: '==', value: studentId }, { field: 'status', operator: '==', value: 'approved' }]);
+
+    const doc = new PDFDocument();
+    const chunks: Buffer[] = [];
+    doc.on('data', (chunk) => chunks.push(chunk));
+
+    return new Promise<string>((resolve, reject) => {
+      doc.on('end', () => {
+        const result = Buffer.concat(chunks);
+        resolve(result.toString('base64'));
+      });
+      doc.on('error', (err) => {
+        reject(err);
+      });
+
+      doc.fontSize(25).text(student.name || 'Student Name', { align: 'center' });
+      doc.fontSize(12).text(student.email || '', { align: 'center' });
+      doc.moveDown();
+
+      const skillsText = student.skills ? `A highly motivated student with foundational knowledge and practical skills in: ${student.skills}. Eager to leverage these abilities in a professional setting.` : '';
+      const summaryText = student.bio || skillsText;
+
+      if (summaryText) {
+        doc.fontSize(18).text("Professional Summary", { underline: true });
+        doc.fontSize(12).text(summaryText);
+        doc.moveDown();
+      }
+
+      if (student.skills) {
+        doc.fontSize(18).text("Core Skills", { underline: true });
+        doc.fontSize(12).text(student.skills);
+        doc.moveDown();
+      }
+
+      doc.fontSize(18).text("Education", { underline: true });
+      doc.fontSize(12).text(`College: ${student.college_name || 'N/A'}`);
+      doc.text(`Department: ${student.department_id || 'N/A'}`);
+      doc.text(`Roll No: ${student.roll_no || 'N/A'}`);
+      doc.moveDown();
+
+      if (certs.length > 0) {
+        doc.fontSize(18).text("Certifications", { underline: true });
+        certs.forEach((c: any) => {
+          doc.fontSize(12).text(`${c.event_name} - ${c.type} (${c.prize_position || 'Participant'})`);
+        });
+        doc.moveDown();
+      }
+
+      if (activities.length > 0) {
+        doc.fontSize(18).text("Career Activities", { underline: true });
+        activities.forEach((a: any) => {
+          doc.fontSize(12).text(`${a.type} at ${a.organization} - ${a.duration}`);
+        });
+        doc.moveDown();
+      }
+
+      doc.end();
+    });
   });
 
 }

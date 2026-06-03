@@ -91,20 +91,20 @@ const ResumeBuilderView: React.FC = () => {
       const token = localStorage.getItem('token');
       const headers = { 'Authorization': `Bearer ${token}` };
 
-      const [profRes, projRes, expRes, skillRes, scoreRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/resume/profile`, { headers }),
-        fetch(`${API_BASE_URL}/api/resume/projects`, { headers }),
-        fetch(`${API_BASE_URL}/api/resume/experience`, { headers }),
-        fetch(`${API_BASE_URL}/api/resume/skills`, { headers }),
-        fetch(`${API_BASE_URL}/api/resume/score`, { headers })
-      ]);
-
-      if (profRes.ok) setProfile((await profRes.json()).data);
-      if (projRes.ok) setProjects((await projRes.json()).data);
-      if (expRes.ok) setExperience((await expRes.json()).data);
-      if (skillRes.ok) setSkills((await skillRes.json()).data);
-      if (scoreRes.ok) setScoreData((await scoreRes.json()));
-      
+      const res = await fetch(`${API_BASE_URL}/api/resume/full-profile`, { headers });
+      if (res.ok) {
+        const result = await res.json();
+        if (result.success && result.data) {
+          const { profile, projects, experience, skills, scoreInfo } = result.data;
+          if (profile) setProfile(profile);
+          if (projects) setProjects(projects);
+          if (experience) setExperience(experience);
+          if (skills) setSkills(skills);
+          if (scoreInfo) setScoreData(scoreInfo);
+        }
+      } else {
+        toast.error('Failed to load resume data');
+      }
     } catch (error) {
       toast.error('Failed to load resume data');
     } finally {

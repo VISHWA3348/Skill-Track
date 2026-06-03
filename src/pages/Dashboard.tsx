@@ -104,6 +104,16 @@ const Dashboard: React.FC = () => {
     return () => clearInterval(interval);
   }, [profile, fetchStats]);
 
+  useEffect(() => {
+    if (profile?.role === 'super_admin') {
+      document.title = 'Skill Track | Super Admin';
+    } else if (profile?.role === 'admin') {
+      document.title = 'Skill Track | Admin';
+    } else {
+      document.title = 'Skill Track | Dashboard';
+    }
+  }, [profile?.role]);
+
   const renderAdminDashboard = () => (
     <div className="space-y-6">
       <h3 className="text-xl font-semibold">College Admin Overview</h3>

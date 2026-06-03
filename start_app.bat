@@ -1,8 +1,8 @@
 @echo off
 SETLOCAL EnableDelayedExpansion
-TITLE CampusBridge System - Development Server
+TITLE Skill Track - Development Server
 echo ==========================================
-echo   CampusBridge System - Starting...
+echo   Skill Track - Starting...
 echo ==========================================
 
 :: Check if node_modules exists

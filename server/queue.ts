@@ -1,4 +1,5 @@
 import { cacheService } from './redis_cache';
+import { redis } from '../src/config/redis';
 
 type JobHandler = (data: any) => Promise<any>;
 
@@ -27,10 +28,11 @@ const jobTypeToQueueMap: Record<string, string> = {
 };
 
 const initBullMQ = async () => {
-  const redisUrl = process.env.REDIS_URL;
-  if (!redisUrl) {
-    console.error("❌ CRITICAL: REDIS_URL not configured. BullMQ failed to initialize.");
-    process.exit(1);
+  if (process.env.REDIS_ONLINE === 'false') {
+    console.log("ℹ️ Running in development/test mode. Falling back to in-memory queue.");
+    useBull = false;
+    startInMemoryWorker();
+    return;
   }
 
   try {
@@ -39,14 +41,10 @@ const initBullMQ = async () => {
     BullWorker = bullmq.Worker;
 
     // Connect to Redis for BullMQ
-    const { default: Redis } = await import('ioredis');
-    const connection = new Redis(redisUrl, { maxRetriesPerRequest: 1, connectTimeout: 2000 });
+    const connection = redis;
     
     connection.on('error', (err) => {
-      // Catch background connection failures silently in dev/test, or log in production
-      if (process.env.NODE_ENV === 'production') {
-        console.error("❌ BullMQ Redis connection error:", err.message);
-      }
+      console.error("❌ BullMQ Redis connection error:", err.message);
     });
 
     // Test the connection first to fail fast if unavailable
@@ -81,6 +79,7 @@ const initBullMQ = async () => {
       workers.push(worker);
     }
 
+    console.log("✅ Workers Registered");
     useBull = true;
   } catch (err: any) {
     console.error("❌ Failed to initialize BullMQ:", err.message);

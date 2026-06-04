@@ -3,6 +3,14 @@ import path from "path";
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
 // Enforce environment validation immediately on startup
+if (!process.env.REDIS_URL) {
+  throw new Error("REDIS_URL is missing in environment");
+}
+
+if (!process.env.JWT_SECRET) {
+  throw new Error("JWT_SECRET is missing in environment");
+}
+
 const REQUIRED_ENV_VARS = [
   'DATABASE_URL',
   'DIRECT_URL',
@@ -67,15 +75,21 @@ async function startServer() {
   // 3. Validate Redis connection
   try {
     const { default: Redis } = await import("ioredis");
-    const redis = new Redis(process.env.REDIS_URL as string, { maxRetriesPerRequest: 1, connectTimeout: 3000 });
-    await redis.ping();
-    await redis.quit();
+    const testRedis = new Redis(process.env.REDIS_URL as string, {
+      maxRetriesPerRequest: 1,
+      connectTimeout: 2000,
+      enableReadyCheck: false
+    });
+    await testRedis.ping();
+    await testRedis.quit();
+    process.env.REDIS_ONLINE = 'true';
     console.log("✅ Redis Connected");
   } catch (err: any) {
     console.error("❌ Redis Connection Failed:", err.message);
     if (process.env.NODE_ENV === 'production') {
       process.exit(1);
     } else {
+      process.env.REDIS_ONLINE = 'false';
       console.log("✅ Redis Connected");
     }
   }

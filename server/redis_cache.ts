@@ -1,4 +1,5 @@
 import { type Redis as RedisClientType } from 'ioredis';
+import { redis } from '../src/config/redis';
 
 let redisClient: RedisClientType | null = null;
 let useRedis = false;
@@ -7,19 +8,14 @@ let useRedis = false;
 const memoryCache = new Map<string, { value: any; expiry: number }>();
 
 const initRedis = async () => {
-  const redisUrl = process.env.REDIS_URL;
-  if (!redisUrl) {
-    console.error("❌ CRITICAL: REDIS_URL not configured. System is shutting down.");
-    process.exit(1);
+  if (process.env.REDIS_ONLINE === 'false') {
+    console.log("ℹ️ Running in development/test mode. Falling back to local cache.");
+    useRedis = false;
+    return;
   }
 
   try {
-    const { default: Redis } = await import('ioredis');
-    redisClient = new Redis(redisUrl, {
-      maxRetriesPerRequest: 1, // fail fast to detect local vs remote
-      connectTimeout: 2000,
-      lazyConnect: true
-    });
+    redisClient = redis;
 
     redisClient.on('error', (err) => {
       console.error("❌ Redis client connection error:", err.message);
@@ -30,11 +26,16 @@ const initRedis = async () => {
       }
     });
 
+    if (redisClient.status === 'ready' || redisClient.status === 'connect') {
+      useRedis = true;
+    }
+
     redisClient.on('connect', () => {
       useRedis = true;
     });
 
-    await redisClient.connect();
+    // Verify connection by pinging
+    await redisClient.ping();
     useRedis = true;
   } catch (error: any) {
     console.error("❌ Redis connection failed:", error.message);

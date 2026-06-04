@@ -79,14 +79,14 @@ export function setupHODFeatures(app: express.Express) {
       const certGrowth = db.prepare(`
         SELECT strftime('%Y-%m', created_at) as month, COUNT(*) as count 
         FROM certifications 
-        WHERE department_id = ? AND is_deleted = 0
+        WHERE college_id = ? AND department_id = ? AND is_deleted = 0
         GROUP BY month 
         ORDER BY month DESC 
         LIMIT 6
-      `).all(department_id) as any[];
+      `).all(college_id, department_id) as any[];
 
       // Placement readiness distribution
-      const students = db.prepare("SELECT score FROM users WHERE role = 'student' AND department_id = ?").all(department_id) as any[];
+      const students = db.prepare("SELECT score FROM users WHERE role = 'student' AND college_id = ? AND department_id = ?").all(college_id, department_id) as any[];
       const readiness = [
         { name: 'Ready', value: students.filter(s => (s.score || 0) >= 75).length },
         { name: 'Almost Ready', value: students.filter(s => (s.score || 0) >= 50 && (s.score || 0) < 75).length },
@@ -172,8 +172,8 @@ export function setupHODFeatures(app: express.Express) {
       const reviews = db.prepare(`
         SELECT COUNT(*) as count 
         FROM certifications 
-        WHERE department_id = ? AND status != 'pending'
-      `).get(department_id) as any;
+        WHERE college_id = ? AND department_id = ? AND status != 'pending'
+      `).get(college_id, department_id) as any;
 
       const performance = staff.map(s => {
         return {
@@ -262,7 +262,7 @@ export function setupHODFeatures(app: express.Express) {
   app.get('/api/hod/reports', authenticate, checkRole(['hod', 'super_admin']), async (req: any, res) => {
     try {
       const { type, format } = req.query;
-      const { department_id } = req.userData;
+      const { college_id, department_id } = req.userData;
 
       if (format === 'excel') {
         const workbook = new ExcelJS.Workbook();
@@ -272,7 +272,7 @@ export function setupHODFeatures(app: express.Express) {
         
         if (type === 'placement') {
           sheet.addRow(['Student Name', 'Roll No', 'CGPA', 'Score', 'Status']);
-          const students = db.prepare("SELECT name, roll_no, score FROM users WHERE role = 'student' AND department_id = ?").all(department_id) as any[];
+          const students = db.prepare("SELECT name, roll_no, score FROM users WHERE role = 'student' AND college_id = ? AND department_id = ?").all(college_id, department_id) as any[];
           students.forEach(s => sheet.addRow([s.name, s.roll_no, (s.score/10).toFixed(2), s.score, s.score > 70 ? 'Ready' : 'Developing']));
         } else {
           sheet.addRow(['Report generated successfully']);

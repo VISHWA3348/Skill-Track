@@ -57,6 +57,7 @@ export function initDb() {
         code VARCHAR(255) UNIQUE NOT NULL,
         college_id VARCHAR(255) NOT NULL,
         department_id VARCHAR(255) NOT NULL,
+        academic_year VARCHAR(20),
         is_active INTEGER DEFAULT 1,
         max_registrations INTEGER DEFAULT -1,
         current_registrations INTEGER DEFAULT 0,
@@ -141,6 +142,7 @@ export function initDb() {
       ALTER TABLE certifications ADD COLUMN IF NOT EXISTS academic_year VARCHAR(20);
       ALTER TABLE career_activities ADD COLUMN IF NOT EXISTS academic_year VARCHAR(20);
       ALTER TABLE student_academic_profile ADD COLUMN IF NOT EXISTS academic_year VARCHAR(20);
+      ALTER TABLE department_invite_codes ADD COLUMN IF NOT EXISTS academic_year VARCHAR(20);
     `);
   } catch(e){}
   
@@ -195,6 +197,15 @@ export function initDb() {
       ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS ip_address VARCHAR(255);
       ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS gps_verification_result VARCHAR(50);
       ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS certificate_id VARCHAR(255);
+    `);
+  } catch(e){}
+
+  try {
+    db.exec(`
+      ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS visibility_scope VARCHAR(50) DEFAULT 'GLOBAL';
+      ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS college_id VARCHAR(255);
+      ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS created_by VARCHAR(255);
+      ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS target_college_ids TEXT;
     `);
   } catch(e){}
     
@@ -614,15 +625,28 @@ export function setDocument(collectionName: string, id: string, data: any) {
     if (deptId && collegeId) {
       const existingCode = db.prepare('SELECT id FROM department_invite_codes WHERE department_id = ?').get(deptId);
       if (!existingCode) {
+        const academicYear = data.academicYear || data.academic_year || null;
         const random = Math.random().toString(36).substring(2, 8).toUpperCase();
         const codePrefix = deptId.substring(0, 5).toUpperCase().replace(/[^A-Z0-9]/g, '');
-        const inviteCode = `${codePrefix}-${random}`;
+        
+        let yrSuffix = '';
+        if (academicYear) {
+          if (academicYear.includes('I Year PG')) yrSuffix = '-1YPG';
+          else if (academicYear.includes('II Year PG')) yrSuffix = '-2YPG';
+          else if (academicYear.includes('I Year')) yrSuffix = '-1Y';
+          else if (academicYear.includes('II Year')) yrSuffix = '-2Y';
+          else if (academicYear.includes('III Year')) yrSuffix = '-3Y';
+          else if (academicYear.includes('IV Year')) yrSuffix = '-4Y';
+          else yrSuffix = '-' + academicYear.replace(/\s+/g, '').substring(0, 4).toUpperCase();
+        }
+        
+        const inviteCode = `${codePrefix}${yrSuffix}-${random}`;
         const newCodeId = 'dic_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
         try {
           db.prepare(`
-            INSERT INTO department_invite_codes (id, code, college_id, department_id, is_active, max_registrations, current_registrations, created_at, created_by)
-            VALUES (?, ?, ?, ?, 1, -1, 0, CURRENT_TIMESTAMP, 'system_auto')
-          `).run(newCodeId, inviteCode, collegeId, deptId);
+            INSERT INTO department_invite_codes (id, code, college_id, department_id, is_active, max_registrations, current_registrations, created_at, created_by, academic_year)
+            VALUES (?, ?, ?, ?, 1, -1, 0, CURRENT_TIMESTAMP, 'system_auto', ?)
+          `).run(newCodeId, inviteCode, collegeId, deptId, academicYear);
         } catch(e) {
           console.error("Failed to auto-generate invite code in DB trigger:", e);
         }
@@ -743,6 +767,11 @@ export function queryDocuments(collectionName: string, conditions: any[] = [], o
 
   for (const cond of conditions) {
     if (!/^[a-zA-Z0-9_.-]+$/.test(cond.field)) continue;
+    
+    // Skip department_id/departmentId for colleges table as it doesn't have it
+    if (tableName === 'colleges' && (cond.field === 'departmentId' || cond.field === 'department_id')) {
+      continue;
+    }
     
     // Mapping camelCase to snake_case for common fields if they come from frontend
     let field = cond.field;

@@ -6,6 +6,7 @@ import ExcelJS from 'exceljs';
 import * as xlsx from 'xlsx';
 import QRCode from 'qrcode';
 import { queueService } from './queue';
+import { calculateResumeScore } from './resume_features';
 
 export function setupAdvancedFeatures(app: express.Express) {
 
@@ -61,20 +62,80 @@ export function setupAdvancedFeatures(app: express.Express) {
 
   app.get("/api/reports/ranking", authenticate, (req: any, res) => {
     try {
-      const students = db.prepare("SELECT uid, name, roll_no, department_id, score FROM users WHERE role = 'student' AND status = 'active'").all() as any[];
-      
-      // Get all approved/verified certs
-      const allCerts = db.prepare("SELECT user_id, type, prize_position FROM certifications WHERE status IN ('approved', 'verified') AND is_deleted = 0").all() as any[];
-      // Get all approved career activities
-      const allActivities = db.prepare("SELECT user_id, type FROM career_activities WHERE status = 'approved' AND is_deleted = 0").all() as any[];
+      const uid = req.user.uid;
+      const userData = db.prepare('SELECT role, college_id, department_id FROM users WHERE uid = ?').get(uid) as any;
+      if (!userData) {
+        return res.status(403).json({ error: "User not found" });
+      }
 
-      // Group by user_id
+      const { role, college_id: userCollegeId, department_id: userDeptId } = userData;
+
+      // Extract client query parameters
+      const filterDept = req.query.department_id;
+      const filterYear = req.query.year;
+      const filterSection = req.query.section;
+
+      let sql = "SELECT uid, name, roll_no, department_id, year, section, college_id, college_name, score FROM users WHERE role = 'student' AND status = 'active'";
+      const params: any[] = [];
+
+      // Role-based data isolation
+      if (role !== 'super_admin') {
+        sql += " AND college_id = ?";
+        params.push(userCollegeId);
+
+        if (role === 'hod' || role === 'staff') {
+          sql += " AND department_id = ?";
+          params.push(userDeptId);
+        }
+      }
+
+      // Query parameter filters
+      if (filterDept && filterDept !== 'all' && filterDept !== '') {
+        // Enforce college admin scope or HOD scope
+        if (role === 'super_admin' || (role === 'admin' && userCollegeId)) {
+          sql += " AND department_id = ?";
+          params.push(filterDept);
+        }
+      }
+      if (filterYear && filterYear !== 'all' && filterYear !== '') {
+        sql += " AND year = ?";
+        params.push(filterYear);
+      }
+      if (filterSection && filterSection !== 'all' && filterSection !== '') {
+        sql += " AND section = ?";
+        params.push(filterSection);
+      }
+
+      const students = db.prepare(sql).all(...params) as any[];
+      if (students.length === 0) {
+        return res.json({ success: true, data: [] });
+      }
+
+      const studentIds = students.map(s => s.uid);
+      const placeholders = studentIds.map(() => '?').join(',');
+
+      // Get all approved/verified certs for these students
+      const allCerts = db.prepare(`
+        SELECT user_id, type, prize_position 
+        FROM certifications 
+        WHERE status IN ('approved', 'verified') AND is_deleted = 0 AND user_id IN (${placeholders})
+      `).all(...studentIds) as any[];
+
+      // Get all approved career activities for these students
+      const allActivities = db.prepare(`
+        SELECT user_id, type 
+        FROM career_activities 
+        WHERE status = 'approved' AND is_deleted = 0 AND user_id IN (${placeholders})
+      `).all(...studentIds) as any[];
+
+      // Group certs by user_id
       const certsByStudent = new Map<string, any[]>();
       allCerts.forEach(c => {
         if (!certsByStudent.has(c.user_id)) certsByStudent.set(c.user_id, []);
         certsByStudent.get(c.user_id)!.push(c);
       });
 
+      // Group activities by user_id
       const actsByStudent = new Map<string, any[]>();
       allActivities.forEach(a => {
         if (!actsByStudent.has(a.user_id)) actsByStudent.set(a.user_id, []);
@@ -83,29 +144,46 @@ export function setupAdvancedFeatures(app: express.Express) {
 
       const ranking = students.map((s: any) => {
         let score = 0;
+        
+        // 1. Resume Score (dynamic contribution)
+        const resumeScoreInfo = calculateResumeScore(s.uid);
+        score += (resumeScoreInfo.score || 0);
+
+        // 2. Approved Certifications
         const certs = certsByStudent.get(s.uid) || [];
-        const activities = actsByStudent.get(s.uid) || [];
-
         certs.forEach((c: any) => {
-          const level = (c.type || '').toLowerCase();
-          if (level.includes('international')) score += SCORING_RULES.certifications.international;
-          else if (level.includes('national')) score += SCORING_RULES.certifications.national;
-          else if (level.includes('state')) score += SCORING_RULES.certifications.state;
-          else score += SCORING_RULES.certifications.college;
-
-          // Prize bonus
-          if (c.prize_position === '1st') score += 20;
-          else if (c.prize_position === '2nd') score += 10;
-          else if (c.prize_position === '3rd') score += 5;
+          const type = (c.type || '').toLowerCase();
+          if (type.includes('hackathon')) {
+            score += 20;
+          } else if (type.includes('workshop')) {
+            score += 5;
+          } else if (type.includes('project')) {
+            score += 15;
+          } else if (type.includes('internship')) {
+            score += 25;
+          } else {
+            // standard certification
+            score += 10;
+          }
         });
 
+        // 3. Approved Career Activities
+        const activities = actsByStudent.get(s.uid) || [];
         activities.forEach((a: any) => {
           const type = (a.type || '').toLowerCase();
-          if (type.includes('internship')) score += SCORING_RULES.activities.internship;
-          else if (type.includes('workshop')) score += SCORING_RULES.activities.workshop;
-          else if (type.includes('course')) score += SCORING_RULES.activities.course;
-          else if (type.includes('project')) score += SCORING_RULES.activities.project;
-          else score += SCORING_RULES.activities.other;
+          if (type.includes('internship')) {
+            score += 25;
+          } else if (type.includes('project')) {
+            score += 15;
+          } else if (type.includes('hackathon')) {
+            score += 20;
+          } else if (type.includes('workshop')) {
+            score += 5;
+          } else if (type.includes('placement')) {
+            score += 10; // placement activities
+          } else {
+            score += 5; // other approved activities
+          }
         });
 
         // Only sync score to DB if it has changed to prevent write overhead
@@ -120,18 +198,42 @@ export function setupAdvancedFeatures(app: express.Express) {
         return {
           uid: s.uid,
           name: s.name,
-          roll_no: s.roll_no,
-          department_id: s.department_id,
+          roll_no: s.roll_no || 'N/A',
+          department_id: s.department_id || 'N/A',
+          year: s.year || 'N/A',
+          section: s.section || 'N/A',
+          college_id: s.college_id || 'N/A',
+          college_name: s.college_name || 'N/A',
+          certificatesCount: certs.length,
+          activitiesCount: activities.length,
           score: score
         };
-      }).sort((a: any, b: any) => b.score - a.score);
+      });
 
-      res.json({ success: true, data: ranking });
+      // Sort: Highest -> Lowest
+      ranking.sort((a: any, b: any) => b.score - a.score);
+
+      // Handle ties properly: standard competition ranking
+      let currentRank = 1;
+      let previousScore = -1;
+      const finalRanked = ranking.map((item: any, index: number) => {
+        if (item.score !== previousScore) {
+          currentRank = index + 1;
+          previousScore = item.score;
+        }
+        return {
+          ...item,
+          rank: currentRank
+        };
+      });
+
+      res.json({ success: true, data: finalRanked });
     } catch (error: any) {
       console.error("Ranking generation error:", error);
       res.json({ success: false, data: [], error: error.message });
     }
   });
+
 
   // ============================================
   // 2. DIGITAL STUDENT PORTFOLIO

@@ -91,10 +91,28 @@ export default function SignupCodesManagement() {
   }, []);
 
   const handleRegenerateDeptCode = async (deptId: string, deptName: string) => {
+    const yearOption = window.prompt(
+      `Regenerate invite code for ${deptName}.\n\nEnter Academic Year (e.g., 'I Year', 'II Year', 'III Year', 'IV Year', 'I Year PG', 'II Year PG') or leave blank for a generic code:`
+    );
+    if (yearOption === null) return;
+
+    let targetYear = yearOption.trim();
+    if (targetYear) {
+      const allowedYears = ['I Year', 'II Year', 'III Year', 'IV Year', 'I Year PG', 'II Year PG'];
+      if (!allowedYears.includes(targetYear)) {
+        toast.error("Invalid academic year. Must be like 'I Year', 'II Year', etc.");
+        return;
+      }
+    }
+
     try {
       const res = await fetch(`${API_BASE_URL}/api/admin/department/${deptId}/regenerate-code`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ academicYear: targetYear || null })
       });
       const data = await res.json();
       if (res.ok && data.success) {
@@ -240,6 +258,7 @@ export default function SignupCodesManagement() {
                 <tr className="bg-slate-50 text-slate-900 font-bold border-b border-slate-100">
                   <th className="p-4 rounded-tl-xl">College</th>
                   <th className="p-4">Department</th>
+                  <th className="p-4">Academic Year</th>
                   <th className="p-4">Invite Code</th>
                   <th className="p-4 text-center">Registrations</th>
                   <th className="p-4">Status</th>
@@ -252,6 +271,15 @@ export default function SignupCodesManagement() {
                   <tr key={dc.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="p-4 font-semibold text-slate-900">{dc.college_name || dc.college_id}</td>
                     <td className="p-4 text-slate-600">{dc.department_name || dc.department_id}</td>
+                    <td className="p-4">
+                      {dc.academic_year ? (
+                        <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[10px] font-bold">
+                          {dc.academic_year}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 text-xs italic">All Years</span>
+                      )}
+                    </td>
                     <td className="p-4">
                       <div className="flex items-center gap-2">
                         <code className="bg-indigo-50 px-2 py-1 rounded text-indigo-700 font-mono font-bold text-xs uppercase">
@@ -291,7 +319,7 @@ export default function SignupCodesManagement() {
                 ))}
                 {deptCodes.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="p-12 text-center text-slate-400 font-medium italic">
+                    <td colSpan={8} className="p-12 text-center text-slate-400 font-medium italic">
                       No department invite codes found. Create a department to auto-generate codes.
                     </td>
                   </tr>

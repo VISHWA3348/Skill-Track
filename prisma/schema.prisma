@@ -307,18 +307,22 @@ model AlumniModel {
 }
 
 model Opportunities {
-  id              String    @id
-  title           String
-  company_name    String
-  type            String
-  required_skills String?
-  location        String?
-  description     String?
-  external_link   String?
-  deadline        DateTime?
-  status          String?   @default("open")
-  created_at      DateTime? @default(now())
-  updated_at      DateTime? @default(now())
+  id                 String    @id
+  title              String
+  company_name       String
+  type               String
+  required_skills    String?
+  location           String?
+  description        String?
+  external_link      String?
+  deadline           DateTime?
+  status             String?   @default("open")
+  created_at         DateTime? @default(now())
+  updated_at         DateTime? @default(now())
+  visibility_scope   String?   @default("GLOBAL")
+  college_id         String?
+  created_by         String?
+  target_college_ids String?
 
   @@map("opportunities")
 }
@@ -744,6 +748,7 @@ model DepartmentInviteCodes {
   code                 String    @unique
   collegeId            String    @map("college_id")
   departmentId         String    @map("department_id")
+  academicYear         String?   @map("academic_year")
   isActive             Int?      @default(1) @map("is_active")
   maxRegistrations     Int?      @default(-1) @map("max_registrations")
   currentRegistrations Int?      @default(0) @map("current_registrations")

@@ -128,7 +128,8 @@ const Students: React.FC = () => {
           collegeId: profile.collegeId,
           departmentId: profile.departmentId,
           rollNo: newStudent.rollNo,
-          year: newStudent.year,
+          class: newStudent.class,
+          academicYear: newStudent.academicYear,
           section: newStudent.section
         })
       });
@@ -153,7 +154,7 @@ const Students: React.FC = () => {
 
       toast.success("Student added successfully.");
       setShowAddModal(false);
-      setNewStudent({ name: '', email: '', rollNo: '', year: '', section: '' });
+      setNewStudent({ name: '', email: '', rollNo: '', year: '', section: '', class: '', academicYear: '' });
       setNewStudentPassword('');
       setPhotoFile(null);
       setPhotoPreview(null);
@@ -300,7 +301,7 @@ const Students: React.FC = () => {
           <div className="flex items-center gap-3">
             <button 
               onClick={() => {
-                setNewStudent({ name: '', email: '', rollNo: '', year: '', section: '' });
+                setNewStudent({ name: '', email: '', rollNo: '', year: '', section: '', class: '', academicYear: '' });
                 setNewStudentPassword('');
                 setPhotoFile(null);
                 setPhotoPreview(null);
@@ -676,17 +677,22 @@ const Students: React.FC = () => {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Degree</label>
                   <select
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                    value={newStudent.year || ''}
-                    onChange={(e) => setNewStudent({...newStudent, year: e.target.value})}
+                    required
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white"
+                    value={newStudent.class || ''}
+                    onChange={(e) => setNewStudent({...newStudent, class: e.target.value})}
                   >
-                    <option value="">Select Year</option>
-                    <option value="1">1st Year</option>
-                    <option value="2">2nd Year</option>
-                    <option value="3">3rd Year</option>
-                    <option value="4">4th Year</option>
+                    <option value="">Select Degree</option>
+                    <option value="B.E">B.E</option>
+                    <option value="B.Tech">B.Tech</option>
+                    <option value="M.E">M.E</option>
+                    <option value="M.Tech">M.Tech</option>
+                    <option value="MBA">MBA</option>
+                    <option value="MCA">MCA</option>
+                    <option value="Diploma">Diploma</option>
+                    <option value="Other">Other</option>
                   </select>
                 </div>
                 <div>
@@ -698,6 +704,20 @@ const Students: React.FC = () => {
                     onChange={(e) => setNewStudent({...newStudent, section: e.target.value})}
                   />
                 </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Academic Year</label>
+                <select
+                  required
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white"
+                  value={newStudent.academicYear || ''}
+                  onChange={(e) => setNewStudent({...newStudent, academicYear: e.target.value})}
+                >
+                  <option value="">Select Academic Year</option>
+                  {(newStudent.class ? (newStudent.class.match(/^(M\.|M[A-Z]|PG|Master)/i) ? ['I Year PG', 'II Year PG'] : ['I Year', 'II Year', 'III Year', 'IV Year']) : ['I Year', 'II Year', 'III Year', 'IV Year']).map((opt) => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
               </div>
 
               <div className="flex gap-3 mt-8">

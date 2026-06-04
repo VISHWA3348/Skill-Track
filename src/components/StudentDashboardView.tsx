@@ -415,11 +415,22 @@ export default function StudentDashboardView() {
                 <div className="grid grid-cols-2 gap-3 w-full mt-6">
                   <div className="bg-slate-50 p-3 rounded-xl text-center border border-slate-100">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Roll No</p>
-                    <p className="text-sm font-bold text-slate-900 mt-0.5">{profile?.rollNo}</p>
+                    <p className="text-sm font-bold text-slate-900 mt-0.5">{profile?.rollNo || 'N/A'}</p>
                   </div>
                   <div className="bg-slate-50 p-3 rounded-xl text-center border border-slate-100">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Dept</p>
-                    <p className="text-sm font-bold text-slate-900 mt-0.5">{profile?.departmentId}</p>
+                    <p className="text-sm font-bold text-slate-900 mt-0.5">{profile?.departmentId || 'N/A'}</p>
+                  </div>
+                  <div className="bg-slate-50 p-3 rounded-xl text-center border border-slate-100">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Degree</p>
+                    <p className="text-sm font-bold text-slate-900 mt-0.5">{profile?.class || 'N/A'}</p>
+                  </div>
+                  <div className="bg-slate-50 p-3 rounded-xl text-center border border-slate-100">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Year & Section</p>
+                    <p className="text-sm font-bold text-slate-900 mt-0.5">
+                      {profile?.academicYear || profile?.academic_year || `${profile?.year || 'I'} Year`}
+                      {profile?.section ? ` - ${profile.section}` : ''}
+                    </p>
                   </div>
                 </div>
               </div>

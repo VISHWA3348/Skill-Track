@@ -11,11 +11,23 @@ import { queueService } from './queue';
  * Format: {DEPT_CODE}-{6 uppercase alphanumeric chars}
  * e.g. CSE-X7A92K, MECH-H3Q8LM
  */
-function generateDeptInviteCode(deptCode: string): string {
+function generateDeptInviteCode(deptCode: string, academicYear?: string): string {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   const bytes = crypto.randomBytes(6);
   const suffix = Array.from(bytes).map(b => alphabet[b % alphabet.length]).join('');
   const prefix = String(deptCode || 'DEPT').toUpperCase().replace(/[^A-Z0-9]/g, '').substring(0, 6);
+  
+  if (academicYear) {
+    let yr = '';
+    if (academicYear.includes('I Year PG')) yr = '1YPG';
+    else if (academicYear.includes('II Year PG')) yr = '2YPG';
+    else if (academicYear.includes('I Year')) yr = '1Y';
+    else if (academicYear.includes('II Year')) yr = '2Y';
+    else if (academicYear.includes('III Year')) yr = '3Y';
+    else if (academicYear.includes('IV Year')) yr = '4Y';
+    else yr = academicYear.replace(/\s+/g, '').substring(0, 4).toUpperCase();
+    return `${prefix}-${yr}-${suffix}`;
+  }
   return `${prefix}-${suffix}`;
 }
 
@@ -285,7 +297,10 @@ export function setupCollegeAdminEnhancements(app: express.Express) {
             ORDER BY created_at DESC LIMIT 1) as invite_code,
           (SELECT id FROM department_invite_codes
             WHERE department_id = d.id AND is_active = 1
-            ORDER BY created_at DESC LIMIT 1) as invite_code_id
+            ORDER BY created_at DESC LIMIT 1) as invite_code_id,
+          (SELECT academic_year FROM department_invite_codes
+            WHERE department_id = d.id AND is_active = 1
+            ORDER BY created_at DESC LIMIT 1) as invite_code_year
         FROM departments d
         WHERE (d.college_id = ? OR ? = 'super_admin')
       `).all(collegeId, req.userData.role);
@@ -300,13 +315,21 @@ export function setupCollegeAdminEnhancements(app: express.Express) {
   // Creates a department and immediately auto-generates a department invite code.
   app.post("/api/admin/department/add", authenticate, checkRole(["admin", "super_admin"]), (req: any, res) => {
     try {
-      const { name, department_id } = req.body;
+      const { name, department_id, academicYear } = req.body;
       if (!name) return res.status(400).json({ error: 'Department name is required' });
 
       const adminUser = req.userData;
       const collegeId = adminUser.collegeId || adminUser.college_id;
       if (!collegeId && adminUser.role !== 'super_admin') {
         return res.status(400).json({ error: 'College context missing — ensure your account is linked to a college' });
+      }
+
+      // Validate academicYear if provided
+      if (academicYear) {
+        const allowedYears = ['I Year', 'II Year', 'III Year', 'IV Year', 'I Year PG', 'II Year PG'];
+        if (!allowedYears.includes(academicYear)) {
+          return res.status(400).json({ error: 'Invalid academic year selection' });
+        }
       }
 
       const deptId   = 'dept_' + Date.now() + crypto.randomBytes(3).toString('hex');
@@ -322,7 +345,7 @@ export function setupCollegeAdminEnhancements(app: express.Express) {
       let inviteCode: string;
       let attempts = 0;
       do {
-        inviteCode = generateDeptInviteCode(deptCode);
+        inviteCode = generateDeptInviteCode(deptCode, academicYear);
         attempts++;
       } while (
         db.prepare('SELECT id FROM department_invite_codes WHERE code = ?').get(inviteCode) &&
@@ -332,9 +355,9 @@ export function setupCollegeAdminEnhancements(app: express.Express) {
       const inviteId = 'dic_' + Date.now() + crypto.randomBytes(3).toString('hex');
       db.prepare(`
         INSERT INTO department_invite_codes
-          (id, code, college_id, department_id, is_active, max_registrations, current_registrations, created_by)
-        VALUES (?, ?, ?, ?, 1, -1, 0, ?)
-      `).run(inviteId, inviteCode, collegeId, deptId, adminUser.uid || 'admin');
+          (id, code, college_id, department_id, is_active, max_registrations, current_registrations, created_by, academic_year)
+        VALUES (?, ?, ?, ?, 1, -1, 0, ?, ?)
+      `).run(inviteId, inviteCode, collegeId, deptId, adminUser.uid || 'admin', academicYear || null);
 
       // Audit both events
       auditLog(adminUser.uid, 'DEPARTMENT_CREATED', `Department "${name}" (${deptId}) created in college ${collegeId}`, collegeId);
@@ -359,6 +382,7 @@ export function setupCollegeAdminEnhancements(app: express.Express) {
       const { id: deptId } = req.params;
       const adminUser = req.userData;
       const collegeId = adminUser.collegeId || adminUser.college_id;
+      const { academicYear } = req.body || {};
 
       // Verify the department exists and belongs to this admin's college
       const dept = db.prepare(`
@@ -370,6 +394,22 @@ export function setupCollegeAdminEnhancements(app: express.Express) {
         return res.status(403).json({ error: 'Forbidden: This department does not belong to your college' });
       }
 
+      // Validate academicYear if provided
+      if (academicYear) {
+        const allowedYears = ['I Year', 'II Year', 'III Year', 'IV Year', 'I Year PG', 'II Year PG'];
+        if (!allowedYears.includes(academicYear)) {
+          return res.status(400).json({ error: 'Invalid academic year selection' });
+        }
+      }
+
+      // Query the academic year of the existing active code
+      const existingActive = db.prepare(`
+        SELECT academic_year FROM department_invite_codes 
+        WHERE department_id = ? AND is_active = 1 
+        ORDER BY created_at DESC LIMIT 1
+      `).get(deptId) as any;
+      const targetYear = academicYear !== undefined ? academicYear : (existingActive?.academic_year || null);
+
       // Deactivate all current active codes for this department
       db.prepare(`
         UPDATE department_invite_codes SET is_active = 0 WHERE department_id = ? AND is_active = 1
@@ -380,7 +420,7 @@ export function setupCollegeAdminEnhancements(app: express.Express) {
       let newCode: string;
       let attempts = 0;
       do {
-        newCode = generateDeptInviteCode(deptCode);
+        newCode = generateDeptInviteCode(deptCode, targetYear);
         attempts++;
       } while (
         db.prepare('SELECT id FROM department_invite_codes WHERE code = ?').get(newCode) &&
@@ -390,9 +430,9 @@ export function setupCollegeAdminEnhancements(app: express.Express) {
       const newInviteId = 'dic_' + Date.now() + crypto.randomBytes(3).toString('hex');
       db.prepare(`
         INSERT INTO department_invite_codes
-          (id, code, college_id, department_id, is_active, max_registrations, current_registrations, created_by)
-        VALUES (?, ?, ?, ?, 1, -1, 0, ?)
-      `).run(newInviteId, newCode, dept.college_id, deptId, adminUser.uid || 'admin');
+          (id, code, college_id, department_id, is_active, max_registrations, current_registrations, created_by, academic_year)
+        VALUES (?, ?, ?, ?, 1, -1, 0, ?, ?)
+      `).run(newInviteId, newCode, dept.college_id, deptId, adminUser.uid || 'admin', targetYear);
 
       auditLog(adminUser.uid, 'INVITE_CODE_REGENERATED', `Invite code regenerated → ${newCode} for dept ${deptId}`, dept.college_id);
 

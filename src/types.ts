@@ -180,6 +180,11 @@ export interface Certificate {
   exif_verification_result?: string;
   uploadTimestamp?: string;
   timestamp?: string;
+  academic_year?: string;
+  academicYear?: string;
+  student_academic_year?: string;
+  department_name?: string;
+  college_name?: string;
 
   status: CertificateStatus;
   remarks: Remark[];

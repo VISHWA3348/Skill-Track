@@ -1219,7 +1219,9 @@ const Certificates: React.FC = () => {
                         </div>
                         <div className="text-[10px] text-slate-500 font-semibold mt-0.5">
                           {cert.rollNo && <span className="mr-2">Roll: {cert.rollNo}</span>}
-                          {cert.class && <span>{cert.class} ({cert.year || 'I'} Yr) {cert.section && `Sec ${cert.section}`}</span>}
+                          {cert.class && <span>Degree: {cert.class} | Year: {cert.student_academic_year || cert.academic_year || cert.academicYear || `${cert.year || 'I'} Yr`}</span>}
+                          {cert.section && <span> | Sec: {cert.section}</span>}
+                          {cert.department_name && <span> | Dept: {cert.department_name}</span>}
                         </div>
                       </td>
                     )}
@@ -1709,7 +1711,9 @@ const Certificates: React.FC = () => {
             <div className="px-6 py-4 flex justify-between items-center bg-indigo-700 text-white">
               <div>
                 <h3 className="text-lg font-bold">🔍 Evidence Review — {selectedCert.eventName}</h3>
-                <p className="text-xs opacity-80 mt-0.5">{selectedCert.studentName} · {selectedCert.rollNo} · {selectedCert.class} {selectedCert.year}</p>
+                <p className="text-xs opacity-80 mt-0.5">
+                  {selectedCert.studentName} · Roll: {selectedCert.rollNo || 'N/A'} · Degree: {selectedCert.class || 'N/A'} · Year: {selectedCert.student_academic_year || selectedCert.academic_year || selectedCert.academicYear || selectedCert.year || 'N/A'} · Sec: {selectedCert.section || 'N/A'} {selectedCert.department_name && `· Dept: ${selectedCert.department_name}`}
+                </p>
               </div>
               <button onClick={() => setShowActionModal(false)} className="text-white/80 hover:text-white"><XCircle className="w-6 h-6"/></button>
             </div>
@@ -1833,6 +1837,9 @@ const Certificates: React.FC = () => {
         const sYear = selectedViewCert.student_year || selectedViewCert.year || '';
         const sSection = selectedViewCert.student_section || selectedViewCert.section || '';
         const sAddress = selectedViewCert.student_address || selectedViewCert.address || '';
+        const sAcademicYear = selectedViewCert.student_academic_year || selectedViewCert.academic_year || selectedViewCert.academicYear || '';
+        const sDeptName = selectedViewCert.department_name || '';
+        const sCollegeName = selectedViewCert.college_name || selectedViewCert.collegeName || '';
         
         const isPdf = selectedViewCert.fileUrl?.toLowerCase().includes('.pdf');
         const mapLat = selectedViewCert.gps_lat || selectedViewCert.gps?.lat || selectedViewCert.exif_lat || selectedViewCert.exifLatitude || 0;
@@ -1879,8 +1886,11 @@ const Certificates: React.FC = () => {
                       <p className="text-xs text-slate-500 truncate">{sEmail || 'No email provided'}</p>
                       <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-600 font-semibold pt-1">
                         {sRoll && <span>Roll: {sRoll}</span>}
-                        {sClass && <span>Class: {sClass} ({sYear || 'I'} Year)</span>}
+                        {sClass && <span>Degree: {sClass}</span>}
+                        {sAcademicYear && <span>Year: {sAcademicYear}</span>}
                         {sSection && <span>Sec: {sSection}</span>}
+                        {sDeptName && <span>Dept: {sDeptName}</span>}
+                        {sCollegeName && <span>College: {sCollegeName}</span>}
                       </div>
                       {sAddress && (
                         <p className="text-[10px] text-slate-500 font-semibold bg-white p-2 rounded-lg border border-slate-100 mt-2">

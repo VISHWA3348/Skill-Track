@@ -545,7 +545,7 @@ const Settings: React.FC = () => {
 
             <div className="bg-blue-50 p-4 rounded-lg space-y-4 border border-blue-100 mt-6">
               <h4 className="text-sm font-bold text-blue-800 uppercase tracking-wider">Academic & College Details</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Roll Number</label>
                   <input 
@@ -557,7 +557,7 @@ const Settings: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Department Code</label>
                   <select 
                     value={departmentId} 
                     onChange={(e) => setDepartmentId(e.target.value)} 
@@ -570,10 +570,19 @@ const Settings: React.FC = () => {
                     ))}
                   </select>
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Department Name</label>
+                  <input 
+                    type="text" 
+                    value={allDepartments.find(d => d.department_id === departmentId)?.name || 'N/A'} 
+                    disabled
+                    className="w-full border bg-gray-50 rounded-lg px-4 py-2 text-gray-500 cursor-not-allowed"
+                  />
+                </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Class</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Degree</label>
                   {isStudent ? (
                     <select
                       value={className}

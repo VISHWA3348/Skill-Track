@@ -20,6 +20,7 @@ const Departments: React.FC = () => {
   const [name, setName] = useState('');
   const [collegeId, setCollegeId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [academicYear, setAcademicYear] = useState('');
 
   const fetchInviteCodes = async () => {
     try {
@@ -98,12 +99,14 @@ const Departments: React.FC = () => {
       setDepartmentId(dept.department_id || '');
       setName(dept.name || dept.department_name || '');
       setCollegeId(dept.collegeId || dept.college_id || '');
+      setAcademicYear('');
     } else {
       setIsEditing(false);
       setEditingId(null);
       setDepartmentId('');
       setName('');
       setCollegeId(profile?.collegeId || '');
+      setAcademicYear('');
     }
     setShowModal(true);
   };
@@ -117,7 +120,8 @@ const Departments: React.FC = () => {
         department_name: name,
         collegeId,
         college_id: collegeId,
-        department_id: departmentId
+        department_id: departmentId,
+        academicYear: academicYear || null
       };
       
       if (isEditing && editingId) {
@@ -143,11 +147,29 @@ const Departments: React.FC = () => {
   };
 
   const handleRegenerateCode = async (deptId: string, deptName: string) => {
+    const yearOption = window.prompt(
+      `Regenerate invite code for ${deptName}.\n\nEnter Academic Year (e.g., 'I Year', 'II Year', 'III Year', 'IV Year', 'I Year PG', 'II Year PG') or leave blank for a generic code:`
+    );
+    if (yearOption === null) return;
+
+    let targetYear = yearOption.trim();
+    if (targetYear) {
+      const allowedYears = ['I Year', 'II Year', 'III Year', 'IV Year', 'I Year PG', 'II Year PG'];
+      if (!allowedYears.includes(targetYear)) {
+        toast.error("Invalid academic year. Must be like 'I Year', 'II Year', etc.");
+        return;
+      }
+    }
+
     try {
       const token = localStorage.getItem('token');
       const res = await fetch(`${API_BASE_URL}/api/admin/department/${deptId}/regenerate-code`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+        },
+        body: JSON.stringify({ academicYear: targetYear || null })
       });
       const data = await res.json();
       if (res.ok && data.success) {
@@ -244,6 +266,11 @@ const Departments: React.FC = () => {
                             <span className="font-mono bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded text-xs font-bold uppercase tracking-wider">
                               {deptInviteCode.code}
                             </span>
+                            {deptInviteCode.academic_year && (
+                              <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[10px] font-bold">
+                                {deptInviteCode.academic_year}
+                              </span>
+                            )}
                             <button
                               onClick={() => {
                                 navigator.clipboard.writeText(deptInviteCode.code);
@@ -310,6 +337,24 @@ const Departments: React.FC = () => {
                   className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" 
                 />
               </div>
+              {!isEditing && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Invite Code Scope / Year (Optional)</label>
+                  <select
+                    value={academicYear}
+                    onChange={(e) => setAcademicYear(e.target.value)}
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 bg-white"
+                  >
+                    <option value="">All Years (Generic Code)</option>
+                    <option value="I Year">I Year</option>
+                    <option value="II Year">II Year</option>
+                    <option value="III Year">III Year</option>
+                    <option value="IV Year">IV Year</option>
+                    <option value="I Year PG">I Year PG</option>
+                    <option value="II Year PG">II Year PG</option>
+                  </select>
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700">College ID</label>
                 <input 

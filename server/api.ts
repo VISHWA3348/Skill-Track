@@ -120,6 +120,7 @@ export function setupApi(app: express.Express) {
       let finalCollegeName: string | null = collegeName || null;
       let usedInviteCodeId: string | null = null;      // for DepartmentInviteCodes row
       let usedLegacyCode: string | null = null;        // for signup_codes row
+      let inviteRowAcademicYear: string | null = null;
 
       const uppercaseCode = providedCode.toUpperCase();
 
@@ -148,6 +149,7 @@ export function setupApi(app: express.Express) {
         finalRole = 'student';
         finalCollegeName = inviteRow.college_name || collegeName || null;
         usedInviteCodeId = inviteRow.id;
+        inviteRowAcademicYear = inviteRow.academic_year || null;
       } else {
         // -------------------------------------------------------
         // BRANCH B: Legacy signup_codes (full backward compat)
@@ -182,38 +184,46 @@ export function setupApi(app: express.Express) {
 
       // Academic Year selection validation
       let mappedLegacyYear = finalYear;
-      let finalAcademicYear = academicYear || null;
+      let finalAcademicYear = inviteRowAcademicYear || academicYear || null;
 
       if (finalRole === 'student') {
-        if (!finalAcademicYear) {
-          return res.status(400).json({ error: 'auth/academic-year-required', message: 'Academic Year selection is required for student registration.' });
-        }
-        
-        const isPG = className ? /^(M\.|M[A-Z]|PG|Master)/i.test(className) : false;
-        const validUGYears = ['I Year', 'II Year', 'III Year', 'IV Year'];
-        const validPGYears = ['I Year PG', 'II Year PG'];
-        
-        if (isPG) {
-          if (!validPGYears.includes(finalAcademicYear)) {
-            return res.status(400).json({ 
-              error: 'auth/invalid-academic-year', 
-              message: `For PG courses, Academic Year must be one of: ${validPGYears.join(', ')}` 
-            });
-          }
+        if (inviteRowAcademicYear) {
+          // If year is locked from invite code, map legacy representation directly
+          if (finalAcademicYear.startsWith('I Year')) mappedLegacyYear = 'I';
+          else if (finalAcademicYear.startsWith('II Year')) mappedLegacyYear = 'II';
+          else if (finalAcademicYear.startsWith('III Year')) mappedLegacyYear = 'III';
+          else if (finalAcademicYear.startsWith('IV Year')) mappedLegacyYear = 'IV';
         } else {
-          if (!validUGYears.includes(finalAcademicYear)) {
-            return res.status(400).json({ 
-              error: 'auth/invalid-academic-year', 
-              message: `For UG courses, Academic Year must be one of: ${validUGYears.join(', ')}` 
-            });
+          if (!finalAcademicYear) {
+            return res.status(400).json({ error: 'auth/academic-year-required', message: 'Academic Year selection is required for student registration.' });
           }
+          
+          const isPG = className ? /^(M\.|M[A-Z]|PG|Master)/i.test(className) : false;
+          const validUGYears = ['I Year', 'II Year', 'III Year', 'IV Year'];
+          const validPGYears = ['I Year PG', 'II Year PG'];
+          
+          if (isPG) {
+            if (!validPGYears.includes(finalAcademicYear)) {
+              return res.status(400).json({ 
+                error: 'auth/invalid-academic-year', 
+                message: `For PG courses, Academic Year must be one of: ${validPGYears.join(', ')}` 
+              });
+            }
+          } else {
+            if (!validUGYears.includes(finalAcademicYear)) {
+              return res.status(400).json({ 
+                error: 'auth/invalid-academic-year', 
+                message: `For UG courses, Academic Year must be one of: ${validUGYears.join(', ')}` 
+              });
+            }
+          }
+          
+          // Map clean academic year string to legacy character representation
+          if (finalAcademicYear.startsWith('I Year')) mappedLegacyYear = 'I';
+          else if (finalAcademicYear.startsWith('II Year')) mappedLegacyYear = 'II';
+          else if (finalAcademicYear.startsWith('III Year')) mappedLegacyYear = 'III';
+          else if (finalAcademicYear.startsWith('IV Year')) mappedLegacyYear = 'IV';
         }
-        
-        // Map clean academic year string to legacy character representation
-        if (finalAcademicYear.startsWith('I Year')) mappedLegacyYear = 'I';
-        else if (finalAcademicYear.startsWith('II Year')) mappedLegacyYear = 'II';
-        else if (finalAcademicYear.startsWith('III Year')) mappedLegacyYear = 'III';
-        else if (finalAcademicYear.startsWith('IV Year')) mappedLegacyYear = 'IV';
       }
 
       // Generate UID
@@ -509,7 +519,7 @@ export function setupApi(app: express.Express) {
       const decoded = verifyToken(token);
       if (!decoded) return res.status(401).json({ error: 'auth/invalid-token', message: 'Invalid token' });
 
-      const user = db.prepare('SELECT uid, name, email, role, phone_number as phone, profile_photo, bio, college_id as collegeId, department_id as departmentId, roll_no as rollNo, class, year, section, city, address, college_name as collegeName, preferences, social_links, skills FROM users WHERE uid = ?').get(decoded.uid) as any;
+      const user = db.prepare('SELECT uid, name, email, role, phone_number as phone, profile_photo, bio, college_id as collegeId, department_id as departmentId, roll_no as rollNo, class, year, section, city, address, college_name as collegeName, preferences, social_links, skills, academic_year as academicYear FROM users WHERE uid = ?').get(decoded.uid) as any;
       if (!user) return res.status(401).json({ error: 'auth/user-not-found', message: 'User not found' });
 
       res.json({ user: { 
@@ -531,7 +541,8 @@ export function setupApi(app: express.Express) {
         skills: user.skills ? user.skills : '',
         bio: user.bio || '',
         preferences: user.preferences ? JSON.parse(user.preferences) : {},
-        socialLinks: user.social_links ? JSON.parse(user.social_links) : {}
+        socialLinks: user.social_links ? JSON.parse(user.social_links) : {},
+        academicYear: user.academicYear
       } });
     } catch (e: any) {
       res.status(401).json({ error: 'auth/verification-failed', message: 'Verification failed' });
@@ -650,7 +661,7 @@ export function setupApi(app: express.Express) {
       const updatedUser = db.prepare(`
         SELECT uid, name, email, role, phone_number as phone, profile_photo, bio, 
                college_id as collegeId, department_id as departmentId, roll_no as rollNo, 
-               class, year, section, city, address, college_name as collegeName, preferences, social_links as socialLinks, skills 
+               class, year, section, city, address, college_name as collegeName, preferences, social_links as socialLinks, skills, academic_year as academicYear
         FROM users WHERE uid = ?
       `).get(uid) as any;
       
@@ -660,7 +671,8 @@ export function setupApi(app: express.Express) {
         bio: updatedUser.bio || '',
         skills: updatedUser.skills || '',
         preferences: updatedUser.preferences ? JSON.parse(updatedUser.preferences) : {},
-        socialLinks: updatedUser.socialLinks ? JSON.parse(updatedUser.socialLinks) : {}
+        socialLinks: updatedUser.socialLinks ? JSON.parse(updatedUser.socialLinks) : {},
+        academicYear: updatedUser.academicYear
       }});
     } catch (e: any) {
       console.error('Profile update error:', e);
@@ -727,8 +739,40 @@ export function setupApi(app: express.Express) {
 
   app.get('/api/opportunities', authenticate, (req: any, res) => {
     try {
-      const opps = db.prepare("SELECT * FROM opportunities ORDER BY created_at DESC").all();
-      res.json({ success: true, data: opps });
+      const uid = req.user.uid;
+      const user = db.prepare('SELECT role, college_id FROM users WHERE uid = ?').get(uid) as any;
+      if (!user) return res.status(403).json({ error: "User not found" });
+
+      const opps = db.prepare("SELECT * FROM opportunities ORDER BY created_at DESC").all() as any[];
+
+      if (user.role === 'super_admin') {
+        return res.json({ success: true, data: opps });
+      }
+
+      const filteredOpps = opps.filter(opp => {
+        if (!opp.visibility_scope || opp.visibility_scope === 'GLOBAL') return true;
+
+        if (opp.visibility_scope === 'COLLEGE_ONLY') {
+          return opp.college_id === user.college_id;
+        }
+
+        if (opp.visibility_scope === 'SELECTED') {
+          if (!opp.target_college_ids) return false;
+          try {
+            const targets = JSON.parse(opp.target_college_ids);
+            if (Array.isArray(targets)) {
+              return targets.includes(user.college_id);
+            }
+          } catch (e) {
+            const targets = opp.target_college_ids.split(',').map((t: string) => t.trim());
+            return targets.includes(user.college_id);
+          }
+        }
+
+        return opp.college_id === user.college_id;
+      });
+
+      res.json({ success: true, data: filteredOpps });
     } catch (e: any) {
       res.status(500).json({ error: 'Failed to fetch opportunities' });
     }
@@ -737,24 +781,70 @@ export function setupApi(app: express.Express) {
   app.post('/api/opportunities', authenticate, checkRole(['super_admin', 'admin']), (req: any, res) => {
     try {
       const id = Date.now().toString();
-      const { title, company_name, type, required_skills, location, description, external_link, deadline } = req.body;
-      
+      const { 
+        title, company_name, type, required_skills, location, description, external_link, deadline,
+        visibility_scope, target_college_ids 
+      } = req.body;
+      const role = req.userData.role;
+      const userCollegeId = req.userData.college_id;
+      const creatorId = req.userData.uid;
+
+      let finalScope = visibility_scope || 'GLOBAL';
+      let finalCollegeId = null;
+      let finalTargets = null;
+
+      if (role === 'admin') {
+        finalCollegeId = userCollegeId;
+        if (finalScope !== 'COLLEGE_ONLY' && finalScope !== 'GLOBAL') {
+          finalScope = 'COLLEGE_ONLY';
+        }
+      } else if (role === 'super_admin') {
+        finalCollegeId = 'super_admin';
+        if (finalScope === 'SELECTED' || finalScope === 'SELECTED_COLLEGES') {
+          finalScope = 'SELECTED';
+          finalTargets = Array.isArray(target_college_ids) 
+            ? JSON.stringify(target_college_ids) 
+            : (typeof target_college_ids === 'string' ? target_college_ids : '[]');
+        } else {
+          finalScope = 'GLOBAL';
+        }
+      }
+
       const insertStmt = db.prepare(`
-        INSERT INTO opportunities (id, title, company_name, type, required_skills, location, description, external_link, deadline)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO opportunities (
+          id, title, company_name, type, required_skills, location, description, external_link, deadline,
+          visibility_scope, college_id, created_by, target_college_ids
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       
-      insertStmt.run(id, title, company_name, type, required_skills, location, description, external_link, deadline);
+      insertStmt.run(
+        id, title, company_name, type, required_skills || null, location || null, description || null, external_link, deadline || null,
+        finalScope, finalCollegeId, creatorId, finalTargets
+      );
       
       // Matching Engine logic
       if (required_skills) {
         const skillsReq = required_skills.split(',').map((s: string) => s.trim().toLowerCase());
-        const students = db.prepare("SELECT uid, skills, name FROM users WHERE role = 'student' AND skills IS NOT NULL AND skills != ''").all() as any[];
+        const students = db.prepare("SELECT uid, skills, name, college_id FROM users WHERE role = 'student' AND skills IS NOT NULL AND skills != ''").all() as any[];
         
         let matchCount = 0;
         const noteStmt = db.prepare("INSERT INTO notifications (id, user_id, title, message, type) VALUES (?, ?, ?, ?, ?)");
         
         students.forEach(student => {
+          // Check if student has visibility access to this opportunity
+          let visible = false;
+          if (finalScope === 'GLOBAL') visible = true;
+          else if (finalScope === 'COLLEGE_ONLY' && student.college_id === finalCollegeId) visible = true;
+          else if (finalScope === 'SELECTED' && finalTargets) {
+            try {
+              const targets = JSON.parse(finalTargets);
+              if (Array.isArray(targets) && targets.includes(student.college_id)) visible = true;
+            } catch(e){}
+          }
+
+          if (!visible) return;
+
           const sSkills = student.skills.split(',').map((s: string) => s.trim().toLowerCase());
           // check for intersection
           const hasMatch = skillsReq.some((reqSkill: string) => sSkills.includes(reqSkill));
@@ -778,6 +868,7 @@ export function setupApi(app: express.Express) {
       res.status(500).json({ error: 'Internal server error' });
     }
   });
+
 
   app.delete('/api/opportunities/:id', authenticate, checkRole(['super_admin', 'admin']), (req: any, res) => {
     try {
@@ -1244,9 +1335,14 @@ export function setupApi(app: express.Express) {
                u.class as student_class, 
                u.year as student_year, 
                u.section as student_section,
-               u.address as student_address
+               u.address as student_address,
+               u.academic_year as student_academic_year,
+               d.name as department_name,
+               col.name as college_name
         FROM certifications c
         LEFT JOIN users u ON c.user_id = u.uid
+        LEFT JOIN departments d ON c.department_id = d.id
+        LEFT JOIN colleges col ON c.college_id = col.id
         WHERE c.is_deleted != 1
       `;
       const params: any[] = [];
@@ -1257,6 +1353,13 @@ export function setupApi(app: express.Express) {
       } else if (role === 'staff' || role === 'hod') {
         sql += ` AND c.college_id = ? AND c.department_id = ?`;
         params.push(collegeId, departmentId);
+        if (role === 'staff') {
+          const assignedYear = req.userData.assigned_academic_year || req.userData.assignedAcademicYear;
+          if (assignedYear && assignedYear !== 'All Years') {
+            sql += ` AND (u.academic_year = ? OR u.academic_year IS NULL)`;
+            params.push(assignedYear);
+          }
+        }
       } else if (role === 'admin') {
         sql += ` AND c.college_id = ?`;
         params.push(collegeId);
@@ -1337,9 +1440,14 @@ export function setupApi(app: express.Express) {
                u.class as student_class, 
                u.year as student_year, 
                u.section as student_section,
-               u.address as student_address
+               u.address as student_address,
+               u.academic_year as student_academic_year,
+               d.name as department_name,
+               col.name as college_name
         FROM certifications c
         LEFT JOIN users u ON c.user_id = u.uid
+        LEFT JOIN departments d ON c.department_id = d.id
+        LEFT JOIN colleges col ON c.college_id = col.id
         WHERE c.id = ? AND c.is_deleted != 1
       `;
       const params: any[] = [id];
@@ -1350,6 +1458,13 @@ export function setupApi(app: express.Express) {
       } else if (role === 'staff' || role === 'hod') {
         sql += ` AND c.college_id = ? AND c.department_id = ?`;
         params.push(collegeId, departmentId);
+        if (role === 'staff') {
+          const assignedYear = req.userData.assigned_academic_year || req.userData.assignedAcademicYear;
+          if (assignedYear && assignedYear !== 'All Years') {
+            sql += ` AND (u.academic_year = ? OR u.academic_year IS NULL)`;
+            params.push(assignedYear);
+          }
+        }
       } else if (role === 'admin') {
         sql += ` AND c.college_id = ?`;
         params.push(collegeId);
@@ -1485,7 +1600,7 @@ export function setupApi(app: express.Express) {
         rollNo,
         class: className,
         year,
-        section: section || null,
+        section: section || req.userData.section || null,
         phoneNumber,
         city,
         collegeName,

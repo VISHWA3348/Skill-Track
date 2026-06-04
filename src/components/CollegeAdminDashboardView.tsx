@@ -48,7 +48,7 @@ export default function CollegeAdminDashboardView() {
     target_department: '',
     target_year: ''
   });
-  const [newDept, setNewDept] = useState({ name: '', department_id: '' });
+  const [newDept, setNewDept] = useState({ name: '', department_id: '', academicYear: '' });
   const [createdInviteCode, setCreatedInviteCode] = useState<string | null>(null);
   const [viewingStudentsCode, setViewingStudentsCode] = useState<{ id: string; code: string; deptName: string } | null>(null);
   const [codeStudents, setCodeStudents] = useState<any[]>([]);
@@ -128,7 +128,7 @@ export default function CollegeAdminDashboardView() {
       if (res.ok && data.success) {
         setCreatedInviteCode(data.inviteCode || null);
         toast.success(`Department added! Invite Code: ${data.inviteCode}`);
-        setNewDept({ name: '', department_id: '' });
+        setNewDept({ name: '', department_id: '', academicYear: '' });
         fetchData();
       } else {
         toast.error(data.error || 'Failed to add department');
@@ -422,7 +422,10 @@ export default function CollegeAdminDashboardView() {
                       </td>
                       <td className="px-6 py-4">
                         <p className="font-medium text-slate-700">{s.department_name}</p>
-                        <p className="text-xs text-slate-400">{s.year} Year - {s.section}</p>
+                        <p className="text-xs text-slate-400">
+                          {s.academic_year || s.academicYear || `${s.year || 'I'} Year`}
+                          {s.section ? ` - ${s.section}` : ''}
+                        </p>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex flex-col gap-1">
@@ -605,8 +608,9 @@ export default function CollegeAdminDashboardView() {
                   </div>
                   {/* Invite Code Section */}
                   <div className="bg-indigo-50 rounded-2xl p-3 border border-indigo-100">
-                    <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-1">
-                      <Key className="w-3 h-3" /> Invite Code
+                    <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2 flex items-center justify-between">
+                      <span className="flex items-center gap-1"><Key className="w-3 h-3" /> Invite Code</span>
+                      <span className="bg-indigo-100 px-1.5 py-0.5 rounded text-indigo-800 text-[9px] font-bold">{d.invite_code_year || 'All Years'}</span>
                     </p>
                     {d.invite_code ? (
                       <div className="flex items-center justify-between gap-2">
@@ -685,6 +689,7 @@ export default function CollegeAdminDashboardView() {
                   <tr>
                     <th className="px-6 py-4">Department</th>
                     <th className="px-6 py-4">Invite Code</th>
+                    <th className="px-6 py-4">Scope / Year</th>
                     <th className="px-6 py-4">Status</th>
                     <th className="px-6 py-4 text-center">Actions</th>
                   </tr>
@@ -710,6 +715,11 @@ export default function CollegeAdminDashboardView() {
                         ) : (
                           <span className="text-xs text-slate-400 italic">No active code</span>
                         )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-xs font-semibold text-slate-600">
+                          {d.invite_code_year || 'All Years'}
+                        </span>
                       </td>
                       <td className="px-6 py-4">
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700">
@@ -1006,6 +1016,22 @@ export default function CollegeAdminDashboardView() {
                     onChange={e => setNewDept({ ...newDept, department_id: e.target.value })}
                     className="w-full px-5 py-3 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-indigo-500 transition-all"
                   />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-700">Academic Year (Optional)</label>
+                  <select
+                    value={newDept.academicYear}
+                    onChange={e => setNewDept({ ...newDept, academicYear: e.target.value })}
+                    className="w-full px-5 py-3 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-indigo-500 transition-all"
+                  >
+                    <option value="">All Years (Generic Code)</option>
+                    <option value="I Year">I Year</option>
+                    <option value="II Year">II Year</option>
+                    <option value="III Year">III Year</option>
+                    <option value="IV Year">IV Year</option>
+                    <option value="I Year PG">I Year PG</option>
+                    <option value="II Year PG">II Year PG</option>
+                  </select>
                 </div>
                 <p className="text-xs text-slate-400 flex items-center gap-1">
                   <Key className="w-3 h-3" /> An invite code will be auto-generated after creation.

@@ -534,7 +534,7 @@ const Users: React.FC = () => {
                       )}
                     </div>
                     {u.rollNo && <div className="text-xs text-gray-500">Roll No: {u.rollNo}</div>}
-                    {u.class && <div className="text-xs text-gray-500">Class: {u.class}</div>}
+                    {u.class && <div className="text-xs text-gray-500">Degree: {u.class}</div>}
                     {(u.academicYear || u.academic_year) && <div className="text-xs text-indigo-600 font-medium">Academic Year: {u.academicYear || u.academic_year}</div>}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -703,7 +703,7 @@ const Users: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Class</label>
+                      <label className="block text-sm font-medium text-gray-700">Degree</label>
                       <input 
                         type="text" 
                         required={newRole === 'student'}

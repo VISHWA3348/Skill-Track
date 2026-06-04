@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import {
   ShieldCheck, ShieldAlert, Clock, MapPin, Search, Filter,
   Download, Eye, CheckCircle2, XCircle, AlertTriangle,
-  Calendar, User, FileText, ExternalLink, QrCode, ZoomIn, ZoomOut, Maximize2, Globe
+  Calendar, User, FileText, ExternalLink, QrCode, ZoomIn, ZoomOut, Maximize2, Globe, Building2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../context/AuthContext';
@@ -142,6 +142,18 @@ export default function HODCertificatesView() {
             </div>
 
             <div className="space-y-2 mb-6 text-xs font-medium text-slate-600">
+              {cert.department_name && (
+                <div className="flex items-center gap-3">
+                  <Building2 className="w-4 h-4 text-slate-400 shrink-0" />
+                  <span>Student Dept: {cert.department_name} {cert.student_section ? `(${cert.student_section})` : ''}</span>
+                </div>
+              )}
+              {cert.college_name && (
+                <div className="flex items-center gap-3">
+                  <Globe className="w-4 h-4 text-slate-400 shrink-0" />
+                  <span>Student College: {cert.college_name}</span>
+                </div>
+              )}
               <div className="flex items-center gap-3">
                 <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
                 <span>Event: {new Date(cert.date).toLocaleDateString()}</span>
@@ -236,8 +248,10 @@ export default function HODCertificatesView() {
                         <p className="text-xs text-slate-500 truncate">{sEmail || 'No email provided'}</p>
                         <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-600 font-semibold pt-1">
                           {sRoll && <span>Roll: {sRoll}</span>}
-                          {sClass && <span>Class: {sClass} ({sYear.includes('Year') ? sYear : `${sYear || 'I'} Year`})</span>}
+                          {sClass && <span>Degree: {sClass} ({sYear.includes('Year') ? sYear : `${sYear || 'I'} Year`})</span>}
                           {sSection && <span>Sec: {sSection}</span>}
+                          {selectedCert.department_name && <span>Dept: {selectedCert.department_name}</span>}
+                          {selectedCert.college_name && <span>College: {selectedCert.college_name}</span>}
                         </div>
                         {sAddress && (
                           <p className="text-[10px] text-slate-500 font-semibold bg-white p-2 rounded-lg border border-slate-100 mt-2">

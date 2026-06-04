@@ -143,7 +143,7 @@ export default function HODStudentManagement() {
                         <div>
                            <h3 className="text-xl font-black text-slate-900">{s.name}</h3>
                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                              {s.roll_no || s.rollNo} • {s.academic_year || s.academicYear || s.year}
+                               {s.roll_no || s.rollNo} • {s.academic_year || s.academicYear || `${s.year || 'I'} Year`}{s.class ? ` (${s.class})` : ''}{s.section ? ` - ${s.section}` : ''}
                            </p>
                         </div>
                      </div>

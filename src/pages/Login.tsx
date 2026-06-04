@@ -42,6 +42,7 @@ const Login: React.FC = () => {
   const [signupCode, setSignupCode] = useState('');
   const [isCodeVerified, setIsCodeVerified] = useState(false);
   const [verifyingCode, setVerifyingCode] = useState(false);
+  const [isAcademicYearLocked, setIsAcademicYearLocked] = useState(false);
   const [verifiedCollegeName, setVerifiedCollegeName] = useState('');
   const [verifiedDeptName, setVerifiedDeptName] = useState('');
 
@@ -173,6 +174,12 @@ const Login: React.FC = () => {
         setVerifiedDeptName(result.data.departmentName || result.data.departmentId);
         if (result.data.batchYear) setYear(result.data.batchYear);
         if (result.data.role) setRole(result.data.role as UserRole);
+        if (result.data.academicYear) {
+          setAcademicYear(result.data.academicYear);
+          setIsAcademicYearLocked(true);
+        } else {
+          setIsAcademicYearLocked(false);
+        }
         toast.success(`✅ Invite code verified! ${result.data.collegeName} — ${result.data.departmentName}`);
       } else {
         const errMsg = result.message || result.error || 'Invalid or expired invite code';
@@ -324,6 +331,8 @@ const Login: React.FC = () => {
                               setSignupCode('');
                               setVerifiedCollegeName('');
                               setVerifiedDeptName('');
+                              setIsAcademicYearLocked(false);
+                              setAcademicYear('');
                             }}
                             className="px-4 py-2 bg-slate-100 text-slate-600 rounded-md text-xs font-bold hover:bg-slate-200 transition-all"
                           >
@@ -422,7 +431,8 @@ const Login: React.FC = () => {
                       </div>
                       <select
                         required
-                        className="appearance-none rounded-md relative block w-full px-3 py-2 pl-10 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white"
+                        disabled={isAcademicYearLocked}
+                        className="appearance-none rounded-md relative block w-full px-3 py-2 pl-10 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white disabled:bg-gray-100 disabled:text-gray-500"
                         value={academicYear}
                         onChange={(e) => setAcademicYear(e.target.value)}
                       >
@@ -431,6 +441,11 @@ const Login: React.FC = () => {
                           <option key={opt} value={opt}>{opt}</option>
                         ))}
                       </select>
+                      {isAcademicYearLocked && (
+                        <p className="text-[10px] text-emerald-600 mt-1 ml-1 font-semibold">
+                          (Auto-detected from invite code)
+                        </p>
+                      )}
                     </div>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">

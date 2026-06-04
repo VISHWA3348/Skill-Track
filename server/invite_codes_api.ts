@@ -5,15 +5,27 @@ import { authenticate, checkRole } from './middleware';
 
 // ============================================================
 // UTILITY: Cryptographically secure invite code suffix
-// Format: CAMP-{DEPT}-{6_RANDOM_CHARS}
+// Format: CAMP-{DEPT}-{YEAR_CODE}-{6_RANDOM_CHARS}
 // ============================================================
-function generateSecureCode(deptCode: string): string {
+function generateSecureCode(deptCode: string, academicYear?: string): string {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   const bytes = crypto.randomBytes(6);
   const suffix = Array.from(bytes)
     .map(b => alphabet[b % alphabet.length])
     .join('');
   const dept = deptCode.toUpperCase().replace(/[^A-Z0-9]/g, '').substring(0, 8);
+  
+  if (academicYear) {
+    let yr = '';
+    if (academicYear.includes('I Year PG')) yr = '1YPG';
+    else if (academicYear.includes('II Year PG')) yr = '2YPG';
+    else if (academicYear.includes('I Year')) yr = '1Y';
+    else if (academicYear.includes('II Year')) yr = '2Y';
+    else if (academicYear.includes('III Year')) yr = '3Y';
+    else if (academicYear.includes('IV Year')) yr = '4Y';
+    else yr = academicYear.replace(/\s+/g, '').substring(0, 4).toUpperCase();
+    return `CAMP-${dept}-${yr}-${suffix}`;
+  }
   return `CAMP-${dept}-${suffix}`;
 }
 
@@ -152,7 +164,8 @@ export function setupInviteCodesApi(app: express.Express) {
           role: 'student',
           maxRegistrations: inviteCode.max_registrations,
           currentRegistrations: inviteCode.current_registrations,
-          expiresAt: inviteCode.expires_at
+          expiresAt: inviteCode.expires_at,
+          academicYear: inviteCode.academic_year || null
         }
       });
     } catch (e: any) {
@@ -339,12 +352,9 @@ export function setupInviteCodesApi(app: express.Express) {
     }
   });
 
-  // ============================================================
-  // POST /api/invite-codes  — Create a new invite code
-  // ============================================================
   router.post('/', (req, res) => {
     try {
-      const { collegeId, departmentId, maxRegistrations, expiresAt, customCode } = req.body;
+      const { collegeId, departmentId, maxRegistrations, expiresAt, customCode, academicYear } = req.body;
       const adminUser = (req as any).userData;
       const ip = getClientIp(req);
 
@@ -355,6 +365,14 @@ export function setupInviteCodesApi(app: express.Express) {
 
       if (!targetCollegeId || !departmentId) {
         return res.status(400).json({ error: 'collegeId and departmentId are required' });
+      }
+
+      // Validate academicYear if provided
+      if (academicYear) {
+        const allowedYears = ['I Year', 'II Year', 'III Year', 'IV Year', 'I Year PG', 'II Year PG'];
+        if (!allowedYears.includes(academicYear)) {
+          return res.status(400).json({ error: 'Invalid academic year selection' });
+        }
       }
 
       // Verify department belongs to the target college
@@ -370,7 +388,7 @@ export function setupInviteCodesApi(app: express.Express) {
 
       const finalCode = customCode
         ? String(customCode).toUpperCase().trim()
-        : generateSecureCode(deptCode);
+        : generateSecureCode(deptCode, academicYear);
 
       // Check uniqueness
       const existing = db.prepare('SELECT id FROM department_invite_codes WHERE code = ?').get(finalCode);
@@ -383,8 +401,8 @@ export function setupInviteCodesApi(app: express.Express) {
       db.prepare(`
         INSERT INTO department_invite_codes (
           id, code, college_id, department_id, is_active,
-          max_registrations, current_registrations, expires_at, created_by
-        ) VALUES (?, ?, ?, ?, 1, ?, 0, ?, ?)
+          max_registrations, current_registrations, expires_at, created_by, academic_year
+        ) VALUES (?, ?, ?, ?, 1, ?, 0, ?, ?, ?)
       `).run(
         id,
         finalCode,
@@ -392,12 +410,13 @@ export function setupInviteCodesApi(app: express.Express) {
         departmentId,
         maxRegistrations !== undefined ? Number(maxRegistrations) : -1,
         expiresAt || null,
-        adminUser?.uid || 'admin'
+        adminUser?.uid || 'admin',
+        academicYear || null
       );
 
       writeAuditLog(
         'INVITE_CODE_CREATED',
-        `Created invite code ${finalCode} for dept ${departmentId} in college ${targetCollegeId}`,
+        `Created invite code ${finalCode} for dept ${departmentId} (year: ${academicYear || 'All'}) in college ${targetCollegeId}`,
         adminUser?.uid || 'admin',
         targetCollegeId,
         ip

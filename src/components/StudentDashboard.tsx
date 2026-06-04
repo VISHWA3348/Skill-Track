@@ -14,6 +14,8 @@ interface Student {
   photoURL?: string;
   academicYear?: string;
   academic_year?: string;
+  class?: string;
+  section?: string;
 }
 
 interface Certification {
@@ -108,7 +110,7 @@ export default function StudentDashboard({ student, onLogout }: StudentDashboard
           </div>
         </div>
       </header>
-
+ 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         {/* Profile Section */}
         <section className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
@@ -128,11 +130,14 @@ export default function StudentDashboard({ student, onLogout }: StudentDashboard
               </div>
               <div className="flex-1 pb-2">
                 <h1 className="text-3xl font-bold text-slate-900">{student.name}</h1>
-                <p className="text-slate-500 font-medium">{student.department} • {student.academicYear || student.academic_year || `${student.year} Year`}</p>
+                <p className="text-slate-500 font-medium">
+                  {student.department} • {student.academicYear || student.academic_year || `${student.year} Year`}
+                  {student.section ? ` (${student.section})` : ''}
+                </p>
               </div>
             </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+ 
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
               <div className="p-4 bg-slate-50 rounded-2xl flex items-center gap-4">
                 <div className="bg-white p-2 rounded-xl shadow-sm">
                   <Hash className="w-5 h-5 text-slate-400" />
@@ -156,8 +161,20 @@ export default function StudentDashboard({ student, onLogout }: StudentDashboard
                   <GraduationCap className="w-5 h-5 text-slate-400" />
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Year</p>
-                  <p className="font-bold text-slate-900">{student.academicYear || student.academic_year || student.year}</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Year & Section</p>
+                  <p className="font-bold text-slate-900">
+                    {student.academicYear || student.academic_year || `${student.year} Year`}
+                    {student.section ? ` - ${student.section}` : ''}
+                  </p>
+                </div>
+              </div>
+              <div className="p-4 bg-slate-50 rounded-2xl flex items-center gap-4">
+                <div className="bg-white p-2 rounded-xl shadow-sm">
+                  <GraduationCap className="w-5 h-5 text-slate-400" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Degree</p>
+                  <p className="font-bold text-slate-900">{student.class || 'N/A'}</p>
                 </div>
               </div>
               <div className="p-4 bg-slate-50 rounded-2xl flex items-center gap-4">

@@ -1,6 +1,6 @@
 import { API_BASE_URL } from '@/config/api';
 import React, { useState, useEffect } from 'react';
-import React, { useState, useEffect } from 'react';
+
 import { db } from '../api/localApi';
 import { useAuth } from '../context/AuthContext';
 import { Trophy, Medal, Award, Search, Filter, TrendingUp } from 'lucide-react';

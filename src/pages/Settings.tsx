@@ -132,13 +132,21 @@ const Settings: React.FC = () => {
     if ((profile?.role === 'admin' || isSuperAdmin) && profile?.collegeId) {
        fetch(`/api/firestore/colleges/${profile.collegeId}`, {
          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-       }).then(res => res.json()).then(data => {
-         if (data.data) setCollegeData({ 
-           name: data.data.name || '', 
-           location: data.data.location || '',
-           lat: data.data.lat || '',
-           lng: data.data.lng || ''
-         });
+       }).then(async (res) => {
+         if (!res.ok) return;
+         const text = await res.text();
+         if (!text) return;
+         try {
+           const data = JSON.parse(text);
+           if (data.data) setCollegeData({ 
+             name: data.data.name || '', 
+             location: data.data.location || '',
+             lat: data.data.lat || '',
+             lng: data.data.lng || ''
+           });
+         } catch (e) {
+           console.error('Failed to parse college data response');
+         }
        });
     }
 
@@ -197,10 +205,26 @@ const Settings: React.FC = () => {
         })
       });
 
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to update profile');
+      if (!response.ok) {
+        let errorMsg = 'Failed to update profile';
+        const errText = await response.text();
+        if (errText) {
+          try { errorMsg = JSON.parse(errText).error || errorMsg; } catch (_) {}
+        }
+        throw new Error(errorMsg);
+      }
+
+      let data: any = {};
+      const responseText = await response.text();
+      if (responseText) {
+        try {
+          data = JSON.parse(responseText);
+        } catch (parseError) {
+          console.error('Invalid JSON response from profile update');
+        }
+      }
       
-      toast.success('Profile updated successfully');
+      toast.success(data.message || 'Profile updated successfully');
       setTimeout(() => window.location.reload(), 1000);
     } catch (err: any) {
       toast.error(err.message);
@@ -230,10 +254,26 @@ const Settings: React.FC = () => {
         })
       });
 
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to change password');
+      if (!response.ok) {
+        let errorMsg = 'Failed to change password';
+        const errText = await response.text();
+        if (errText) {
+          try { errorMsg = JSON.parse(errText).error || errorMsg; } catch (_) {}
+        }
+        throw new Error(errorMsg);
+      }
+
+      let data: any = {};
+      const responseText = await response.text();
+      if (responseText) {
+        try {
+          data = JSON.parse(responseText);
+        } catch (parseError) {
+          console.error('Invalid JSON response from password change');
+        }
+      }
       
-      toast.success('Password changed successfully');
+      toast.success(data.message || 'Password changed successfully');
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
@@ -296,7 +336,17 @@ const Settings: React.FC = () => {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
         body: formData
       });
-      const data = await response.json();
+      if (!response.ok) throw new Error('Upload failed');
+      let data: any = {};
+      const responseText = await response.text();
+      if (responseText) {
+        try {
+          data = JSON.parse(responseText);
+        } catch (parseError) {
+          console.error('Invalid JSON response from upload');
+          throw new Error('Server returned invalid response');
+        }
+      }
       if (data.url) {
         setProfilePhoto(data.url);
         toast.success('Photo uploaded successfully');
@@ -348,7 +398,17 @@ const Settings: React.FC = () => {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
             body: formData
           });
-          const data = await response.json();
+          if (!response.ok) throw new Error('Upload failed');
+          let data: any = {};
+          const captureText = await response.text();
+          if (captureText) {
+            try {
+              data = JSON.parse(captureText);
+            } catch (parseError) {
+              console.error('Invalid JSON response from capture upload');
+              throw new Error('Server returned invalid response');
+            }
+          }
           if (data.url) {
             setProfilePhoto(data.url);
             toast.success('Photo captured and uploaded');
@@ -890,18 +950,7 @@ const Settings: React.FC = () => {
                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${preferences.smsNotifications ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
                 </div>
-                <div className="pt-2 border-t border-gray-200 mt-3">
-                  <label className="block text-sm font-medium text-gray-700 mb-1 mt-2">UI Theme Setting</label>
-                  <select 
-                    value={preferences.theme || 'system'}
-                    onChange={(e) => setPreferences({ ...preferences, theme: e.target.value as any })}
-                    className="w-full md:w-1/2 border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none bg-white"
-                  >
-                    <option value="light">Light Mode</option>
-                    <option value="dark">Dark Mode</option>
-                    <option value="system">System Default</option>
-                  </select>
-                </div>
+
               </div>
             </div>
 

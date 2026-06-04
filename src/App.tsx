@@ -47,10 +47,10 @@ const EnterpriseSolutions = React.lazy(() => import('./pages/EnterpriseSolutions
 
 // Shared page-level loading spinner
 const PageLoader: React.FC = () => (
-  <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
+  <div className="flex items-center justify-center min-h-screen bg-gray-50">
     <div className="flex flex-col items-center gap-3">
       <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500" />
-      <span className="text-sm text-gray-500 dark:text-gray-400">Loading…</span>
+      <span className="text-sm text-gray-500">Loading…</span>
     </div>
   </div>
 );

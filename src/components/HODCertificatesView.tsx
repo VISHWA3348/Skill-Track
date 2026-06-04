@@ -1,57 +1,27 @@
 import { API_BASE_URL } from '@/config/api';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  ShieldCheck, ShieldAlert, Clock, MapPin, Search,
-  Eye, CheckCircle, XCircle, AlertTriangle,
-  Calendar, FileText, ExternalLink, Image as ImageIcon,
-  RefreshCw, ChevronRight, UserCheck, Layers
+  ShieldCheck, ShieldAlert, Clock, MapPin, Search, Filter,
+  Download, Eye, CheckCircle2, XCircle, AlertTriangle,
+  Calendar, User, FileText, ExternalLink, QrCode, ZoomIn, ZoomOut, Maximize2, Globe
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
 
-/* ─── helpers ────────────────────────────────────────────────── */
-const statusMeta: Record<string, { label: string; bg: string; text: string; border: string }> = {
-  pending:        { label: 'Pending Review',     bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-200' },
-  staff_approved: { label: 'Staff Approved',     bg: 'bg-blue-50',    text: 'text-blue-700',    border: 'border-blue-200'  },
-  approved:       { label: 'Approved ✓',         bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
-  rejected:       { label: 'Rejected',           bg: 'bg-rose-50',    text: 'text-rose-700',    border: 'border-rose-200'  },
-};
-
-function StatusBadge({ status }: { status: string }) {
-  const m = statusMeta[status] ?? { label: status, bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-200' };
-  return (
-    <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border ${m.bg} ${m.text} ${m.border}`}>
-      {m.label}
-    </span>
-  );
-}
-
-/* ─── main component ─────────────────────────────────────────── */
 export default function HODCertificatesView() {
   const { profile } = useAuth();
   const [certificates, setCertificates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
-  const [filterFraud, setFilterFraud] = useState('all');
 
   const [selectedCert, setSelectedCert] = useState<any>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [remark, setRemark] = useState('');
-  const [flagFraud, setFlagFraud] = useState(false);
-  const [fraudReason, setFraudReason] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const [zoom, setZoom] = useState(1);
 
-  /* photo lightbox */
-  const [lightboxUrl, setLightboxUrl] = useState('');
-  const [showLightbox, setShowLightbox] = useState(false);
-
-  /* ─── fetch ─────────────────────────────────────────────────── */
-  const fetchCerts = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
-    else setRefreshing(true);
+  const fetchCerts = async () => {
     try {
       const token = localStorage.getItem('token');
       const res = await fetch(`${API_BASE_URL}/api/certifications`, {
@@ -59,22 +29,21 @@ export default function HODCertificatesView() {
       });
       if (res.ok) {
         const data = await res.json();
-        setCertificates(Array.isArray(data) ? data : []);
+        // HOD already gets filtered data from backend if isolation is active
+        setCertificates(data);
       }
     } catch (err) {
-      console.error('Failed to fetch certificates', err);
-      toast.error('Failed to load certificates');
+      console.error(err);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
+  };
+
+  useEffect(() => {
+    fetchCerts();
   }, []);
 
-  useEffect(() => { fetchCerts(); }, [fetchCerts]);
-
-  /* ─── update status ──────────────────────────────────────────── */
-  const handleUpdateStatus = async (id: string, status: 'approved' | 'rejected') => {
-    setSubmitting(true);
+  const handleUpdateStatus = async (id: string, status: string) => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/certifications/${id}/status`, {
         method: 'PUT',
@@ -84,484 +53,416 @@ export default function HODCertificatesView() {
         },
         body: JSON.stringify({ status, remark })
       });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to update');
+      if (res.ok) {
+        toast.success(`Certificate ${status} successfully`);
+        setShowDetailModal(false);
+        fetchCerts();
+        setRemark('');
       }
-
-      const result = await res.json();
-      toast.success(`Certificate ${status === 'approved' ? 'approved ✅' : 'rejected ❌'} by ${result.reviewedBy || profile?.name || 'HOD'}`);
-      setShowDetailModal(false);
-      setRemark('');
-      setFlagFraud(false);
-      setFraudReason('');
-      fetchCerts(true);
-    } catch (e: any) {
-      toast.error(e.message || 'Failed to update certificate');
-    } finally {
-      setSubmitting(false);
+    } catch (e) {
+      toast.error("Failed to update certificate");
     }
   };
 
-  /* ─── filter ─────────────────────────────────────────────────── */
   const filtered = certificates.filter(c => {
-    const q = searchTerm.toLowerCase();
-    const matchSearch = !q || c.eventName?.toLowerCase().includes(q) || c.studentName?.toLowerCase().includes(q) || c.rollNo?.toLowerCase().includes(q);
-    const matchStatus = filterStatus === 'all' || c.status === filterStatus;
-    const matchFraud =
-      filterFraud === 'all' ? true :
-      filterFraud === 'fraud' ? c.fraudFlag :
-      filterFraud === 'gps' ? c.gpsVerified :
-      !c.fraudFlag;
-    return matchSearch && matchStatus && matchFraud;
+    const matchesSearch = c.eventName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.studentName?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = filterStatus === 'all' || c.status === filterStatus;
+    return matchesSearch && matchesStatus;
   });
 
-  /* ─── summary counts ─────────────────────────────────────────── */
-  const counts = {
-    pending: certificates.filter(c => c.status === 'pending').length,
-    staff_approved: certificates.filter(c => c.status === 'staff_approved').length,
-    approved: certificates.filter(c => c.status === 'approved').length,
-    rejected: certificates.filter(c => c.status === 'rejected').length,
-    fraud: certificates.filter(c => c.fraudFlag).length,
-  };
-
-  /* ─── open detail ────────────────────────────────────────────── */
-  const openDetail = (cert: any) => {
-    setSelectedCert(cert);
-    setRemark('');
-    setFlagFraud(cert.fraudFlag || false);
-    setFraudReason(cert.fraudReason || '');
-    setShowDetailModal(true);
-  };
-
-  /* ═══════════════════════════════════════════════════════════════ */
   return (
     <div className="space-y-8 max-w-[1400px] mx-auto">
-      {/* ── Header ── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Certificate Review</h1>
-          <p className="text-slate-500 font-medium mt-1">Review and approve department certificates</p>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Strategic Certificate Review</h1>
+          <p className="text-slate-500 font-medium">Verified achievements oversight and audit</p>
         </div>
-        <button onClick={() => fetchCerts(true)} disabled={refreshing}
-          className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-2xl shadow-sm text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all disabled:opacity-50">
-          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} /> Refresh
-        </button>
+        <div className="flex items-center gap-4">
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search achievements..."
+              className="pl-12 pr-4 py-3 bg-white border border-slate-100 rounded-2xl shadow-sm focus:ring-2 focus:ring-indigo-500 w-full md:w-64"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <select
+            className="px-4 py-3 bg-white border border-slate-100 rounded-2xl shadow-sm font-bold text-slate-700"
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+          >
+            <option value="all">All Status</option>
+            <option value="pending">Pending</option>
+            <option value="staff_approved">Staff Approved</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </div>
       </div>
 
-      {/* ── Stats Row ── */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        {[
-          { label: 'Pending',        val: counts.pending,        color: 'text-amber-600',   bg: 'bg-amber-50'   },
-          { label: 'Staff Approved', val: counts.staff_approved, color: 'text-blue-600',    bg: 'bg-blue-50'    },
-          { label: 'Approved',       val: counts.approved,       color: 'text-emerald-600', bg: 'bg-emerald-50' },
-          { label: 'Rejected',       val: counts.rejected,       color: 'text-rose-600',    bg: 'bg-rose-50'    },
-          { label: 'Fraud Flagged',  val: counts.fraud,          color: 'text-red-700',     bg: 'bg-red-50'     },
-        ].map(s => (
-          <div key={s.label} className={`${s.bg} rounded-2xl p-4 text-center border border-white shadow-sm`}>
-            <p className={`text-2xl font-black ${s.color}`}>{s.val}</p>
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">{s.label}</p>
-          </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filtered.map(cert => (
+          <motion.div
+            layout
+            key={cert.id}
+            className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm hover:shadow-md transition-all group"
+          >
+            <div className="flex items-start justify-between mb-6">
+              <div className={`p-3 rounded-2xl ${cert.status === 'pending' ? 'bg-amber-50 text-amber-600' : cert.status === 'rejected' ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                <FileText className="w-6 h-6" />
+              </div>
+              <div className="flex flex-col items-end gap-2">
+                <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${cert.status === 'pending' ? 'bg-amber-100 text-amber-700' :
+                    cert.status === 'rejected' ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
+                  }`}>
+                  {cert.status.replace('_', ' ')}
+                </span>
+                {cert.fraudFlag && (
+                  <span className="flex items-center gap-1 text-[10px] font-black text-rose-600 uppercase tracking-widest animate-pulse">
+                    <AlertTriangle className="w-3 h-3" /> Flagged
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <h3 className="text-lg font-black text-slate-900 mb-1 group-hover:text-indigo-600 transition-colors line-clamp-1">{cert.eventName}</h3>
+            <div className="flex items-start gap-2 mb-4">
+              <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center text-xs font-black shrink-0 mt-0.5">
+                {cert.studentName ? cert.studentName.charAt(0).toUpperCase() : 'S'}
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-slate-700 block truncate">{cert.studentName}</span>
+                <span className="text-[10px] text-slate-400 font-semibold block truncate">
+                  {cert.student_roll_no || cert.rollNo || ''} ({cert.student_class || cert.class || ''} | {cert.academicYear || cert.academic_year || cert.student_year || cert.year || ''})
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-2 mb-6 text-xs font-medium text-slate-600">
+              <div className="flex items-center gap-3">
+                <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
+                <span>Event: {new Date(cert.date).toLocaleDateString()}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
+                <span className="truncate">{cert.eventCollegeName}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <Clock className="w-4 h-4 text-slate-400 shrink-0" />
+                <span className="text-[10px] text-slate-400">
+                  Submitted: {new Date(cert.created_at || cert.uploadTimestamp || cert.timestamp).toLocaleString()}
+                </span>
+              </div>
+              <div className="pt-2 border-t border-slate-100 flex flex-wrap gap-2">
+                {cert.gps_verified === 1 || cert.gpsVerified ? (
+                  <span className="px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-700 text-[9px] font-black uppercase tracking-wider">GPS Verified</span>
+                ) : cert.exif_verification_result === 'Mismatch' || cert.exifVerificationResult === 'Mismatch' ? (
+                  <span className="px-2 py-0.5 rounded-lg bg-amber-50 text-amber-700 text-[9px] font-black uppercase tracking-wider">GPS Mismatch</span>
+                ) : cert.exif_verification_result === 'Suspicious' || cert.exifVerificationResult === 'Suspicious' ? (
+                  <span className="px-2 py-0.5 rounded-lg bg-rose-50 text-rose-700 text-[9px] font-black uppercase tracking-wider">Suspicious EXIF</span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded-lg bg-slate-100 text-slate-500 text-[9px] font-bold uppercase tracking-wider">No GPS</span>
+                )}
+                <span className="px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-700 text-[9px] font-black uppercase tracking-wider capitalize">
+                  {(cert.type || '').replace('-', ' ')}
+                </span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => { setSelectedCert(cert); setShowDetailModal(true); }}
+              className="w-full py-4 bg-slate-50 text-slate-700 rounded-2xl font-black text-sm hover:bg-indigo-600 hover:text-white transition-all flex items-center justify-center gap-2"
+            >
+              <Eye className="w-4 h-4" /> Review Details
+            </button>
+          </motion.div>
         ))}
       </div>
 
-      {/* ── Filters ── */}
-      <div className="flex flex-wrap gap-3 items-center bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input type="text" placeholder="Search student, event, roll no..." value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            className="pl-9 pr-4 py-2.5 w-full bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all" />
-        </div>
-        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-          className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none">
-          <option value="all">All Statuses</option>
-          <option value="pending">Pending</option>
-          <option value="staff_approved">Staff Approved</option>
-          <option value="approved">Approved</option>
-          <option value="rejected">Rejected</option>
-        </select>
-        <select value={filterFraud} onChange={e => setFilterFraud(e.target.value)}
-          className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500/20 outline-none">
-          <option value="all">All Entries</option>
-          <option value="fraud">Fraud Flagged</option>
-          <option value="gps">GPS Verified</option>
-          <option value="clean">Clean Only</option>
-        </select>
-      </div>
-
-      {/* ── Certificate Cards ── */}
-      {loading ? (
-        <div className="text-center py-20 text-slate-400 font-medium">Loading certificates…</div>
-      ) : filtered.length === 0 ? (
-        <div className="text-center py-20 text-slate-400 font-medium">No certificates match your filters.</div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filtered.map(cert => (
-            <motion.div layout key={cert.id}
-              className={`bg-white p-6 rounded-[28px] border shadow-sm hover:shadow-md transition-all group cursor-pointer ${cert.fraudFlag ? 'border-red-200' : 'border-slate-100'}`}
-              onClick={() => openDetail(cert)}>
-              {/* top row */}
-              <div className="flex items-start justify-between mb-4">
-                <div className={`p-3 rounded-2xl ${cert.status === 'pending' ? 'bg-amber-50' : cert.status === 'rejected' ? 'bg-rose-50' : cert.status === 'staff_approved' ? 'bg-blue-50' : 'bg-emerald-50'}`}>
-                  <FileText className={`w-5 h-5 ${cert.status === 'pending' ? 'text-amber-500' : cert.status === 'rejected' ? 'text-rose-500' : cert.status === 'staff_approved' ? 'text-blue-500' : 'text-emerald-500'}`} />
-                </div>
-                <div className="flex flex-col items-end gap-1.5">
-                  <StatusBadge status={cert.status} />
-                  {cert.fraudFlag && (
-                    <span className="flex items-center gap-1 text-[9px] font-black text-red-600 uppercase tracking-widest animate-pulse">
-                      <AlertTriangle className="w-2.5 h-2.5" /> Fraud
-                    </span>
-                  )}
-                  {cert.gpsVerified && !cert.fraudFlag && (
-                    <span className="flex items-center gap-1 text-[9px] font-black text-emerald-600 uppercase tracking-widest">
-                      <ShieldCheck className="w-2.5 h-2.5" /> GPS ✓
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <h3 className="text-base font-black text-slate-900 mb-1 group-hover:text-indigo-600 transition-colors line-clamp-1">{cert.eventName}</h3>
-              <p className="text-xs font-bold text-slate-500 mb-4 line-clamp-1">{cert.eventCollegeName}</p>
-
-              <div className="space-y-2 mb-5">
-                <div className="flex items-center gap-2 text-xs font-medium text-slate-600">
-                  <div className="w-5 h-5 rounded-lg bg-slate-100 flex items-center justify-center text-[10px] font-black shrink-0">
-                    {cert.studentName?.charAt(0)}
-                  </div>
-                  {cert.studentName}
-                  {cert.rollNo && <span className="text-slate-400 font-mono text-[10px]">({cert.rollNo})</span>}
-                </div>
-                <div className="flex items-center gap-2 text-xs text-slate-500">
-                  <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                  {new Date(cert.date).toLocaleDateString()}
-                  <span className="ml-auto capitalize text-indigo-600 font-semibold text-[10px]">{cert.type}</span>
-                </div>
-                {cert.gps_lat && (
-                  <div className="flex items-center gap-2 text-xs text-slate-500">
-                    <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                    {cert.locality || cert.district || `${Number(cert.gps_lat).toFixed(4)}, ${Number(cert.gps_lng).toFixed(4)}`}
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center justify-between pt-4 border-t border-slate-50">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Review Evidence</span>
-                <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-indigo-500 transition-colors" />
-              </div>
-            </motion.div>
-          ))}
-        </div>
-      )}
-
-      {/* ═══════════════════════════════════════════════════════════ */}
-      {/* ── Detail Modal ── */}
       <AnimatePresence>
-        {showDetailModal && selectedCert && (
-          <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 bg-slate-900/70 backdrop-blur-sm overflow-y-auto">
-            <motion.div
-              initial={{ opacity: 0, y: 40, scale: 0.97 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 40, scale: 0.97 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="bg-white w-full max-w-4xl my-6 rounded-[36px] shadow-2xl overflow-hidden"
-            >
-              {/* modal header */}
-              <div className="bg-indigo-700 px-8 py-6 flex items-start justify-between">
-                <div>
-                  <h2 className="text-xl font-black text-white leading-tight">{selectedCert.eventName}</h2>
-                  <p className="text-indigo-200 text-sm font-medium mt-1">
-                    {selectedCert.studentName}
-                    {selectedCert.rollNo && <span className="text-indigo-300 ml-2">· {selectedCert.rollNo}</span>}
-                    {selectedCert.class && <span className="text-indigo-300 ml-2">· {selectedCert.class} {selectedCert.year}</span>}
-                  </p>
-                </div>
-                <button onClick={() => setShowDetailModal(false)} className="text-indigo-200 hover:text-white transition-colors mt-0.5">
-                  <XCircle className="w-7 h-7" />
-                </button>
-              </div>
+        {showDetailModal && selectedCert && (() => {
+          const sName = selectedCert.student_name || selectedCert.studentName || 'Student';
+          const sEmail = selectedCert.student_email || selectedCert.studentEmail || '';
+          const sPhoto = selectedCert.student_profile_photo || selectedCert.profilePhoto || selectedCert.photoUrl || '';
+          const sRoll = selectedCert.student_roll_no || selectedCert.rollNo || '';
+          const sClass = selectedCert.student_class || selectedCert.class || '';
+          const sYear = selectedCert.academicYear || selectedCert.academic_year || selectedCert.student_year || selectedCert.year || '';
+          const sSection = selectedCert.student_section || selectedCert.section || '';
+          const sAddress = selectedCert.student_address || selectedCert.address || '';
+          
+          const isPdf = selectedCert.fileUrl?.toLowerCase().includes('.pdf');
+          const mapLat = selectedCert.gps_lat || selectedCert.gps?.lat || selectedCert.exif_lat || selectedCert.exifLatitude || 0;
+          const mapLng = selectedCert.gps_lng || selectedCert.gps?.lng || selectedCert.exif_lng || selectedCert.exifLongitude || 0;
 
-              <div className="p-8 space-y-8 max-h-[78vh] overflow-y-auto">
-                {/* ── Info cards row ── */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {[
-                    { label: 'College', val: selectedCert.college_name || selectedCert.collegeName },
-                    { label: 'Event Date', val: selectedCert.date ? new Date(selectedCert.date).toLocaleDateString() : '—' },
-                    { label: 'Type', val: selectedCert.type },
-                    { label: 'Phone', val: selectedCert.phone_number || selectedCert.phoneNumber || '—' },
-                  ].map(f => (
-                    <div key={f.label} className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
-                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">{f.label}</p>
-                      <p className="text-sm font-bold text-slate-800 capitalize truncate">{f.val || '—'}</p>
-                    </div>
-                  ))}
-                </div>
-
-                {/* ── Status + Badges ── */}
-                <div className="flex flex-wrap gap-2">
-                  <StatusBadge status={selectedCert.status} />
-                  {selectedCert.fraudFlag && (
-                    <span className="flex items-center gap-1.5 px-3 py-1.5 bg-red-100 text-red-700 border border-red-200 rounded-full text-[11px] font-black">
-                      <AlertTriangle className="w-3.5 h-3.5 animate-pulse" /> Fraud Flagged
-                    </span>
-                  )}
-                  {selectedCert.gpsVerified && !selectedCert.fraudFlag && (
-                    <span className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-full text-[11px] font-black">
-                      <ShieldCheck className="w-3.5 h-3.5" /> GPS Verified ✓
-                    </span>
-                  )}
-                  {selectedCert.cashPrizeAmount > 0 && (
-                    <span className="px-3 py-1.5 bg-yellow-100 text-yellow-700 border border-yellow-200 rounded-full text-[11px] font-black">
-                      ₹{selectedCert.cashPrizeAmount} Prize
-                    </span>
-                  )}
-                </div>
-
-                {/* ── Two-column: Certificate doc + Proof photo ── */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Certificate document */}
+          return (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }} 
+                animate={{ opacity: 1, scale: 1 }} 
+                exit={{ opacity: 0, scale: 0.95 }} 
+                className="bg-white w-full max-w-6xl max-h-[92vh] overflow-y-auto rounded-[32px] shadow-2xl p-8 border border-slate-100"
+              >
+                {/* Header */}
+                <div className="flex items-center justify-between pb-6 mb-6 border-b border-slate-100">
                   <div>
-                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-                      <FileText className="w-3.5 h-3.5" /> Certificate Document
-                    </p>
-                    {selectedCert.fileUrl || selectedCert.certificate_url ? (
-                      <div className="relative group rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 aspect-[4/3]">
-                        {(selectedCert.fileUrl || selectedCert.certificate_url || '').toLowerCase().includes('.pdf') ? (
-                          <iframe
-                            src={selectedCert.fileUrl || selectedCert.certificate_url}
-                            className="w-full h-full"
-                            title="Certificate PDF"
-                          />
+                    <h2 className="text-2xl font-black text-slate-900">{selectedCert.eventName || 'Certificate Review'}</h2>
+                    <p className="text-slate-500 text-sm font-semibold">Departmental Credential Verification Panel</p>
+                  </div>
+                  <button 
+                    onClick={() => { setShowDetailModal(false); setZoom(1); }} 
+                    className="p-2 hover:bg-slate-100 rounded-xl transition-colors"
+                  >
+                    <XCircle className="w-8 h-8 text-slate-400" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  {/* Left Column: Student Details + Document Viewer */}
+                  <div className="space-y-6">
+                    {/* Student Info Card */}
+                    <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 flex items-start gap-4">
+                      <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-indigo-100 bg-white shrink-0 flex items-center justify-center">
+                        {sPhoto ? (
+                          <img src={sPhoto.startsWith('http') || sPhoto.startsWith('/') ? sPhoto : `/${sPhoto}`} className="w-full h-full object-cover" alt="Student" />
                         ) : (
-                          <img
-                            src={selectedCert.fileUrl || selectedCert.certificate_url}
-                            alt="Certificate"
-                            className="w-full h-full object-contain cursor-zoom-in"
-                            onClick={() => { setLightboxUrl(selectedCert.fileUrl || selectedCert.certificate_url); setShowLightbox(true); }}
-                          />
+                          <User className="w-8 h-8 text-slate-300" />
                         )}
-                        <a href={selectedCert.fileUrl || selectedCert.certificate_url} target="_blank" rel="noopener noreferrer"
-                          className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-black gap-2 text-sm">
-                          <ExternalLink className="w-5 h-5" /> Open Original
-                        </a>
                       </div>
-                    ) : (
-                      <div className="aspect-[4/3] bg-slate-100 rounded-2xl flex items-center justify-center">
-                        <p className="text-slate-400 text-sm font-medium">No certificate file uploaded</p>
+                      <div className="space-y-1 min-w-0">
+                        <h4 className="font-bold text-slate-900 truncate">{sName}</h4>
+                        <p className="text-xs text-slate-500 truncate">{sEmail || 'No email provided'}</p>
+                        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-600 font-semibold pt-1">
+                          {sRoll && <span>Roll: {sRoll}</span>}
+                          {sClass && <span>Class: {sClass} ({sYear.includes('Year') ? sYear : `${sYear || 'I'} Year`})</span>}
+                          {sSection && <span>Sec: {sSection}</span>}
+                        </div>
+                        {sAddress && (
+                          <p className="text-[10px] text-slate-500 font-semibold bg-white p-2 rounded-lg border border-slate-100 mt-2">
+                            <span className="text-slate-400">Address:</span> {sAddress}
+                          </p>
+                        )}
                       </div>
-                    )}
-                    {selectedCert.certificate_file_name && (
-                      <p className="text-[10px] text-slate-400 mt-1.5 font-mono">
-                        📄 {selectedCert.certificate_file_name} · {(selectedCert.certificate_file_type || '').toUpperCase()}
-                      </p>
-                    )}
+                    </div>
+
+                    {/* Certificate Document Viewer */}
+                    <div className="space-y-2">
+                      <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Certificate Document</h4>
+                      {selectedCert.fileUrl ? (
+                        <div className="rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 shadow-inner">
+                          {isPdf ? (
+                            <iframe src={selectedCert.fileUrl} className="w-full h-96" title="PDF Viewer" />
+                          ) : (
+                            <div className="w-full h-96 flex items-center justify-center p-2 bg-white">
+                              <img src={selectedCert.fileUrl} className="max-h-full max-w-full object-contain" alt="Certificate Preview" />
+                            </div>
+                          )}
+                          <div className="p-3 bg-slate-100 border-t flex justify-between items-center text-xs">
+                            <span className="font-semibold text-slate-600">Type: {isPdf ? 'PDF Document' : 'Image File'}</span>
+                            <a href={selectedCert.fileUrl} target="_blank" rel="noreferrer" className="text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1">
+                              View Original <ExternalLink className="w-3.5 h-3.5" />
+                            </a>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="h-48 rounded-2xl border-2 border-dashed border-slate-200 flex items-center justify-center text-slate-400 text-sm">
+                          No certificate document uploaded
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Zoomable Proof Photo */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Proof Photo Evidence</h4>
+                        {selectedCert.gpsPhotoUrl && (
+                          <div className="flex gap-2">
+                            <button type="button" onClick={() => setZoom(z => Math.max(0.5, z - 0.25))} className="p-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-600" title="Zoom Out"><ZoomOut className="w-3.5 h-3.5" /></button>
+                            <button type="button" onClick={() => setZoom(1)} className="p-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-600" title="Reset"><Maximize2 className="w-3.5 h-3.5" /></button>
+                            <button type="button" onClick={() => setZoom(z => Math.min(3, z + 0.25))} className="p-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-600" title="Zoom In"><ZoomIn className="w-3.5 h-3.5" /></button>
+                          </div>
+                        )}
+                      </div>
+                      {selectedCert.gpsPhotoUrl ? (
+                        <div className="h-64 rounded-2xl border border-slate-200 bg-slate-900 overflow-hidden flex items-center justify-center relative group">
+                          <img 
+                            src={selectedCert.gpsPhotoUrl} 
+                            style={{ transform: `scale(${zoom})` }}
+                            className="max-h-full max-w-full object-contain transition-transform duration-200" 
+                            alt="Proof Photo Evidence" 
+                          />
+                          <a href={selectedCert.gpsPhotoUrl} download className="absolute bottom-3 right-3 p-2 bg-black/60 rounded-xl text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/80">
+                            <Download className="w-4 h-4" />
+                          </a>
+                        </div>
+                      ) : (
+                        <div className="h-48 rounded-2xl border-2 border-dashed border-slate-200 flex items-center justify-center text-slate-400 text-sm">
+                          No proof photo evidence provided
+                        </div>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Proof photo */}
-                  <div>
-                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-                      <ImageIcon className="w-3.5 h-3.5" /> Proof Photo
-                    </p>
-                    {selectedCert.photoUrl || selectedCert.proof_photo_url ? (
-                      <div className="relative group rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 aspect-[4/3]">
-                        <img
-                          src={selectedCert.photoUrl || selectedCert.proof_photo_url}
-                          alt="Proof"
-                          className="w-full h-full object-contain cursor-zoom-in"
-                          onClick={() => { setLightboxUrl(selectedCert.photoUrl || selectedCert.proof_photo_url); setShowLightbox(true); }}
-                        />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-black text-sm gap-2">
-                          <ImageIcon className="w-5 h-5" /> Enlarge
+                  {/* Right Column: GPS + EXIF + Actions */}
+                  <div className="space-y-6">
+                    {/* GPS Details Table */}
+                    <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 space-y-3">
+                      <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                        <MapPin className="w-4 h-4 text-indigo-500" /> Geolocation Intelligence
+                      </h4>
+                      <div className="grid grid-cols-2 gap-4 text-xs font-semibold">
+                        <div className="bg-white p-3 rounded-xl border border-slate-100">
+                          <span className="text-slate-400 block text-[10px] uppercase">Browser Coordinates</span>
+                          <span className="text-slate-800">{selectedCert.gps ? `${selectedCert.gps.lat.toFixed(6)}, ${selectedCert.gps.lng.toFixed(6)}` : 'N/A'}</span>
                         </div>
-                      </div>
-                    ) : (
-                      <div className="aspect-[4/3] bg-slate-100 rounded-2xl flex items-center justify-center">
-                        <p className="text-slate-400 text-sm font-medium">No proof photo uploaded</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* ── GPS / EXIF panel ── */}
-                <div>
-                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-                    <MapPin className="w-3.5 h-3.5" /> GPS & EXIF Verification
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="bg-slate-50 rounded-2xl p-5 border border-slate-100 space-y-2.5 font-mono text-xs">
-                      {selectedCert.gps_lat ? (
-                        <div className="flex items-start gap-2">
-                          <span className="text-slate-400 shrink-0">📍 GPS</span>
-                          <span className="text-slate-700">{Number(selectedCert.gps_lat).toFixed(6)}, {Number(selectedCert.gps_lng).toFixed(6)}</span>
-                        </div>
-                      ) : null}
-                      {selectedCert.exif_latitude ? (
-                        <div className="flex items-start gap-2">
-                          <span className="text-slate-400 shrink-0">📷 EXIF</span>
-                          <span className="text-blue-600">{Number(selectedCert.exif_latitude).toFixed(6)}, {Number(selectedCert.exif_longitude).toFixed(6)}</span>
-                        </div>
-                      ) : null}
-                      {selectedCert.exif_timestamp ? (
-                        <div className="flex items-start gap-2">
-                          <span className="text-slate-400 shrink-0">🕐 Photo</span>
-                          <span className="text-slate-700">{new Date(selectedCert.exif_timestamp).toLocaleString()}</span>
-                        </div>
-                      ) : null}
-                      {selectedCert.street ? (
-                        <div className="flex items-start gap-2">
-                          <span className="text-slate-400 shrink-0">🏠 Addr</span>
-                          <span className="text-slate-700 font-sans">
-                            {[selectedCert.street, selectedCert.area, selectedCert.locality, selectedCert.district, selectedCert.state].filter(Boolean).join(', ')}
+                        <div className="bg-white p-3 rounded-xl border border-slate-100">
+                          <span className="text-slate-400 block text-[10px] uppercase">Altitude & Accuracy</span>
+                          <span className="text-slate-800">
+                            {selectedCert.altitude !== null ? `${selectedCert.altitude.toFixed(1)}m` : 'N/A'} 
+                            {selectedCert.accuracy !== null ? ` (±${selectedCert.accuracy.toFixed(1)}m)` : ''}
                           </span>
                         </div>
-                      ) : null}
-                      {selectedCert.postal_code ? (
-                        <div className="flex items-start gap-2">
-                          <span className="text-slate-400 shrink-0">📮 PIN</span>
-                          <span className="text-slate-700">{selectedCert.postal_code}{selectedCert.country ? ` · ${selectedCert.country}` : ''}</span>
+                        <div className="bg-white p-3 rounded-xl border border-slate-100 col-span-2">
+                          <span className="text-slate-400 block text-[10px] uppercase">Street & Locality</span>
+                          <span className="text-slate-800">
+                            {[selectedCert.street, selectedCert.locality, selectedCert.area].filter(Boolean).join(', ') || 'N/A'}
+                          </span>
                         </div>
-                      ) : null}
-                      {!selectedCert.gps_lat && !selectedCert.exif_latitude && (
-                        <p className="text-slate-400 italic">No GPS or EXIF data recorded for this submission.</p>
-                      )}
-                      {selectedCert.fraudReason ? (
-                        <div className="mt-1 p-2 bg-red-50 rounded-xl border border-red-100">
-                          <p className="text-red-600 font-bold font-sans">⚠️ {selectedCert.fraudReason}</p>
+                        <div className="bg-white p-3 rounded-xl border border-slate-100">
+                          <span className="text-slate-400 block text-[10px] uppercase">District & State</span>
+                          <span className="text-slate-800">
+                            {[selectedCert.district, selectedCert.state].filter(Boolean).join(', ') || 'N/A'}
+                          </span>
                         </div>
-                      ) : null}
-                      {selectedCert.gps_lat && (
-                        <a href={`https://www.google.com/maps?q=${selectedCert.gps_lat},${selectedCert.gps_lng}`}
-                          target="_blank" rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-blue-600 hover:underline font-sans mt-1">
-                          <MapPin className="w-3 h-3" /> Google Maps ↗
-                        </a>
-                      )}
+                        <div className="bg-white p-3 rounded-xl border border-slate-100">
+                          <span className="text-slate-400 block text-[10px] uppercase">Country & Postal Code</span>
+                          <span className="text-slate-800">
+                            {[selectedCert.country, selectedCert.postalCode || selectedCert.postal_code].filter(Boolean).join(' - ') || 'N/A'}
+                          </span>
+                        </div>
+                        <div className="bg-white p-3 rounded-xl border border-slate-100 col-span-2 grid grid-cols-2 gap-2">
+                          <div>
+                            <span className="text-slate-400 block text-[10px] uppercase">Timezone</span>
+                            <span className="text-slate-800 truncate block">{selectedCert.timezone || 'N/A'}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block text-[10px] uppercase">Browser Timestamp</span>
+                            <span className="text-slate-800 block truncate">{selectedCert.browserTimestamp ? new Date(selectedCert.browserTimestamp).toLocaleTimeString() : 'N/A'}</span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
 
-                    {/* OSM Map */}
-                    {selectedCert.gps_lat && selectedCert.gps_lng ? (
-                      <iframe
-                        className="w-full h-full min-h-[200px] rounded-2xl border border-slate-200"
-                        loading="lazy"
-                        title="Event Location"
-                        src={`https://www.openstreetmap.org/export/embed.html?bbox=${Number(selectedCert.gps_lng) - 0.012},${Number(selectedCert.gps_lat) - 0.012},${Number(selectedCert.gps_lng) + 0.012},${Number(selectedCert.gps_lat) + 0.012}&layer=mapnik&marker=${selectedCert.gps_lat},${selectedCert.gps_lng}`}
-                      />
-                    ) : (
-                      <div className="bg-slate-100 rounded-2xl flex items-center justify-center min-h-[180px]">
-                        <p className="text-slate-400 text-xs font-medium">No map data available</p>
+                    {/* EXIF Metadata Table */}
+                    <div className="bg-indigo-50/50 p-5 rounded-2xl border border-indigo-100/50 space-y-3">
+                      <h4 className="text-xs font-black text-indigo-900 uppercase tracking-widest flex items-center gap-1.5">
+                        <ShieldCheck className="w-4 h-4 text-indigo-600" /> EXIF Validation Status
+                      </h4>
+                      <div className="grid grid-cols-2 gap-4 text-xs font-semibold">
+                        <div className="bg-white p-3 rounded-xl border border-indigo-50">
+                          <span className="text-slate-400 block text-[10px] uppercase">Camera & Device</span>
+                          <span className="text-slate-800 truncate block">{[selectedCert.exifCamera, selectedCert.exifDevice].filter(Boolean).join(' ') || 'N/A'}</span>
+                        </div>
+                        <div className="bg-white p-3 rounded-xl border border-indigo-50">
+                          <span className="text-slate-400 block text-[10px] uppercase">Image Coordinates</span>
+                          <span className="text-slate-800">{selectedCert.exifLatitude ? `${selectedCert.exifLatitude.toFixed(6)}, ${selectedCert.exifLongitude?.toFixed(6)}` : 'N/A'}</span>
+                        </div>
+                        <div className="bg-white p-3 rounded-xl border border-indigo-50">
+                          <span className="text-slate-400 block text-[10px] uppercase">Image Timestamp</span>
+                          <span className="text-slate-800 block truncate">{selectedCert.exifTimestamp ? new Date(selectedCert.exifTimestamp).toLocaleString() : 'N/A'}</span>
+                        </div>
+                        <div className="bg-white p-3 rounded-xl border border-indigo-50">
+                          <span className="text-slate-400 block text-[10px] uppercase">Validation Status</span>
+                          <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-black uppercase mt-1 ${
+                            selectedCert.exifVerificationResult === 'Verified' ? 'bg-emerald-100 text-emerald-700' :
+                            selectedCert.exifVerificationResult === 'Mismatch' ? 'bg-amber-100 text-amber-700' :
+                            selectedCert.exifVerificationResult === 'Suspicious' ? 'bg-rose-100 text-rose-700' :
+                            'bg-slate-100 text-slate-600'
+                          }`}>{selectedCert.exifVerificationResult || 'No EXIF'}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Interactive Google Map */}
+                    {mapLat !== 0 && (
+                      <div className="space-y-2">
+                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Interactive Audit Map</h4>
+                        <div className="rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 shadow-sm">
+                          <iframe 
+                            src={`https://maps.google.com/maps?q=${mapLat},${mapLng}&z=15&output=embed`} 
+                            className="w-full h-48 border-0" 
+                            allowFullScreen 
+                            loading="lazy" 
+                            title="Interactive Maps"
+                          />
+                        </div>
                       </div>
                     )}
-                  </div>
-                </div>
 
-                {/* ── Prize info ── */}
-                {(selectedCert.prizePosition || selectedCert.prizeType) && (
-                  <div className="grid grid-cols-3 gap-3">
-                    {[
-                      { label: 'Prize Position', val: selectedCert.prizePosition || '—' },
-                      { label: 'Prize Type', val: selectedCert.prizeType || '—' },
-                      { label: 'Cash Amount', val: selectedCert.cashPrizeAmount ? `₹${selectedCert.cashPrizeAmount}` : '—' },
-                    ].map(f => (
-                      <div key={f.label} className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">{f.label}</p>
-                        <p className="text-sm font-bold text-slate-800">{f.val}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* ── Reviewer history ── */}
-                {Array.isArray(selectedCert.remarks) && selectedCert.remarks.length > 0 && (
-                  <div>
-                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-                      <UserCheck className="w-3.5 h-3.5" /> Reviewer History
-                    </p>
-                    <div className="space-y-3 max-h-36 overflow-y-auto pr-1">
-                      {selectedCert.remarks.map((r: any, i: number) => (
-                        <div key={i} className="flex gap-3 bg-slate-50 rounded-2xl p-4 border border-slate-100">
-                          <div className="w-9 h-9 rounded-xl bg-indigo-100 flex items-center justify-center text-xs font-black text-indigo-700 shrink-0">
-                            {(r.role || r.reviewerName || 'U').charAt(0).toUpperCase()}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex justify-between items-center mb-0.5">
-                              <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{(r.reviewerName || r.userId || '—')} [{r.role}]</span>
-                              <span className="text-[10px] font-bold text-slate-400">{r.timestamp ? new Date(r.timestamp).toLocaleString() : ''}</span>
-                            </div>
-                            <p className="text-xs font-medium text-slate-700">{r.comment}</p>
-                          </div>
+                    {/* Decisions Remarks & Actions */}
+                    {selectedCert.status === 'pending' || selectedCert.status === 'staff_approved' ? (
+                      <div className="space-y-4 pt-4 border-t border-slate-100">
+                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Review Remarks</h4>
+                        <textarea
+                          className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-medium text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all resize-none"
+                          rows={3}
+                          placeholder="Enter comments, validation reasons, or rejection details..."
+                          value={remark}
+                          onChange={(e) => setRemark(e.target.value)}
+                        />
+                        <div className="flex gap-4">
+                          <button
+                            onClick={() => handleUpdateStatus(selectedCert.id, 'rejected')}
+                            className="flex-1 py-4 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-2xl font-black text-sm transition-all border border-rose-200"
+                          >
+                            Reject Achievement
+                          </button>
+                          <button
+                            onClick={() => handleUpdateStatus(selectedCert.id, 'approved')}
+                            className="flex-1 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black text-sm transition-all shadow-lg shadow-emerald-100"
+                          >
+                            Approve & Verify
+                          </button>
                         </div>
-                      ))}
+                      </div>
+                    ) : (
+                      <div className="p-4 bg-slate-100 rounded-2xl border text-center font-bold text-slate-600 text-sm">
+                        Decision finalized: {selectedCert.status.replace('_', ' ').toUpperCase()}
+                      </div>
+                    )}
+
+                    {/* Audit Timeline */}
+                    <div className="pt-6 border-t border-slate-100">
+                      <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Audit Timeline</h4>
+                      <div className="space-y-4 max-h-48 overflow-y-auto pr-2">
+                        {selectedCert.remarks && selectedCert.remarks.length > 0 ? (
+                          selectedCert.remarks.map((r: any, idx: number) => (
+                            <div key={idx} className="flex gap-3 text-xs">
+                              <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-black shrink-0 text-slate-500">
+                                {r.role.charAt(0).toUpperCase()}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex justify-between items-center mb-1">
+                                  <span className="font-bold text-indigo-600 uppercase text-[10px] tracking-wider">{r.role.replace('_', ' ')}</span>
+                                  <span className="text-[10px] text-slate-400">{new Date(r.timestamp).toLocaleDateString()}</span>
+                                </div>
+                                <p className="font-semibold text-slate-700 break-words">{r.comment}</p>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-xs text-slate-400 italic">No audit records yet</p>
+                        )}
+                      </div>
                     </div>
                   </div>
-                )}
-
-                {/* ── Review form ── */}
-                <div className="border-t border-slate-100 pt-6 space-y-4">
-                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                    <Layers className="w-3.5 h-3.5" /> HOD Decision
-                  </p>
-                  <textarea
-                    className="w-full p-5 bg-slate-50 border border-slate-200 rounded-2xl font-medium text-sm focus:ring-2 focus:ring-indigo-500/30 outline-none resize-none transition-all"
-                    rows={3}
-                    placeholder="Add review remarks (optional)…"
-                    value={remark}
-                    onChange={e => setRemark(e.target.value)}
-                  />
-
-                  <div className="flex items-center gap-2 p-4 bg-red-50 border border-red-100 rounded-2xl">
-                    <input type="checkbox" id="hodFraud" checked={flagFraud} onChange={e => setFlagFraud(e.target.checked)}
-                      className="w-4 h-4 text-red-600 rounded cursor-pointer" />
-                    <label htmlFor="hodFraud" className="text-sm font-black text-red-700 flex items-center gap-1.5 cursor-pointer">
-                      <AlertTriangle className="w-4 h-4" /> Flag as Fraudulent
-                    </label>
-                  </div>
-                  {flagFraud && (
-                    <input type="text" value={fraudReason} onChange={e => setFraudReason(e.target.value)}
-                      className="w-full px-4 py-3 bg-white border border-red-200 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-red-500/20 outline-none"
-                      placeholder="Reason for fraud flag…" />
-                  )}
-
-                  <div className="flex gap-4 pt-2">
-                    <button
-                      onClick={() => handleUpdateStatus(selectedCert.id, 'rejected')}
-                      disabled={submitting}
-                      className="flex-1 py-4 bg-rose-50 text-rose-600 rounded-2xl font-black text-base hover:bg-rose-100 transition-all border-2 border-rose-100 flex items-center justify-center gap-2 disabled:opacity-50">
-                      <XCircle className="w-5 h-5" /> Reject
-                    </button>
-                    <button
-                      onClick={() => handleUpdateStatus(selectedCert.id, 'approved')}
-                      disabled={submitting}
-                      className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-black text-base hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-100 flex items-center justify-center gap-2 disabled:opacity-50">
-                      <CheckCircle className="w-5 h-5" /> {submitting ? 'Processing…' : 'Approve'}
-                    </button>
-                  </div>
                 </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* ── Photo Lightbox ── */}
-      <AnimatePresence>
-        {showLightbox && lightboxUrl && (
-          <div className="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center p-4"
-            onClick={() => setShowLightbox(false)}>
-            <motion.img
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              src={lightboxUrl}
-              alt="Enlarged"
-              className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl cursor-zoom-out"
-            />
-            <button onClick={() => setShowLightbox(false)}
-              className="absolute top-4 right-4 text-white/80 hover:text-white">
-              <XCircle className="w-8 h-8" />
-            </button>
-          </div>
-        )}
+              </motion.div>
+            </div>
+          );
+        })()}
       </AnimatePresence>
     </div>
   );

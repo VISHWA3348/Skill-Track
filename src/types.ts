@@ -31,6 +31,10 @@ export interface UserProfile {
   class?: string;
   year?: string;
   section?: string;
+  academicYear?: string;
+  academic_year?: string;
+  assignedAcademicYear?: string;
+  assigned_academic_year?: string;
   city?: string;
   phoneNumber?: string;
   photoUrl?: string;
@@ -39,6 +43,7 @@ export interface UserProfile {
   isActive?: boolean;
   status?: 'active' | 'suspended' | 'inactive';
   lastLogin?: string;
+  address?: string;
 }
 
 export interface College {
@@ -116,6 +121,65 @@ export interface Certificate {
   fraudFlag?: boolean; // True if mismatch or suspicious
   fraudReason?: string; // Description of the fraud flag
   fileHash?: string; // SHA-256 hash of the uploaded file
+
+  // Advanced Geolocation & Address metadata
+  altitude?: number | null;
+  accuracy?: number | null;
+  street?: string;
+  area?: string;
+  locality?: string;
+  district?: string;
+  state?: string;
+  country?: string;
+  postalCode?: string;
+  postal_code?: string;
+  timezone?: string;
+  browserTimestamp?: string | null;
+  deviceTimestamp?: string | null;
+  googleMapsUrl?: string;
+
+  // EXIF specific metadata
+  exifLatitude?: number | null;
+  exifLongitude?: number | null;
+  exifTimestamp?: string | null;
+  exifCamera?: string;
+  exifDevice?: string;
+  exifVerificationResult?: string;
+
+  // Cloudinary storage metadata
+  certificatePublicId?: string;
+  certificateFileType?: string;
+  certificateFileName?: string;
+  certificateUploadedAt?: string;
+
+  proofPhotoPublicId?: string;
+  proofPhotoFileType?: string;
+  proofPhotoFileName?: string;
+  proofPhotoUploadedAt?: string;
+
+  // SQL Joins & Legacy Metadata fields
+  section?: string;
+  student_name?: string;
+  student_email?: string;
+  studentEmail?: string;
+  student_profile_photo?: string;
+  profilePhoto?: string;
+  student_roll_no?: string;
+  student_class?: string;
+  student_year?: string;
+  student_section?: string;
+  student_address?: string;
+  address?: string;
+  gps_lat?: number;
+  gps_lng?: number;
+  exif_lat?: number | null;
+  exif_lng?: number | null;
+  exif_timestamp?: string | null;
+  exif_camera?: string;
+  exif_device?: string;
+  exif_verification_result?: string;
+  uploadTimestamp?: string;
+  timestamp?: string;
 
   status: CertificateStatus;
   remarks: Remark[];

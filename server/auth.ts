@@ -5,13 +5,8 @@ import { logger } from './logger';
 let JWT_SECRET = process.env.JWT_SECRET;
 
 if (!JWT_SECRET) {
-  if (process.env.NODE_ENV === 'production') {
-    logger.error('CRITICAL_BOOT_FAILURE', 'JWT_SECRET environment variable is not defined in production. System is shutting down for security.');
-    process.exit(1);
-  } else {
-    logger.warn('INSECURE_CONFIGURATION', 'JWT_SECRET is missing. Falling back to development key.');
-    JWT_SECRET = 'super-secret-jwt-key-change-in-production';
-  }
+  logger.error('CRITICAL_BOOT_FAILURE', 'JWT_SECRET environment variable is not defined. System is shutting down for security.');
+  process.exit(1);
 }
 
 export const hashPassword = async (password: string): Promise<string> => {

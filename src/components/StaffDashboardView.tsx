@@ -319,6 +319,8 @@ export default function StaffDashboardView() {
                             <div className="flex items-center gap-2 mt-0.5">
                                <span className="text-[10px] font-black text-slate-400 uppercase">{s.roll_no || 'N/A'}</span>
                                <span className="w-1 h-1 rounded-full bg-slate-300" />
+                               <span className="text-[10px] font-black text-slate-400 uppercase">{s.academicYear || s.academic_year || `${s.year} Year` || 'N/A'}</span>
+                               <span className="w-1 h-1 rounded-full bg-slate-300" />
                                <span className="text-[10px] font-black text-slate-400 uppercase">{s.class} {s.section}</span>
                             </div>
                           </div>
@@ -497,7 +499,9 @@ export default function StaffDashboardView() {
                               {getStatusBadge(selectedStudent.academic?.cgpa || 0, selectedStudent.academic?.arrears || 0).label}
                            </span>
                         </div>
-                        <p className="text-slate-500 font-black text-lg mt-1">{selectedStudent.profile.roll_no} • {selectedStudent.profile.department_id}</p>
+                        <p className="text-slate-500 font-black text-lg mt-1">
+                           {selectedStudent.profile.roll_no} • {selectedStudent.profile.department_id} • {selectedStudent.profile.academicYear || selectedStudent.profile.academic_year || `${selectedStudent.profile.year} Year` || ''}
+                        </p>
                         <div className="flex gap-3 mt-4">
                            <a href={selectedStudent.academic?.github_url} target="_blank" className="p-3 bg-white border border-slate-100 rounded-2xl text-slate-400 hover:text-slate-900 hover:shadow-md transition-all"><Plus className="w-5 h-5" /></a>
                            <a href={selectedStudent.academic?.linkedin_url} target="_blank" className="p-3 bg-white border border-slate-100 rounded-2xl text-slate-400 hover:text-blue-600 hover:shadow-md transition-all"><Plus className="w-5 h-5" /></a>

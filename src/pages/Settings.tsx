@@ -36,10 +36,12 @@ const Settings: React.FC = () => {
   const [departmentId, setDepartmentId] = useState(profile?.departmentId || '');
   const [className, setClassName] = useState(profile?.class || '');
   const [year, setYear] = useState(profile?.year || '');
+  const [academicYear, setAcademicYear] = useState(profile?.academicYear || profile?.academic_year || '');
   const [profilePhoto, setProfilePhoto] = useState(profile?.profilePhoto || '');
   const [bio, setBio] = useState(profile?.bio || '');
   const [section, setSection] = useState(profile?.section || '');
   const [city, setCity] = useState(profile?.city || '');
+  const [address, setAddress] = useState(profile?.address || '');
   const [collegeName, setCollegeName] = useState(profile?.collegeName || '');
   const [collegeId, setCollegeId] = useState(profile?.collegeId || '');
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
@@ -109,6 +111,7 @@ const Settings: React.FC = () => {
     setDepartmentId(profile?.departmentId || '');
     setClassName(profile?.class || '');
     setYear(profile?.year || '');
+    setAcademicYear(profile?.academicYear || profile?.academic_year || '');
     setProfilePhoto(profile?.profilePhoto || '');
     setPreferences(profile?.preferences || { emailNotifications: true, smsNotifications: false, theme: 'system' as any });
     setSocialLinks(profile?.socialLinks || { linkedin: '', github: '' });
@@ -116,6 +119,7 @@ const Settings: React.FC = () => {
     setBio(profile?.bio || '');
     setSection(profile?.section || '');
     setCity(profile?.city || '');
+    setAddress(profile?.address || '');
     setCollegeName(profile?.collegeName || '');
     setCollegeId(profile?.collegeId || '');
     setCareerInterests(profile?.preferences?.careerInterests || []);
@@ -179,11 +183,13 @@ const Settings: React.FC = () => {
           rollNo,
           className,
           year,
+          academicYear,
           section,
           departmentId,
           collegeId,
           collegeName,
           city,
+          address,
           preferences: { ...preferences, careerInterests, hobbies },
           socialLinks: { ...socialLinks, twitter: twitterUrl, portfolio: portfolioUrl },
           skills,
@@ -513,6 +519,19 @@ const Settings: React.FC = () => {
               </div>
             </div>
 
+            <div className="grid grid-cols-1 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                <input 
+                  type="text" 
+                  value={address} 
+                  onChange={(e) => setAddress(e.target.value)} 
+                  className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                  placeholder="Your Street Address, Locality, City, State, Pincode"
+                />
+              </div>
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Professional Biography</label>
               <textarea 
@@ -543,7 +562,7 @@ const Settings: React.FC = () => {
                     value={departmentId} 
                     onChange={(e) => setDepartmentId(e.target.value)} 
                     className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none bg-white disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
-                    disabled={!collegeId || isStudent}
+                    disabled={!collegeId}
                   >
                     <option value="">Select Department</option>
                     {filteredDepts.map(d => (
@@ -581,19 +600,17 @@ const Settings: React.FC = () => {
                   )}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Academic Year</label>
                   {isStudent ? (
                     <select
-                      value={year}
-                      onChange={(e) => setYear(e.target.value)}
-                      className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                      value={academicYear}
+                      onChange={(e) => setAcademicYear(e.target.value)}
+                      className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none bg-white font-medium text-slate-700"
                     >
-                      <option value="">Select Year</option>
-                      <option value="I">I</option>
-                      <option value="II">II</option>
-                      <option value="III">III</option>
-                      <option value="IV">IV</option>
-                      <option value="V">V</option>
+                      <option value="">Select Academic Year</option>
+                      {(className ? (className.match(/^(M\.|M[A-Z]|PG|Master)/i) ? ['I Year PG', 'II Year PG'] : ['I Year', 'II Year', 'III Year', 'IV Year']) : ['I Year', 'II Year', 'III Year', 'IV Year']).map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
                     </select>
                   ) : (
                     <input 

@@ -126,6 +126,77 @@ export function initDb() {
   try { db.exec("CREATE INDEX IF NOT EXISTS idx_signup_codes_active ON signup_codes(is_active)"); } catch(e){}
 
   console.log("✅ Performance indexes verified in PostgreSQL");
+
+  // safe alterations for advanced GPS, EXIF, Cloudinary metadata, and audit logs
+  try {
+    db.exec(`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS address VARCHAR(255);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_photo_public_id VARCHAR(255);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_photo_file_type VARCHAR(255);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_photo_file_name VARCHAR(255);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_photo_uploaded_at TIMESTAMP;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS academic_year VARCHAR(20);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS assigned_academic_year VARCHAR(20);
+      ALTER TABLE students ADD COLUMN IF NOT EXISTS academic_year VARCHAR(20);
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS academic_year VARCHAR(20);
+      ALTER TABLE career_activities ADD COLUMN IF NOT EXISTS academic_year VARCHAR(20);
+      ALTER TABLE student_academic_profile ADD COLUMN IF NOT EXISTS academic_year VARCHAR(20);
+    `);
+  } catch(e){}
+  
+  try {
+    db.exec(`
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS altitude DOUBLE PRECISION;
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS accuracy DOUBLE PRECISION;
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS street VARCHAR(255);
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS area VARCHAR(255);
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS locality VARCHAR(255);
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS district VARCHAR(255);
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS state VARCHAR(255);
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS country VARCHAR(255);
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS postal_code VARCHAR(255);
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS timezone VARCHAR(255);
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS device_timestamp TIMESTAMP;
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS browser_timestamp TIMESTAMP;
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS google_maps_url TEXT;
+
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS certificate_url TEXT;
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS certificate_public_id VARCHAR(255);
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS certificate_file_type VARCHAR(255);
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS certificate_file_name VARCHAR(255);
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS certificate_uploaded_at TIMESTAMP;
+
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS proof_photo_url TEXT;
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS proof_photo_public_id VARCHAR(255);
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS proof_photo_file_type VARCHAR(255);
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS proof_photo_file_name VARCHAR(255);
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS proof_photo_uploaded_at TIMESTAMP;
+
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS exif_lat DOUBLE PRECISION;
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS exif_lng DOUBLE PRECISION;
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS exif_timestamp TIMESTAMP;
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS exif_camera VARCHAR(255);
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS exif_device VARCHAR(255);
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS exif_verification_result VARCHAR(50);
+
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS section VARCHAR(50);
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS browser_metadata TEXT;
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS verification_metadata TEXT;
+      ALTER TABLE certifications ADD COLUMN IF NOT EXISTS upload_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+    `);
+  } catch(e){}
+
+  try {
+    db.exec(`
+      ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS reviewer_id VARCHAR(255);
+      ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS reviewer_role VARCHAR(50);
+      ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS action_type VARCHAR(50);
+      ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS remarks TEXT;
+      ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS ip_address VARCHAR(255);
+      ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS gps_verification_result VARCHAR(50);
+      ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS certificate_id VARCHAR(255);
+    `);
+  } catch(e){}
     
     console.log("✅ department_invite_codes table successfully verified in PostgreSQL");
   } catch (err) {
@@ -265,14 +336,18 @@ export function setDocument(collectionName: string, id: string, data: any) {
     const merged = { ...existing, ...data };
     
     db.prepare(`
-      INSERT INTO users (uid, name, email, password_hash, role, college_id, department_id, roll_no, class, year, section, city, phone_number, profile_photo, college_name, status, is_active, last_login, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO users (uid, name, email, password_hash, role, college_id, department_id, roll_no, class, year, section, city, phone_number, profile_photo, college_name, status, is_active, last_login, created_at, address, profile_photo_public_id, profile_photo_file_type, profile_photo_file_name, profile_photo_uploaded_at, academic_year, assigned_academic_year)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(uid) DO UPDATE SET
         name=excluded.name, email=excluded.email, password_hash=COALESCE(excluded.password_hash, users.password_hash),
         role=excluded.role, college_id=excluded.college_id, department_id=excluded.department_id,
         roll_no=excluded.roll_no, class=excluded.class, year=excluded.year, section=excluded.section,
         city=excluded.city, phone_number=excluded.phone_number, profile_photo=excluded.profile_photo,
-        college_name=excluded.college_name, status=excluded.status, is_active=excluded.is_active
+        college_name=excluded.college_name, status=excluded.status, is_active=excluded.is_active,
+        address=excluded.address, profile_photo_public_id=excluded.profile_photo_public_id,
+        profile_photo_file_type=excluded.profile_photo_file_type, profile_photo_file_name=excluded.profile_photo_file_name,
+        profile_photo_uploaded_at=excluded.profile_photo_uploaded_at,
+        academic_year=excluded.academic_year, assigned_academic_year=excluded.assigned_academic_year
     `).run(
       id, 
       (merged.name || merged.displayName) ?? null, 
@@ -292,7 +367,14 @@ export function setDocument(collectionName: string, id: string, data: any) {
       merged.status ?? 'active', 
       (merged.is_active || merged.isActive) ? 1 : 1, 
       (merged.last_login || merged.lastLogin) ?? null, 
-      (merged.created_at || merged.createdAt || new Date().toISOString()) ?? null
+      (merged.created_at || merged.createdAt || new Date().toISOString()) ?? null,
+      merged.address ?? null,
+      merged.profile_photo_public_id ?? null,
+      merged.profile_photo_file_type ?? null,
+      merged.profile_photo_file_name ?? null,
+      merged.profile_photo_uploaded_at ?? null,
+      (merged.academic_year || merged.academicYear) ?? null,
+      (merged.assigned_academic_year || merged.assignedAcademicYear) ?? null
     );
   } else if (tableName === 'students') {
     // Synchronize both Users and Students tables
@@ -304,13 +386,13 @@ export function setDocument(collectionName: string, id: string, data: any) {
     const passHash = data.password_hash || data.passwordHash || existingUser.password_hash || existingUser.passwordHash || null;
 
     db.prepare(`
-      INSERT INTO users (uid, name, email, password_hash, role, college_id, department_id, roll_no, class, year, section, photo_url, status, is_active, created_at)
-      VALUES (?, ?, ?, ?, 'student', ?, ?, ?, ?, ?, ?, ?, 'active', 1, ?)
+      INSERT INTO users (uid, name, email, password_hash, role, college_id, department_id, roll_no, class, year, section, photo_url, status, is_active, created_at, academic_year, assigned_academic_year)
+      VALUES (?, ?, ?, ?, 'student', ?, ?, ?, ?, ?, ?, ?, 'active', 1, ?, ?, ?)
       ON CONFLICT(uid) DO UPDATE SET
         name=excluded.name, email=excluded.email, password_hash=COALESCE(excluded.password_hash, users.password_hash),
         college_id=excluded.college_id, department_id=excluded.department_id, 
         roll_no=excluded.roll_no, class=excluded.class, year=excluded.year, section=excluded.section, 
-        photo_url=excluded.photo_url
+        photo_url=excluded.photo_url, academic_year=excluded.academic_year, assigned_academic_year=excluded.assigned_academic_year
     `).run(
       id, 
       data.name || existingUser.name || 'Student', 
@@ -323,16 +405,18 @@ export function setDocument(collectionName: string, id: string, data: any) {
       data.year,
       data.section,
       data.photo_url || data.photoUrl || data.photoURL,
-      data.created_at || data.createdAt || new Date().toISOString()
+      data.created_at || data.createdAt || new Date().toISOString(),
+      (data.academic_year || data.academicYear) ?? null,
+      (data.assigned_academic_year || data.assignedAcademicYear) ?? null
     );
 
     // 2. Ensure Student bridge table updated
     db.prepare(`
-      INSERT INTO students (user_id, roll_no, class, year, section, department_id, college_id, enrollment_date)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO students (user_id, roll_no, class, year, section, department_id, college_id, enrollment_date, academic_year)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(user_id) DO UPDATE SET
         roll_no=excluded.roll_no, class=excluded.class, year=excluded.year, section=excluded.section,
-        department_id=excluded.department_id, college_id=excluded.college_id
+        department_id=excluded.department_id, college_id=excluded.college_id, academic_year=excluded.academic_year
     `).run(
       id,
       studentId,
@@ -341,128 +425,138 @@ export function setDocument(collectionName: string, id: string, data: any) {
       data.section,
       departmentId,
       data.college_id || data.collegeId,
-      data.created_at || data.createdAt || new Date().toISOString()
+      data.created_at || data.createdAt || new Date().toISOString(),
+      (data.academic_year || data.academicYear) ?? null
     );
   } else if (tableName === 'certifications') {
     const existing = getDocument('certifications', id) || {};
     const merged = { ...existing, ...data };
     
+    let finalAcademicYear = (merged.academic_year || merged.academicYear) ?? null;
+    if (!finalAcademicYear && (merged.user_id || merged.userId)) {
+      const studentUser = db.prepare('SELECT academic_year FROM users WHERE uid = ?').get(merged.user_id || merged.userId) as any;
+      if (studentUser) {
+        finalAcademicYear = studentUser.academic_year;
+      }
+    }
+
     db.prepare(`
-      INSERT INTO certifications (id, user_id, student_name, roll_no, class, year, phone_number, city, college_name, college_id, department_id, event_name, event_college_name, event_location, date, type, file_url, photo_url, gps_lat, gps_lng, prize_position, custom_prize_position, prize_type, cash_prize_amount, prize_description, gps_photo_url, gps_photo_lat, gps_photo_lng, gps_photo_timestamp, gps_verified, fraud_flag, fraud_reason, file_hash, certificate_url, certificate_public_id, certificate_file_type, certificate_file_name, certificate_uploaded_at, proof_photo_url, proof_photo_public_id, street, area, locality, district, state, country, postal_code, google_maps_url, exif_latitude, exif_longitude, exif_timestamp, verification_status, upload_timestamp, status, remarks, is_deleted, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO certifications (
+        id, user_id, student_name, roll_no, class, year, phone_number, city, college_name, college_id, department_id, event_name, event_college_name, event_location, date, type, file_url, photo_url, gps_lat, gps_lng, prize_position, custom_prize_position, prize_type, cash_prize_amount, prize_description, gps_photo_url, gps_photo_lat, gps_photo_lng, gps_photo_timestamp, gps_verified, fraud_flag, fraud_reason, file_hash, status, remarks, is_deleted, created_at, updated_at,
+        altitude, accuracy, street, area, locality, district, state, country, postal_code, timezone, device_timestamp, browser_timestamp, google_maps_url,
+        certificate_url, certificate_public_id, certificate_file_type, certificate_file_name, certificate_uploaded_at,
+        proof_photo_url, proof_photo_public_id, proof_photo_file_type, proof_photo_file_name, proof_photo_uploaded_at,
+        exif_lat, exif_lng, exif_timestamp, exif_camera, exif_device, exif_verification_result,
+        section, browser_metadata, verification_metadata, upload_timestamp, academic_year
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         student_name=excluded.student_name, roll_no=excluded.roll_no, class=excluded.class, year=excluded.year,
-        phone_number=excluded.phone_number, city=excluded.city, college_name=excluded.college_name,
-        college_id=excluded.college_id, department_id=excluded.department_id,
-        event_name=excluded.event_name, event_college_name=excluded.event_college_name, event_location=excluded.event_location,
-        date=excluded.date, type=excluded.type,
-        file_url=COALESCE(excluded.file_url, certifications.file_url),
-        photo_url=COALESCE(excluded.photo_url, certifications.photo_url),
-        gps_lat=COALESCE(excluded.gps_lat, certifications.gps_lat),
-        gps_lng=COALESCE(excluded.gps_lng, certifications.gps_lng),
-        prize_position=excluded.prize_position, custom_prize_position=excluded.custom_prize_position,
-        prize_type=excluded.prize_type, cash_prize_amount=excluded.cash_prize_amount, prize_description=excluded.prize_description,
-        gps_photo_url=COALESCE(excluded.gps_photo_url, certifications.gps_photo_url),
-        gps_photo_lat=COALESCE(excluded.gps_photo_lat, certifications.gps_photo_lat),
-        gps_photo_lng=COALESCE(excluded.gps_photo_lng, certifications.gps_photo_lng),
-        gps_photo_timestamp=COALESCE(excluded.gps_photo_timestamp, certifications.gps_photo_timestamp),
-        gps_verified=excluded.gps_verified, fraud_flag=excluded.fraud_flag, fraud_reason=excluded.fraud_reason,
-        file_hash=COALESCE(excluded.file_hash, certifications.file_hash),
-        certificate_url=COALESCE(excluded.certificate_url, certifications.certificate_url),
-        certificate_public_id=COALESCE(excluded.certificate_public_id, certifications.certificate_public_id),
-        certificate_file_type=COALESCE(excluded.certificate_file_type, certifications.certificate_file_type),
-        certificate_file_name=COALESCE(excluded.certificate_file_name, certifications.certificate_file_name),
-        certificate_uploaded_at=COALESCE(excluded.certificate_uploaded_at, certifications.certificate_uploaded_at),
-        proof_photo_url=COALESCE(excluded.proof_photo_url, certifications.proof_photo_url),
-        proof_photo_public_id=COALESCE(excluded.proof_photo_public_id, certifications.proof_photo_public_id),
-        street=COALESCE(excluded.street, certifications.street),
-        area=COALESCE(excluded.area, certifications.area),
-        locality=COALESCE(excluded.locality, certifications.locality),
-        district=COALESCE(excluded.district, certifications.district),
-        state=COALESCE(excluded.state, certifications.state),
-        country=COALESCE(excluded.country, certifications.country),
-        postal_code=COALESCE(excluded.postal_code, certifications.postal_code),
-        google_maps_url=COALESCE(excluded.google_maps_url, certifications.google_maps_url),
-        exif_latitude=COALESCE(excluded.exif_latitude, certifications.exif_latitude),
-        exif_longitude=COALESCE(excluded.exif_longitude, certifications.exif_longitude),
-        exif_timestamp=COALESCE(excluded.exif_timestamp, certifications.exif_timestamp),
-        verification_status=COALESCE(excluded.verification_status, certifications.verification_status),
-        upload_timestamp=COALESCE(excluded.upload_timestamp, certifications.upload_timestamp),
-        status=excluded.status, remarks=excluded.remarks, is_deleted=excluded.is_deleted,
-        updated_at=CURRENT_TIMESTAMP
+        event_name=excluded.event_name, date=excluded.date, status=excluded.status, 
+        remarks=excluded.remarks, is_deleted=excluded.is_deleted, updated_at=CURRENT_TIMESTAMP,
+        altitude=excluded.altitude, accuracy=excluded.accuracy, street=excluded.street, area=excluded.area, locality=excluded.locality, district=excluded.district, state=excluded.state, country=excluded.country, postal_code=excluded.postal_code, timezone=excluded.timezone, device_timestamp=excluded.device_timestamp, browser_timestamp=excluded.browser_timestamp, google_maps_url=excluded.google_maps_url,
+        certificate_url=excluded.certificate_url, certificate_public_id=excluded.certificate_public_id, certificate_file_type=excluded.certificate_file_type, certificate_file_name=excluded.certificate_file_name, certificate_uploaded_at=excluded.certificate_uploaded_at,
+        proof_photo_url=excluded.proof_photo_url, proof_photo_public_id=excluded.proof_photo_public_id, proof_photo_file_type=excluded.proof_photo_file_type, proof_photo_file_name=excluded.proof_photo_file_name, proof_photo_uploaded_at=excluded.proof_photo_uploaded_at,
+        exif_lat=excluded.exif_lat, exif_lng=excluded.exif_lng, exif_timestamp=excluded.exif_timestamp, exif_camera=excluded.exif_camera, exif_device=excluded.exif_device, exif_verification_result=excluded.exif_verification_result,
+        section=excluded.section, browser_metadata=excluded.browser_metadata, verification_metadata=excluded.verification_metadata, upload_timestamp=excluded.upload_timestamp, academic_year=excluded.academic_year
     `).run(
-      id,
-      (merged.user_id || merged.userId) ?? null,
-      (merged.student_name || merged.studentName) ?? null,
-      (merged.roll_no || merged.rollNo) ?? null,
-      merged.class ?? null,
-      merged.year ?? null,
-      (merged.phone_number || merged.phoneNumber) ?? null,
-      merged.city ?? null,
-      (merged.college_name || merged.collegeName) ?? null,
-      (merged.college_id || merged.collegeId) ?? null,
-      (merged.department_id || merged.departmentId) ?? null,
-      (merged.event_name || merged.eventName) ?? null,
-      (merged.event_college_name || merged.eventCollegeName) ?? null,
-      (merged.event_location || merged.eventLocation) ?? null,
-      merged.date ?? null,
-      merged.type ?? null,
-      (merged.file_url || merged.fileUrl) ?? null,
-      (merged.photo_url || merged.photoUrl) ?? null,
-      (merged.gps?.lat || merged.gps_lat) ?? null,
-      (merged.gps?.lng || merged.gps_lng) ?? null,
-      (merged.prize_position || merged.prizePosition) ?? null,
-      (merged.custom_prize_position || merged.customPrizePosition) ?? null,
-      (merged.prize_type || merged.prizeType) ?? null,
-      (merged.cash_prize_amount || merged.cashPrizeAmount) ?? null,
-      (merged.prize_description || merged.prizeDescription) ?? null,
-      (merged.gps_photo_url || merged.gpsPhotoUrl) ?? null,
-      (merged.gps_photo_lat || merged.gpsPhotoLat) ?? null,
-      (merged.gps_photo_lng || merged.gpsPhotoLng) ?? null,
-      (merged.gps_photo_timestamp || merged.gpsPhotoTimestamp) ?? null,
-      (merged.gps_verified || merged.gpsVerified) ? 1 : 0,
-      (merged.fraud_flag || merged.fraudFlag) ? 1 : 0,
-      (merged.fraud_reason || merged.fraudReason) ?? null,
-      (merged.file_hash || merged.fileHash) ?? null,
-      // Cloudinary cert
-      (merged.certificate_url || merged.certificateUrl || merged.file_url || merged.fileUrl) ?? null,
-      (merged.certificate_public_id || merged.certificatePublicId) ?? null,
-      (merged.certificate_file_type || merged.certificateFileType) ?? null,
-      (merged.certificate_file_name || merged.certificateFileName) ?? null,
-      (merged.certificate_uploaded_at || merged.certificateUploadedAt) ?? null,
-      // Cloudinary proof photo
-      (merged.proof_photo_url || merged.proofPhotoUrl || merged.photo_url || merged.photoUrl) ?? null,
-      (merged.proof_photo_public_id || merged.proofPhotoPublicId) ?? null,
-      // Address
+      id, 
+      (merged.user_id || merged.userId) ?? null, 
+      (merged.student_name || merged.studentName) ?? null, 
+      (merged.roll_no || merged.rollNo) ?? null, 
+      merged.class ?? null, 
+      merged.year ?? null, 
+      (merged.phone_number || merged.phoneNumber) ?? null, 
+      merged.city ?? null, 
+      (merged.college_name || merged.collegeName) ?? null, 
+      (merged.college_id || merged.collegeId) ?? null, 
+      (merged.department_id || merged.departmentId) ?? null, 
+      (merged.event_name || merged.eventName) ?? null, 
+      (merged.event_college_name || merged.eventCollegeName) ?? null, 
+      (merged.event_location || merged.eventLocation) ?? null, 
+      merged.date ?? null, 
+      merged.type ?? null, 
+      (merged.file_url || merged.fileUrl || merged.certificate_url) ?? null, 
+      (merged.photo_url || merged.photoUrl || merged.proof_photo_url) ?? null, 
+      (merged.gps?.lat || merged.gps_lat) ?? null, 
+      (merged.gps?.lng || merged.gps_lng) ?? null, 
+      (merged.prize_position || merged.prizePosition) ?? null, 
+      (merged.custom_prize_position || merged.customPrizePosition) ?? null, 
+      (merged.prize_type || merged.prizeType) ?? null, 
+      (merged.cash_prize_amount || merged.cashPrizeAmount) ?? null, 
+      (merged.prize_description || merged.prizeDescription) ?? null, 
+      (merged.gps_photo_url || merged.gpsPhotoUrl) ?? null, 
+      (merged.gps_photo_lat || merged.gpsPhotoLat) ?? null, 
+      (merged.gps_photo_lng || merged.gpsPhotoLng) ?? null, 
+      (merged.gps_photo_timestamp || merged.gpsPhotoTimestamp) ?? null, 
+      (merged.gps_verified || merged.gpsVerified) ? 1 : 0, 
+      (merged.fraud_flag || merged.fraudFlag) ? 1 : 0, 
+      (merged.fraud_reason || merged.fraudReason) ?? null, 
+      (merged.file_hash || merged.fileHash) ?? null, 
+      (merged.status || 'pending') ?? null, 
+      JSON.stringify(merged.remarks || []), 
+      merged.is_deleted ? 1 : 0, 
+      (merged.created_at || merged.createdAt || new Date().toISOString()) ?? null, 
+      new Date().toISOString(),
+      
+      // New GPS Fields
+      merged.altitude ?? null,
+      merged.accuracy ?? null,
       merged.street ?? null,
       merged.area ?? null,
       merged.locality ?? null,
       merged.district ?? null,
       merged.state ?? null,
       merged.country ?? null,
-      (merged.postal_code || merged.postalCode) ?? null,
-      (merged.google_maps_url || merged.googleMapsUrl) ?? null,
-      // EXIF
-      (merged.exif_latitude || merged.exifLatitude) ?? null,
-      (merged.exif_longitude || merged.exifLongitude) ?? null,
+      merged.postal_code ?? merged.postalCode ?? null,
+      merged.timezone ?? null,
+      merged.device_timestamp ?? merged.deviceTimestamp ?? null,
+      merged.browser_timestamp ?? merged.browserTimestamp ?? null,
+      merged.google_maps_url ?? merged.googleMapsUrl ?? null,
+      
+      // New Cloudinary Fields
+      (merged.certificate_url || merged.certificateUrl || merged.file_url || merged.fileUrl) ?? null,
+      (merged.certificate_public_id || merged.certificatePublicId) ?? null,
+      (merged.certificate_file_type || merged.certificateFileType) ?? null,
+      (merged.certificate_file_name || merged.certificateFileName) ?? null,
+      (merged.certificate_uploaded_at || merged.certificateUploadedAt) ?? null,
+      
+      (merged.proof_photo_url || merged.proofPhotoUrl || merged.photo_url || merged.photoUrl) ?? null,
+      (merged.proof_photo_public_id || merged.proofPhotoPublicId) ?? null,
+      (merged.proof_photo_file_type || merged.proofPhotoFileType) ?? null,
+      (merged.proof_photo_file_name || merged.proofPhotoFileName) ?? null,
+      (merged.proof_photo_uploaded_at || merged.proofPhotoUploadedAt) ?? null,
+      
+      // New EXIF Fields
+      (merged.exif_lat || merged.exifLatitude) ?? null,
+      (merged.exif_lng || merged.exifLongitude) ?? null,
       (merged.exif_timestamp || merged.exifTimestamp) ?? null,
-      // Verification
-      (merged.verification_status || merged.verificationStatus) ?? null,
-      (merged.upload_timestamp || merged.uploadTimestamp) ?? null,
-      (merged.status || 'pending') ?? null,
-      JSON.stringify(merged.remarks || []),
-      merged.is_deleted ? 1 : 0,
-      (merged.created_at || merged.createdAt || new Date().toISOString()) ?? null,
-      new Date().toISOString()
+      (merged.exif_camera || merged.exifCamera) ?? null,
+      (merged.exif_device || merged.exifDevice) ?? null,
+      (merged.exif_verification_result || merged.exifVerificationResult || merged.verificationStatus) ?? null,
+      
+      merged.section ?? null,
+      merged.browser_metadata ?? merged.browserMetadata ?? null,
+      merged.verification_metadata ?? merged.verificationMetadata ?? null,
+      (merged.upload_timestamp || merged.uploadTimestamp || new Date().toISOString()),
+      finalAcademicYear
     );
   } else if (tableName === 'career_activities') {
+    let finalAcademicYear = (data.academic_year || data.academicYear) ?? null;
+    if (!finalAcademicYear && (data.user_id || data.userId)) {
+      const studentUser = db.prepare('SELECT academic_year FROM users WHERE uid = ?').get(data.user_id || data.userId) as any;
+      if (studentUser) {
+        finalAcademicYear = studentUser.academic_year;
+      }
+    }
+
     db.prepare(`
-      INSERT INTO career_activities (id, user_id, student_id, college_id, department_id, type, organization, duration, details, status, is_deleted, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO career_activities (id, user_id, student_id, college_id, department_id, type, organization, duration, details, status, is_deleted, created_at, updated_at, academic_year)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         type=excluded.type, organization=excluded.organization, duration=excluded.duration,
         details=excluded.details, status=excluded.status, is_deleted=excluded.is_deleted,
-        updated_at=CURRENT_TIMESTAMP
+        updated_at=CURRENT_TIMESTAMP, academic_year=excluded.academic_year
     `).run(
       id, 
       (data.user_id || data.userId) ?? null, 
@@ -476,7 +570,8 @@ export function setDocument(collectionName: string, id: string, data: any) {
       data.status || 'pending', 
       data.is_deleted ? 1 : 0, 
       (data.created_at || data.createdAt || new Date().toISOString()) ?? null, 
-      new Date().toISOString()
+      new Date().toISOString(),
+      finalAcademicYear
     );
   } else if (tableName === 'colleges') {
     db.prepare(`
@@ -533,6 +628,25 @@ export function setDocument(collectionName: string, id: string, data: any) {
         }
       }
     }
+  } else if (tableName === 'audit_logs') {
+    db.prepare(`
+      INSERT INTO audit_logs (id, user_id, action, details, college_id, timestamp, reviewer_id, reviewer_role, action_type, remarks, ip_address, gps_verification_result, certificate_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id,
+      (data.user_id || data.userId) ?? null,
+      data.action ?? null,
+      data.details ?? null,
+      (data.college_id || data.collegeId) ?? null,
+      (data.timestamp || new Date().toISOString()),
+      (data.reviewer_id || data.reviewerId) ?? null,
+      (data.reviewer_role || data.reviewerRole) ?? null,
+      (data.action_type || data.actionType) ?? null,
+      data.remarks ?? null,
+      (data.ip_address || data.ipAddress) ?? null,
+      (data.gps_verification_result || data.gpsVerificationResult) ?? null,
+      (data.certificate_id || data.certificateId) ?? null
+    );
   } else {
     // Fallback for smaller/config tables
     const existing = getDocument(collectionName, id) || {};
@@ -643,6 +757,8 @@ export function queryDocuments(collectionName: string, conditions: any[] = [], o
       'departmentId': 'department_id',
       'rollNo': 'roll_no',
       'profilePhoto': 'profile_photo',
+      'academicYear': 'academic_year',
+      'assignedAcademicYear': 'assigned_academic_year',
       'studentId': tableName === 'career_activities' || tableName === 'students' ? (tableName === 'students' ? 'user_id' : 'student_id') : 'user_id',
       'studentName': tableName === 'students' ? 'u.name' : 'student_name',
       'eventName': 'event_name',
@@ -700,8 +816,54 @@ export function queryDocuments(collectionName: string, conditions: any[] = [], o
       if (row.updated_at) { row.updatedAt = row.updated_at; }
       
       // Table specific normalization
-      if (tableName === 'certifications' && typeof row.remarks === 'string') {
-        try { row.remarks = JSON.parse(row.remarks); } catch(e) { row.remarks = []; }
+      if (tableName === 'certifications') {
+        if (typeof row.remarks === 'string') {
+          try { row.remarks = JSON.parse(row.remarks); } catch(e) { row.remarks = []; }
+        }
+        row.gpsVerified = row.gps_verified === 1;
+        row.fraudFlag = row.fraud_flag === 1;
+        row.gpsPhotoUrl = row.gps_photo_url;
+        row.gpsPhotoLat = row.gps_photo_lat;
+        row.gpsPhotoLng = row.gps_photo_lng;
+        row.gpsPhotoTimestamp = row.gps_photo_timestamp;
+        
+        row.altitude = row.altitude;
+        row.accuracy = row.accuracy;
+        row.street = row.street;
+        row.area = row.area;
+        row.locality = row.locality;
+        row.district = row.district;
+        row.state = row.state;
+        row.country = row.country;
+        row.postalCode = row.postal_code;
+        row.timezone = row.timezone;
+        row.deviceTimestamp = row.device_timestamp;
+        row.browserTimestamp = row.browser_timestamp;
+        row.googleMapsUrl = row.google_maps_url;
+        
+        row.certificateUrl = row.certificate_url || row.file_url;
+        row.fileUrl = row.certificate_url || row.file_url;
+        row.certificatePublicId = row.certificate_public_id;
+        row.certificateFileType = row.certificate_file_type;
+        row.certificateFileName = row.certificate_file_name;
+        row.certificateUploadedAt = row.certificate_uploaded_at;
+        
+        row.proofPhotoUrl = row.proof_photo_url || row.photo_url;
+        row.photoUrl = row.proof_photo_url || row.photo_url;
+        row.proofPhotoPublicId = row.proof_photo_public_id;
+        row.proofPhotoFileType = row.proof_photo_file_type;
+        row.proofPhotoFileName = row.proof_photo_file_name;
+        row.proofPhotoUploadedAt = row.proof_photo_uploaded_at;
+        
+        row.exifLatitude = row.exif_lat;
+        row.exifLongitude = row.exif_lng;
+        row.exifTimestamp = row.exif_timestamp;
+        row.exifCamera = row.exif_camera;
+        row.exifDevice = row.exif_device;
+        row.exifVerificationResult = row.exif_verification_result;
+        row.verificationStatus = row.exif_verification_result || 'Missing EXIF';
+        row.academicYear = row.academic_year;
+        row.academic_year = row.academic_year;
       }
       return row;
     });

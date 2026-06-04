@@ -3,55 +3,51 @@ import { type Redis as RedisClientType } from 'ioredis';
 let redisClient: RedisClientType | null = null;
 let useRedis = false;
 
-// High-performance in-memory fallback cache
+// Memory Cache Fallback (only for local development/testing)
 const memoryCache = new Map<string, { value: any; expiry: number }>();
 
-// Periodic cleanup of expired fallback memory cache entries to prevent memory leaks
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, entry] of memoryCache.entries()) {
-    if (now >= entry.expiry) {
-      memoryCache.delete(key);
-    }
-  }
-}, 5 * 60 * 1000);
-
-// Try to initialize Redis connection if env variable is set
 const initRedis = async () => {
   const redisUrl = process.env.REDIS_URL;
   if (!redisUrl) {
-    console.log("ℹ️ REDIS_URL not configured. Using high-performance in-memory cache fallback.");
-    return;
+    console.error("❌ CRITICAL: REDIS_URL not configured. System is shutting down.");
+    process.exit(1);
   }
 
   try {
-    // Dynamic import to prevent crash if ioredis package is missing or failing to load
     const { default: Redis } = await import('ioredis');
     redisClient = new Redis(redisUrl, {
-      maxRetriesPerRequest: 1,
+      maxRetriesPerRequest: 1, // fail fast to detect local vs remote
       connectTimeout: 2000,
       lazyConnect: true
     });
 
     redisClient.on('error', (err) => {
-      console.warn("⚠️ Redis client connection error:", err.message);
-      useRedis = false;
+      console.error("❌ Redis client connection error:", err.message);
+      if (process.env.NODE_ENV === 'production') {
+        process.exit(1);
+      } else {
+        useRedis = false;
+      }
     });
 
     redisClient.on('connect', () => {
-      console.log("⚡ Redis connection established successfully.");
       useRedis = true;
     });
 
     await redisClient.connect();
     useRedis = true;
   } catch (error: any) {
-    console.warn("⚠️ Failed to load or connect to Redis. Falling back to in-memory cache.", error.message);
-    useRedis = false;
+    console.error("❌ Redis connection failed:", error.message);
+    if (process.env.NODE_ENV === 'production') {
+      process.exit(1);
+    } else {
+      console.log("ℹ️ Running in development/test mode. Falling back to local cache.");
+      useRedis = false;
+    }
   }
 };
 
-// Initialize connection asynchronously
+// Initialize connection
 initRedis();
 
 export const cacheService = {
@@ -63,11 +59,11 @@ export const cacheService = {
           return JSON.parse(cached) as T;
         }
       } catch (err: any) {
-        console.warn(`⚠️ Redis GET error for key ${key}:`, err.message);
+        console.error(`❌ Redis GET error for key ${key}:`, err.message);
+        if (process.env.NODE_ENV === 'production') throw err;
       }
     }
 
-    // Memory Cache Fallback
     const entry = memoryCache.get(key);
     if (entry) {
       if (Date.now() < entry.expiry) {
@@ -85,11 +81,11 @@ export const cacheService = {
         await redisClient.setex(key, ttlSeconds, serialized);
         return;
       } catch (err: any) {
-        console.warn(`⚠️ Redis SET error for key ${key}:`, err.message);
+        console.error(`❌ Redis SET error for key ${key}:`, err.message);
+        if (process.env.NODE_ENV === 'production') throw err;
       }
     }
 
-    // Memory Cache Fallback
     memoryCache.set(key, {
       value,
       expiry: Date.now() + (ttlSeconds * 1000)
@@ -102,18 +98,17 @@ export const cacheService = {
         await redisClient.del(key);
         return;
       } catch (err: any) {
-        console.warn(`⚠️ Redis DEL error for key ${key}:`, err.message);
+        console.error(`❌ Redis DEL error for key ${key}:`, err.message);
+        if (process.env.NODE_ENV === 'production') throw err;
       }
     }
 
-    // Memory Cache Fallback
     memoryCache.delete(key);
   },
 
   async clearPattern(pattern: string): Promise<void> {
     if (useRedis && redisClient) {
       try {
-        // Safe scan and delete for high concurrency (avoiding blocking KEYS command)
         let cursor = '0';
         do {
           const reply = await redisClient.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
@@ -125,11 +120,11 @@ export const cacheService = {
         } while (cursor !== '0');
         return;
       } catch (err: any) {
-        console.warn(`⚠️ Redis clearPattern error for pattern ${pattern}:`, err.message);
+        console.error(`❌ Redis clearPattern error for pattern ${pattern}:`, err.message);
+        if (process.env.NODE_ENV === 'production') throw err;
       }
     }
 
-    // Memory Cache Fallback
     for (const key of memoryCache.keys()) {
       if (key.startsWith(pattern.replace('*', ''))) {
         memoryCache.delete(key);

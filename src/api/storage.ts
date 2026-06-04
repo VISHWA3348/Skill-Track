@@ -1,5 +1,4 @@
 import { API_BASE_URL } from '@/config/api';
-// LOCAL SQLite API STORAGE
 
 export function getStorage() {
   return { isMock: true };
@@ -24,7 +23,17 @@ export async function uploadBytes(storageRef: any, file: File) {
 
   if (!res.ok) throw new Error(await res.text());
   const data = await res.json();
-  return { ref: { ...storageRef, downloadURL: data.url }, metadata: {} };
+  return { 
+    ref: { 
+      ...storageRef, 
+      downloadURL: data.url,
+      publicId: data.publicId,
+      fileType: data.fileType,
+      fileName: data.fileName,
+      uploadedAt: data.uploadedAt
+    }, 
+    metadata: {} 
+  };
 }
 
 export function uploadBytesResumable(storageRef: any, file: File) {
@@ -57,6 +66,11 @@ export function uploadBytesResumable(storageRef: any, file: File) {
           onProgress({ bytesTransferred: file.size, totalBytes: file.size });
           
           task.snapshot.downloadURL = data.url;
+          (task.snapshot as any).publicId = data.publicId;
+          (task.snapshot as any).fileType = data.fileType;
+          (task.snapshot as any).fileName = data.fileName;
+          (task.snapshot as any).uploadedAt = data.uploadedAt;
+          
           if (!isCancelled) onComplete();
         } catch (e) {
           if (!isCancelled && onError) onError(e);
@@ -73,16 +87,10 @@ export function uploadBytesResumable(storageRef: any, file: File) {
 }
 
 export async function getDownloadURL(storageRef: any) {
-  // If the upload task completed, downloadURL will be attached to the snapshot hack
   if (storageRef && storageRef.downloadURL) return storageRef.downloadURL;
-  
-  // Actually, uploadBytesResumable returns a task. getDownloadURL takes the snapshot usually, 
-  // or the ref. We pass the task's snapshot in normal Firebase.
   if (storageRef.task && storageRef.task.snapshot.downloadURL) {
       return storageRef.task.snapshot.downloadURL;
   }
-  
-  // If the component passes a task or snapshot directly:
   if (storageRef.snapshot && storageRef.snapshot.downloadURL) return storageRef.snapshot.downloadURL;
   return storageRef.downloadURL || '/placeholder.jpg';
 }

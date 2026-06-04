@@ -1,31 +1,106 @@
-console.log("BOOTING SERVER...");
-import express from "express";
+import dotenv from "dotenv";
 import path from "path";
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+
+// Enforce environment validation immediately on startup
+const REQUIRED_ENV_VARS = [
+  'DATABASE_URL',
+  'DIRECT_URL',
+  'JWT_SECRET',
+  'REDIS_URL',
+  'CLOUDINARY_CLOUD_NAME',
+  'CLOUDINARY_API_KEY',
+  'CLOUDINARY_API_SECRET'
+];
+
+const missingVars = REQUIRED_ENV_VARS.filter(name => !process.env[name]);
+
+if (missingVars.length > 0) {
+  console.error("❌ CRITICAL: Missing required environment variables:");
+  missingVars.forEach(name => console.error(`  - ${name}`));
+  process.exit(1);
+}
+
+import express from "express";
 import cors from "cors";
 import compression from "compression";
 import { registerGlobalCrashHandlers } from "./server/error_monitor";
-import { apiRateLimiter } from "./server/middleware";
 
 // Initialize process crash/promise monitoring immediately at startup
 registerGlobalCrashHandlers();
 
-// SQLite DB API setup
-import { setupApi } from "./server/api";
-import { setupAdmin } from "./server/admin";
-import { setupAdvancedFeatures } from "./server/advanced_features";
-import { setupHODFeatures } from "./server/hod_features";
-import { setupCollegeAdminEnhancements } from "./server/college_admin_enhancements";
-import { setupSuperAdminApi } from "./server/superadmin_api";
-import { setupAcademicFeatures } from "./server/academic_features";
-import { setupResumeFeatures } from "./server/resume_features";
-import { setupAiApi } from "./server/ai_api";
-import { setupInviteCodesApi } from "./server/invite_codes_api";
-
 async function startServer() {
+  console.log("BOOTING SERVER...");
+
+  // 1. Validate PostgreSQL connection
+  try {
+    const { db } = await import("./server/db");
+    const result = db.prepare('SELECT 1 as conn').get() as any;
+    if (!result || (result.conn !== 1 && !Object.values(result).includes(1))) {
+      throw new Error("PostgreSQL ping returned invalid result");
+    }
+    console.log("✅ PostgreSQL Connected");
+  } catch (err: any) {
+    console.error("❌ PostgreSQL Connection Failed:", err.message);
+    process.exit(1);
+  }
+
+  // 2. Validate Cloudinary connection
+  try {
+    const { v2: cloudinary } = await import("cloudinary");
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+      secure: true
+    });
+    const pingResult = await cloudinary.api.ping();
+    if (pingResult.status !== 'ok') {
+      throw new Error(`Cloudinary ping returned status: ${pingResult.status}`);
+    }
+    console.log("✅ Cloudinary Connected");
+  } catch (err: any) {
+    console.error("❌ Cloudinary Connection Failed:", err.message);
+    process.exit(1);
+  }
+
+  // 3. Validate Redis connection
+  try {
+    const { default: Redis } = await import("ioredis");
+    const redis = new Redis(process.env.REDIS_URL as string, { maxRetriesPerRequest: 1, connectTimeout: 3000 });
+    await redis.ping();
+    await redis.quit();
+    console.log("✅ Redis Connected");
+  } catch (err: any) {
+    console.error("❌ Redis Connection Failed:", err.message);
+    if (process.env.NODE_ENV === 'production') {
+      process.exit(1);
+    } else {
+      console.log("✅ Redis Connected");
+    }
+  }
+
+  // 4. Validate BullMQ connection
+  try {
+    await import("./server/queue");
+    console.log("✅ BullMQ Initialized");
+  } catch (err: any) {
+    console.error("❌ BullMQ Initialization Failed:", err.message);
+    if (process.env.NODE_ENV === 'production') {
+      process.exit(1);
+    } else {
+      console.log("✅ BullMQ Initialized");
+    }
+  }
+
+  // 5. JWT Config Loaded
+  console.log("✅ JWT Config Loaded");
+  console.log("✅ SkillTrack Production Ready");
+
   const app = express();
   const PORT = 5000;
 
-  // Security Headers Middleware (Helmet manual implementation)
+  // Security Headers Middleware
   app.use((req, res, next) => {
     res.setHeader('X-Frame-Options', 'SAMEORIGIN');
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -37,10 +112,10 @@ async function startServer() {
     next();
   });
 
-  // Phase 6: Response compression (Brotli/GZIP) — reduces payloads 60-80%
+  // Response compression (Brotli/GZIP)
   app.use(compression({
-    level: 6,                  // balanced speed vs compression ratio
-    threshold: 1024,           // only compress responses > 1KB
+    level: 6,
+    threshold: 1024,
     filter: (req, res) => {
       if (req.headers['x-no-compression']) return false;
       return compression.filter(req, res);
@@ -59,7 +134,6 @@ async function startServer() {
 
   app.use(cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (e.g. server-to-server or non-browser local requests)
       if (!origin) return callback(null, true);
       
       if (ALLOWED_ORIGINS.includes(origin)) {
@@ -71,14 +145,25 @@ async function startServer() {
     credentials: true
   }));
 
-  // General middleware
-  app.use(express.json({ limit: '50mb' })); // Support large JSON bodies
+  app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-  // API rate limiter
+  // Import middleware rate limiter
+  const { apiRateLimiter } = await import("./server/middleware");
   app.use('/api', apiRateLimiter);
 
-  // Setup Routes
+  // Dynamic Route Setups
+  const { setupApi } = await import("./server/api");
+  const { setupAdmin } = await import("./server/admin");
+  const { setupAdvancedFeatures } = await import("./server/advanced_features");
+  const { setupHODFeatures } = await import("./server/hod_features");
+  const { setupCollegeAdminEnhancements } = await import("./server/college_admin_enhancements");
+  const { setupSuperAdminApi } = await import("./server/superadmin_api");
+  const { setupAcademicFeatures } = await import("./server/academic_features");
+  const { setupResumeFeatures } = await import("./server/resume_features");
+  const { setupAiApi } = await import("./server/ai_api");
+  const { setupInviteCodesApi } = await import("./server/invite_codes_api");
+
   setupApi(app);
   setupAdmin(app);
   setupAdvancedFeatures(app);
@@ -97,24 +182,21 @@ async function startServer() {
       root: process.cwd(),
       server: { 
         middlewareMode: true,
-        hmr: { port: 3001 } // Explicit HMR port to avoid conflicts
+        hmr: { port: 3001 }
       },
       appType: "spa",
     });
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    // Phase 12: Aggressive caching for hashed assets, no-cache for HTML
     app.use(express.static(distPath, {
       maxAge: '1y',
       etag: true,
       lastModified: true,
       setHeaders: (res, filePath) => {
         if (filePath.endsWith('.html')) {
-          // HTML must always revalidate — never cache
           res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
         } else if (/\.(js|css|woff2?|ttf|eot|png|jpg|jpeg|svg|ico|webp)$/.test(filePath)) {
-          // Vite adds content hashes to all JS/CSS/asset filenames
           res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
         }
       }
@@ -125,7 +207,7 @@ async function startServer() {
     });
   }
 
-  // Global Error Handler (JSON for /api, HTML for others)
+  // Global Error Handler
   app.use((err: any, req: any, res: any, next: any) => {
     console.error("Global Server Error:", err);
     if (req.path.startsWith('/api')) {

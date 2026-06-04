@@ -6,18 +6,31 @@ const handlers = new Map<string, JobHandler>();
 const inMemoryQueue: Array<{ id: string; type: string; data: any; retries: number }> = [];
 let isProcessingInMemory = false;
 
-// BullMQ lazy load references
+// BullMQ references
 let BullQueue: any = null;
 let BullWorker: any = null;
-let bullQueueInstance: any = null;
 let useBull = false;
+
+const queues: Record<string, any> = {};
+const workers: any[] = [];
+
+const jobTypeToQueueMap: Record<string, string> = {
+  'send-broadcast-notification': 'Notification Queue',
+  'generate-resume-pdf': 'Resume Processing Queue',
+  'ai-analysis': 'Background Task Queue',
+  'export-excel': 'Background Task Queue',
+  'email': 'Email Queue',
+  'notification': 'Notification Queue',
+  'certificate': 'Certificate Processing Queue',
+  'resume': 'Resume Processing Queue',
+  'background': 'Background Task Queue'
+};
 
 const initBullMQ = async () => {
   const redisUrl = process.env.REDIS_URL;
   if (!redisUrl) {
-    console.log("ℹ️ BullMQ not initialized (no REDIS_URL). Using high-performance in-memory async queue.");
-    startInMemoryWorker();
-    return;
+    console.error("❌ CRITICAL: REDIS_URL not configured. BullMQ failed to initialize.");
+    process.exit(1);
   }
 
   try {
@@ -27,32 +40,57 @@ const initBullMQ = async () => {
 
     // Connect to Redis for BullMQ
     const { default: Redis } = await import('ioredis');
-    const connection = new Redis(redisUrl, { maxRetriesPerRequest: null });
-
-    bullQueueInstance = new BullQueue('skill-track-jobs', { connection });
+    const connection = new Redis(redisUrl, { maxRetriesPerRequest: 1, connectTimeout: 2000 });
     
-    // Initialize BullMQ Worker
-    new BullWorker('skill-track-jobs', async (job) => {
-      const handler = handlers.get(job.name);
-      if (handler) {
-        try {
-          const result = await handler(job.data);
-          await cacheService.set(`job:result:${job.id}`, { status: 'completed', result }, 120);
-          return result;
-        } catch (err: any) {
-          await cacheService.set(`job:result:${job.id}`, { status: 'failed', error: err.message || 'Job execution failed' }, 120);
-          throw err;
-        }
+    connection.on('error', (err) => {
+      // Catch background connection failures silently in dev/test, or log in production
+      if (process.env.NODE_ENV === 'production') {
+        console.error("❌ BullMQ Redis connection error:", err.message);
       }
-      throw new Error(`No handler registered for job type: ${job.name}`);
-    }, { connection, concurrency: 5 });
+    });
+
+    // Test the connection first to fail fast if unavailable
+    await connection.ping();
+
+    const queueNames = [
+      'Email Queue',
+      'Notification Queue',
+      'Certificate Processing Queue',
+      'Resume Processing Queue',
+      'Background Task Queue'
+    ];
+
+    for (const qName of queueNames) {
+      queues[qName] = new BullQueue(qName, { connection });
+
+      const worker = new BullWorker(qName, async (job) => {
+        const handler = handlers.get(job.name);
+        if (handler) {
+          try {
+            const result = await handler(job.data);
+            await cacheService.set(`job:result:${job.id}`, { status: 'completed', result }, 120);
+            return result;
+          } catch (err: any) {
+            await cacheService.set(`job:result:${job.id}`, { status: 'failed', error: err.message || 'Job execution failed' }, 120);
+            throw err;
+          }
+        }
+        throw new Error(`No handler registered for job type: ${job.name}`);
+      }, { connection, concurrency: 5 });
+
+      workers.push(worker);
+    }
 
     useBull = true;
-    console.log("⚡ BullMQ background worker queue initialized successfully.");
   } catch (err: any) {
-    console.warn("⚠️ Failed to initialize BullMQ, falling back to in-memory async queue.", err.message);
-    useBull = false;
-    startInMemoryWorker();
+    console.error("❌ Failed to initialize BullMQ:", err.message);
+    if (process.env.NODE_ENV === 'production') {
+      process.exit(1);
+    } else {
+      console.log("ℹ️ Running in development/test mode. Falling back to in-memory queue.");
+      useBull = false;
+      startInMemoryWorker();
+    }
   }
 };
 
@@ -63,7 +101,7 @@ const startInMemoryWorker = () => {
 
   const processNext = async () => {
     if (inMemoryQueue.length === 0) {
-      setTimeout(processNext, 500); // Poll every 500ms when idle
+      setTimeout(processNext, 500);
       return;
     }
 
@@ -87,12 +125,10 @@ const startInMemoryWorker = () => {
       console.error(`❌ Background job ${job.id} failed:`, err.message);
       if (job.retries > 0) {
         job.retries--;
-        // Exponential backoff retry
         setTimeout(() => {
           inMemoryQueue.push(job);
         }, 2000);
       } else {
-        // Out of retries, mark as failed
         await cacheService.set(`job:result:${job.id}`, { status: 'failed', error: err.message || 'Job execution failed' }, 120);
       }
     }
@@ -120,21 +156,19 @@ export const queueService = {
    */
   async addJob(type: string, data: any): Promise<string> {
     const jobId = `${type}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    const qName = jobTypeToQueueMap[type] || 'Background Task Queue';
+    const queue = queues[qName];
 
-    if (useBull && bullQueueInstance) {
-      try {
-        const job = await bullQueueInstance.add(type, data, {
-          jobId,
-          attempts: 3,
-          backoff: { type: 'exponential', delay: 1000 }
-        });
-        return job.id || jobId;
-      } catch (err: any) {
-        console.warn("⚠️ BullMQ addJob failed, falling back to in-memory queue:", err.message);
-      }
+    if (useBull && queue) {
+      const job = await queue.add(type, data, {
+        jobId,
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 1000 }
+      });
+      return job.id || jobId;
     }
 
-    // In-memory fallback queue
+    // In-memory fallback queue for development
     inMemoryQueue.push({
       id: jobId,
       type,
@@ -155,10 +189,9 @@ export const queueService = {
         if (entry && typeof entry === 'object' && entry.status === 'failed') {
           throw new Error(entry.error || "Job execution failed");
         }
-        // Legacy fallback in case raw result was stored directly
         return entry;
       }
-      await new Promise(resolve => setTimeout(resolve, 100)); // Poll every 100ms
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
     throw new Error("Job execution timeout");
   }

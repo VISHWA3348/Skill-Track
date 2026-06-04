@@ -37,10 +37,24 @@ export default function HODStudentManagement() {
     fetchStudents();
   }, []);
 
+  const yearMap: Record<string, string[]> = {
+    '1': ['I', 'I Year', 'I Year PG'],
+    '2': ['II', 'II Year', 'II Year PG'],
+    '3': ['III', 'III Year'],
+    '4': ['IV', 'IV Year']
+  };
+
   const filtered = students.filter(s => {
     const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           (s.roll_no || s.rollNo || '').toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesYear = yearFilter === 'all' || s.year === yearFilter;
+    let matchesYear = false;
+    if (yearFilter === 'all') {
+      matchesYear = true;
+    } else {
+      const allowedYears = yearMap[yearFilter] || [];
+      const currentYear = s.academic_year || s.academicYear || s.year || '';
+      matchesYear = allowedYears.includes(currentYear);
+    }
     return matchesSearch && matchesYear;
   });
 
@@ -128,7 +142,9 @@ export default function HODStudentManagement() {
                         </div>
                         <div>
                            <h3 className="text-xl font-black text-slate-900">{s.name}</h3>
-                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{s.roll_no || s.rollNo}</p>
+                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                              {s.roll_no || s.rollNo} • {s.academic_year || s.academicYear || s.year}
+                           </p>
                         </div>
                      </div>
 

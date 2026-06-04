@@ -67,8 +67,14 @@ export function setupAcademicFeatures(app: express.Express) {
       const departmentId = req.userData.departmentId || req.userData.department_id;
       const { year, section } = req.query;
 
-      let query = "SELECT uid, name, roll_no, class, year, section FROM users WHERE role = 'student' AND department_id = ?";
+      let query = "SELECT uid, name, roll_no, class, year, section, academic_year FROM users WHERE role = 'student' AND department_id = ?";
       const params: any[] = [departmentId];
+
+      const assignedYear = req.userData.assigned_academic_year || req.userData.assignedAcademicYear;
+      if (req.userData.role === 'staff' && assignedYear && assignedYear !== 'All Years') {
+        query += " AND academic_year = ?";
+        params.push(assignedYear);
+      }
 
       if (year) {
         query += " AND year = ?";

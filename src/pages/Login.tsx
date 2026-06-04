@@ -30,6 +30,7 @@ const Login: React.FC = () => {
   const [deptId, setDeptId] = useState('');
   const [collegeId, setCollegeId] = useState('');
   const [year, setYear] = useState('');
+  const [academicYear, setAcademicYear] = useState('');
   const [collegeName, setCollegeName] = useState('');
   const [city, setCity] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -203,6 +204,7 @@ const Login: React.FC = () => {
         rollNo,
         class: className,
         year,
+        academicYear,
         section,
         city,
         phoneNumber,
@@ -420,17 +422,14 @@ const Login: React.FC = () => {
                       </div>
                       <select
                         required
-                        disabled={isCodeVerified && !!year}
-                        className="appearance-none rounded-md relative block w-full px-3 py-2 pl-10 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:bg-gray-100 disabled:text-gray-500 bg-white"
-                        value={year}
-                        onChange={(e) => setYear(e.target.value)}
+                        className="appearance-none rounded-md relative block w-full px-3 py-2 pl-10 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white"
+                        value={academicYear}
+                        onChange={(e) => setAcademicYear(e.target.value)}
                       >
-                        <option value="">Select Year</option>
-                        <option value="I">I</option>
-                        <option value="II">II</option>
-                        <option value="III">III</option>
-                        <option value="IV">IV</option>
-                        <option value="V">V</option>
+                        <option value="">Select Academic Year</option>
+                        {(className ? (className.match(/^(M\.|M[A-Z]|PG|Master)/i) ? ['I Year PG', 'II Year PG'] : ['I Year', 'II Year', 'III Year', 'IV Year']) : ['I Year', 'II Year', 'III Year', 'IV Year']).map((opt) => (
+                          <option key={opt} value={opt}>{opt}</option>
+                        ))}
                       </select>
                     </div>
                     <div className="relative">

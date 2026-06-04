@@ -147,21 +147,24 @@ export function calculateResumeScore(studentId: string) {
     // student_academic_profile
     const academicExists = db.prepare('SELECT id FROM student_academic_profile WHERE student_id = ?').get(studentId) as any;
     if (academicExists) {
+      const u = db.prepare('SELECT academic_year FROM users WHERE uid = ?').get(studentId) as any;
       db.prepare(`
         UPDATE student_academic_profile 
-        SET placement_readiness_score = ?, updated_at = CURRENT_TIMESTAMP
+        SET placement_readiness_score = ?,
+            academic_year = COALESCE(?, academic_year),
+            updated_at = CURRENT_TIMESTAMP
         WHERE student_id = ?
-      `).run(finalScore, studentId);
+      `).run(finalScore, u?.academic_year || null, studentId);
     } else {
-      const u = db.prepare('SELECT name, roll_no, department_id, class, year, college_id FROM users WHERE uid = ?').get(studentId) as any;
+      const u = db.prepare('SELECT name, roll_no, department_id, class, year, college_id, academic_year FROM users WHERE uid = ?').get(studentId) as any;
       if (u) {
         db.prepare(`
-          INSERT INTO student_academic_profile (id, student_id, student_name, roll_no, department_id, class, year, college_id, cgpa, arrears, attendance_percentage, placement_readiness_score)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO student_academic_profile (id, student_id, student_name, roll_no, department_id, class, year, college_id, cgpa, arrears, attendance_percentage, placement_readiness_score, academic_year)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
           'ap_' + studentId, studentId, u.name || 'Student', u.roll_no || null,
           u.department_id || null, u.class || null, u.year || null,
-          u.college_id || null, 0.0, 0, 0.0, finalScore
+          u.college_id || null, 0.0, 0, 0.0, finalScore, u.academic_year || null
         );
       }
     }

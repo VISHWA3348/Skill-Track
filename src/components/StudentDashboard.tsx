@@ -12,6 +12,8 @@ interface Student {
   contact: string;
   password?: string;
   photoURL?: string;
+  academicYear?: string;
+  academic_year?: string;
 }
 
 interface Certification {
@@ -126,7 +128,7 @@ export default function StudentDashboard({ student, onLogout }: StudentDashboard
               </div>
               <div className="flex-1 pb-2">
                 <h1 className="text-3xl font-bold text-slate-900">{student.name}</h1>
-                <p className="text-slate-500 font-medium">{student.department} • {student.year} Year</p>
+                <p className="text-slate-500 font-medium">{student.department} • {student.academicYear || student.academic_year || `${student.year} Year`}</p>
               </div>
             </div>
 
@@ -155,7 +157,7 @@ export default function StudentDashboard({ student, onLogout }: StudentDashboard
                 </div>
                 <div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Year</p>
-                  <p className="font-bold text-slate-900">{student.year}</p>
+                  <p className="font-bold text-slate-900">{student.academicYear || student.academic_year || student.year}</p>
                 </div>
               </div>
               <div className="p-4 bg-slate-50 rounded-2xl flex items-center gap-4">

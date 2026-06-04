@@ -2,7 +2,7 @@ import jwt from 'jsonwebtoken';
 import { db, queryDocuments, getDocument } from './db';
 import { cacheService } from './redis_cache';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-jwt-key-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET;
 
 const getClientIp = (req: any): string => {
   let ip = req.headers['cf-connecting-ip'] || 
@@ -162,6 +162,12 @@ export const getDataIsolationFilters = (collectionName: string, userData: any) =
   if (role === 'staff' || role === 'hod') {
     conditions.push({ field: 'college_id', operator: '==', value: userData.college_id });
     conditions.push({ field: 'department_id', operator: '==', value: userData.department_id });
+    if (role === 'staff') {
+      const assignedYear = userData.assigned_academic_year || userData.assignedAcademicYear;
+      if (assignedYear && assignedYear !== 'All Years' && ['certifications', 'career_activities', 'students', 'users'].includes(collectionName)) {
+        conditions.push({ field: 'academic_year', operator: '==', value: assignedYear });
+      }
+    }
   }
 
   if (collectionName === 'certifications' || collectionName === 'career_activities') {

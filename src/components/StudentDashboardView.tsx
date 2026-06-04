@@ -502,7 +502,7 @@ export default function StudentDashboardView() {
                   )}
                 </div>
                 <h3 className="text-xl font-black text-slate-900">{profile?.name}</h3>
-                <p className="text-sm font-medium text-slate-500 mb-2">{profile?.departmentId} • {profile?.year || '1st'} Year</p>
+                <p className="text-sm font-medium text-slate-500 mb-2">{profile?.departmentId} • {profile?.academicYear || profile?.academic_year || `${profile?.year || '1st'} Year`}</p>
                 
                 {profile?.bio && (
                   <p className="text-xs text-slate-600 text-center line-clamp-3 mb-4 leading-relaxed italic px-2">

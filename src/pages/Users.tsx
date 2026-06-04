@@ -49,6 +49,8 @@ const Users: React.FC = () => {
   const [newClass, setNewClass] = useState('');
   const [newSection, setNewSection] = useState('');
   const [newPhoneNumber, setNewPhoneNumber] = useState('');
+  const [newAcademicYear, setNewAcademicYear] = useState('');
+  const [newAssignedAcademicYear, setNewAssignedAcademicYear] = useState('');
 
   // Dropdown data
   const [colleges, setColleges] = useState<any[]>([]);
@@ -164,6 +166,8 @@ const Users: React.FC = () => {
       setNewClass(user.class || '');
       setNewSection(user.section || '');
       setNewPhoneNumber(user.phoneNumber || '');
+      setNewAcademicYear(user.academicYear || user.academic_year || '');
+      setNewAssignedAcademicYear(user.assignedAcademicYear || user.assigned_academic_year || '');
     } else {
       setIsEditing(false);
       setEditingUserId(null);
@@ -183,6 +187,8 @@ const Users: React.FC = () => {
       setNewClass('');
       setNewSection('');
       setNewPhoneNumber('');
+      setNewAcademicYear('');
+      setNewAssignedAcademicYear('');
     }
     setError('');
     setShowAddModal(true);
@@ -215,6 +221,11 @@ const Users: React.FC = () => {
         body.rollNo = newRollNo || undefined;
         body.class = newClass || undefined;
         body.section = newSection || undefined;
+        body.academicYear = newAcademicYear || undefined;
+      }
+
+      if (newRole === 'staff') {
+        body.assignedAcademicYear = newAssignedAcademicYear || undefined;
       }
 
       if (!isEditing) {
@@ -245,6 +256,8 @@ const Users: React.FC = () => {
       setNewClass('');
       setNewSection('');
       setNewPhoneNumber('');
+      setNewAcademicYear('');
+      setNewAssignedAcademicYear('');
       setIsEditing(false);
       setEditingUserId(null);
       fetchUsers();
@@ -372,7 +385,9 @@ const Users: React.FC = () => {
         departmentId: u.departmentid || u.departmentId || null,
         rollNo: u.rollno || u.rollNo || null,
         class: u.class || null,
-        year: u.year || null
+        year: u.year || null,
+        academicYear: u.academicyear || u.academicYear || null,
+        assignedAcademicYear: u.assignedacademicyear || u.assignedAcademicYear || null
       }));
 
       const token = localStorage.getItem('token');
@@ -520,6 +535,7 @@ const Users: React.FC = () => {
                     </div>
                     {u.rollNo && <div className="text-xs text-gray-500">Roll No: {u.rollNo}</div>}
                     {u.class && <div className="text-xs text-gray-500">Class: {u.class}</div>}
+                    {(u.academicYear || u.academic_year) && <div className="text-xs text-indigo-600 font-medium">Academic Year: {u.academicYear || u.academic_year}</div>}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     <div>{u.email}</div>
@@ -531,6 +547,7 @@ const Users: React.FC = () => {
                       <span className="text-sm text-gray-900 capitalize">{(u.role || "").replace('_', ' ')}</span>
                     </div>
                     {u.year && <div className="text-xs text-gray-500">Year: {u.year}</div>}
+                    {u.role === 'staff' && (u.assignedAcademicYear || u.assigned_academic_year) && <div className="text-xs text-green-600 font-medium">Responsibility: {u.assignedAcademicYear || u.assigned_academic_year}</div>}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     <div>{u.departmentId || '-'}</div>
@@ -656,6 +673,22 @@ const Users: React.FC = () => {
                   )}
                 </select>
               </div>
+              {newRole === 'staff' && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700">Assigned Year Responsibility</label>
+                  <select
+                    value={newAssignedAcademicYear}
+                    onChange={(e) => setNewAssignedAcademicYear(e.target.value)}
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 bg-white"
+                  >
+                    <option value="All Years">All Years (Default)</option>
+                    <option value="I Year">I Year</option>
+                    <option value="II Year">II Year</option>
+                    <option value="III Year">III Year</option>
+                    <option value="IV Year">IV Year</option>
+                  </select>
+                </div>
+              )}
               {newRole === 'student' && (
                 <>
                   <div className="grid grid-cols-2 gap-4">
@@ -682,14 +715,18 @@ const Users: React.FC = () => {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Year</label>
-                      <input 
-                        type="text" 
+                      <label className="block text-sm font-medium text-gray-700">Academic Year</label>
+                      <select
                         required={newRole === 'student'}
-                        value={newYear}
-                        onChange={(e) => setNewYear(e.target.value)}
-                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" 
-                      />
+                        value={newAcademicYear}
+                        onChange={(e) => setNewAcademicYear(e.target.value)}
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 bg-white"
+                      >
+                        <option value="">Select Academic Year</option>
+                        {(newClass ? (newClass.match(/^(M\.|M[A-Z]|PG|Master)/i) ? ['I Year PG', 'II Year PG'] : ['I Year', 'II Year', 'III Year', 'IV Year']) : ['I Year', 'II Year', 'III Year', 'IV Year']).map((opt) => (
+                          <option key={opt} value={opt}>{opt}</option>
+                        ))}
+                      </select>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700">Section</label>

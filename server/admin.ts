@@ -13,7 +13,7 @@ function getStatsCacheKey(userData: any): string {
 }
 
 export function invalidateStatsCache(): void {
-  cacheService.clearPattern('dashboard:*').catch(() => { });
+  cacheService.clearPattern('stats:*').catch(() => { });
 }
 
 export function setupAdmin(app: express.Express) {

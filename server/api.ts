@@ -295,7 +295,7 @@ export function setupApi(app: express.Express) {
         );
       }
 
-      const token = generateToken({ uid, email });
+      const token = generateToken({ uid, email, role: newUser.role, collegeId: newUser.college_id });
       res.json({ token, user: { uid, email, displayName: newUser.name, role: newUser.role } });
     } catch (e: any) {
       console.error("User creation error:", e);
@@ -344,7 +344,7 @@ export function setupApi(app: express.Express) {
       // Successful login - Reset attempts
       db.prepare("UPDATE users SET login_attempts = 0, last_login = CURRENT_TIMESTAMP WHERE uid = ?").run(user.uid);
 
-      const token = generateToken({ uid: user.uid, email: user.email });
+      const token = generateToken({ uid: user.uid, email: user.email, role: user.role, collegeId: user.college_id });
       res.json({ token, user: { uid: user.uid, email: user.email, displayName: user.name, role: user.role } });
     } catch (e: any) {
       console.error("Login attempt error:", e.message); // Not logging password!
@@ -405,7 +405,7 @@ export function setupApi(app: express.Express) {
       db.prepare('UPDATE otp_codes SET used = TRUE WHERE id = ?').run(record.id);
       db.prepare("UPDATE users SET login_attempts = 0, last_login = CURRENT_TIMESTAMP WHERE uid = ?").run(user.uid);
 
-      const token = generateToken({ uid: user.uid, email: user.email });
+      const token = generateToken({ uid: user.uid, email: user.email, role: user.role, collegeId: user.college_id });
       return res.json({ token, user: { uid: user.uid, email: user.email, displayName: user.name, role: user.role } });
     } catch (e: any) {
       console.error("OTP verification error:", e.message);
@@ -1205,11 +1205,34 @@ export function setupApi(app: express.Express) {
       if (!doc) return res.status(404).json({ error: 'Not found' });
       
       // Secondary check for isolation (if fetching by ID)
-      const role = req.userData.role;
-      const ownerId = doc.user_id || doc.userId;
+      const role = req.user.role;
+      const callerCollegeId = req.user.collegeId;
+      const callerDeptId = req.user.departmentId;
+      const callerUid = req.user.uid;
+
       if (role !== 'super_admin') {
-        if (collection === 'certifications' && role === 'student' && ownerId !== req.userData.uid) {
-           return res.status(403).json({ error: "Forbidden: Not your document" });
+        if (collection === 'users' || collection === 'students') {
+          const targetUser = doc;
+          if (role === 'student' && targetUser.uid !== callerUid && targetUser.user_id !== callerUid) {
+            return res.status(403).json({ error: "Forbidden: You can only access your own profile" });
+          }
+          if (targetUser.college_id && targetUser.college_id !== callerCollegeId) {
+            return res.status(403).json({ error: "Forbidden: College mismatch" });
+          }
+          if ((role === 'hod' || role === 'staff') && targetUser.department_id && targetUser.department_id !== callerDeptId) {
+            return res.status(403).json({ error: "Forbidden: Department mismatch" });
+          }
+        } else if (collection === 'certifications' || collection === 'career_activities') {
+          const ownerId = doc.user_id || doc.userId || doc.student_id || doc.studentId;
+          if (role === 'student' && ownerId !== callerUid) {
+            return res.status(403).json({ error: "Forbidden: Not your document" });
+          }
+          if (doc.college_id && doc.college_id !== callerCollegeId) {
+            return res.status(403).json({ error: "Forbidden: College mismatch" });
+          }
+          if ((role === 'hod' || role === 'staff') && doc.department_id && doc.department_id !== callerDeptId) {
+            return res.status(403).json({ error: "Forbidden: Department mismatch" });
+          }
         }
       }
       
@@ -1223,15 +1246,46 @@ export function setupApi(app: express.Express) {
     // Only admins or super admins can modify core data via this generic endpoint
     // Students can only upload via specific /api/upload
     const collection = req.params.collection;
-    const role = req.userData?.role;
+    const role = req.user.role;
+    const id = req.params.id;
 
-    if (['users', 'students', 'colleges', 'departments', 'auditLogs', 'settings', 'permissions'].includes(collection) && role !== 'super_admin' && role !== 'admin') {
-      const id = req.params.id;
-      // Allow users to update their own profile record in 'users' or 'students' collection
-      if ((collection === 'users' || collection === 'students') && id === req.userData.uid) {
-        // Continue to update
-      } else {
-        return res.status(403).json({ error: "Forbidden: Access restricted" });
+    if (role !== 'super_admin') {
+      // 1. Enforce student can only update their own record in users or students
+      if (role === 'student') {
+        if ((collection !== 'users' && collection !== 'students') || id !== req.user.id) {
+          return res.status(403).json({ error: "Forbidden: Access restricted" });
+        }
+      }
+      
+      // 2. Enforce target record belongs to caller's college/department
+      const existingDoc = getDocument(collection, id);
+      if (existingDoc) {
+        const docCollegeId = existingDoc.college_id || existingDoc.collegeId;
+        const docDeptId = existingDoc.department_id || existingDoc.departmentId;
+        const callerCollegeId = req.user.collegeId;
+        const callerDeptId = req.user.departmentId;
+        
+        if (docCollegeId && docCollegeId !== callerCollegeId) {
+          return res.status(403).json({ error: "Forbidden: College mismatch" });
+        }
+        if ((role === 'hod' || role === 'staff') && docDeptId && docDeptId !== callerDeptId) {
+          return res.status(403).json({ error: "Forbidden: Department mismatch" });
+        }
+      }
+      
+      // 3. Enforce that if caller is updating/setting data, they cannot spoof college_id or department_id
+      if (req.body.data) {
+        const dataCollegeId = req.body.data.college_id || req.body.data.collegeId;
+        const dataDeptId = req.body.data.department_id || req.body.data.departmentId;
+        const callerCollegeId = req.user.collegeId;
+        const callerDeptId = req.user.departmentId;
+        
+        if (dataCollegeId && dataCollegeId !== callerCollegeId) {
+          return res.status(403).json({ error: "Forbidden: Cannot assign to another college" });
+        }
+        if ((role === 'hod' || role === 'staff') && dataDeptId && dataDeptId !== callerDeptId) {
+          return res.status(403).json({ error: "Forbidden: Cannot assign to another department" });
+        }
       }
     }
 
@@ -1255,11 +1309,28 @@ export function setupApi(app: express.Express) {
 
   app.post('/api/firestore/:collection', authenticate, checkRole(['super_admin', 'admin', 'hod', 'staff', 'student']), async (req: any, res) => {
     const collection = req.params.collection;
-    const role = req.userData?.role;
+    const role = req.user.role;
 
     // Students can create certifications/activities, but not colleges/users/etc.
     if (['users', 'colleges', 'departments', 'settings', 'permissions'].includes(collection) && role !== 'super_admin' && role !== 'admin') {
       return res.status(403).json({ error: "Forbidden" });
+    }
+
+    if (role !== 'super_admin') {
+      // Enforce caller cannot spoof college_id or department_id when creating new documents
+      if (req.body.data) {
+        const dataCollegeId = req.body.data.college_id || req.body.data.collegeId;
+        const dataDeptId = req.body.data.department_id || req.body.data.departmentId;
+        const callerCollegeId = req.user.collegeId;
+        const callerDeptId = req.user.departmentId;
+        
+        if (dataCollegeId && dataCollegeId !== callerCollegeId) {
+          return res.status(403).json({ error: "Forbidden: Cannot assign to another college" });
+        }
+        if ((role === 'hod' || role === 'staff') && dataDeptId && dataDeptId !== callerDeptId) {
+          return res.status(403).json({ error: "Forbidden: Cannot assign to another department" });
+        }
+      }
     }
 
     try {
@@ -1908,6 +1979,20 @@ export function setupApi(app: express.Express) {
       const user = db.prepare('SELECT uid, name, email, role, roll_no, class, year, section, department_id, college_id FROM users WHERE uid = ?').get(studentId) as any;
       if (!user) return res.status(404).json({ error: 'Student not found' });
 
+      // Enforce college and department isolation for non-super-admins
+      const callerRole = req.user.role;
+      const callerCollegeId = req.user.collegeId;
+      const callerDeptId = req.user.departmentId;
+
+      if (callerRole !== 'super_admin') {
+        if (user.college_id !== callerCollegeId) {
+          return res.status(403).json({ error: 'Forbidden: Access to other college data is denied' });
+        }
+        if ((callerRole === 'staff' || callerRole === 'hod') && user.department_id !== callerDeptId) {
+          return res.status(403).json({ error: 'Forbidden: Access to other department data is denied' });
+        }
+      }
+
       const academic = db.prepare('SELECT * FROM student_academic_profile WHERE student_id = ?').get(studentId);
       const skills = db.prepare('SELECT * FROM student_skills WHERE student_id = ?').all(studentId);
       const certs = db.prepare('SELECT * FROM certifications WHERE user_id = ?').all(studentId);
@@ -1994,7 +2079,7 @@ export function setupApi(app: express.Express) {
       const { role, college_id, department_id, uid } = req.userData;
       const assignedYear = req.userData.assigned_academic_year || req.userData.assignedAcademicYear;
       
-      const cacheKey = `dashboard:${uid}:staff:${assignedYear || 'any'}`;
+      const cacheKey = `staff:dashboard-stats:${college_id || 'any'}:${department_id || 'any'}:${uid}:${assignedYear || 'any'}`;
       const cached = await cacheService.get(cacheKey);
       if (cached) {
         return res.json({ success: true, data: cached, _cached: true });
@@ -2115,7 +2200,7 @@ export function setupApi(app: express.Express) {
       const { role, college_id, department_id, uid } = req.userData;
       const assignedYear = req.userData.assigned_academic_year || req.userData.assignedAcademicYear;
       
-      const cacheKey = `analytics:${college_id || 'any'}:staff:${uid}:${assignedYear || 'any'}`;
+      const cacheKey = `staff:analytics:${college_id || 'any'}:${department_id || 'any'}:${uid}:${assignedYear || 'any'}`;
       const cached = await cacheService.get(cacheKey);
       if (cached) {
         return res.json({ success: true, data: cached, _cached: true });
@@ -2382,7 +2467,7 @@ export function setupApi(app: express.Express) {
   app.get('/api/staff/dashboard-overview', authenticate, checkRole(['staff', 'hod', 'admin']), async (req: any, res) => {
     try {
       const { college_id, department_id, uid } = req.userData;
-      const cacheKey = `dashboard:${uid}:staff:overview`;
+      const cacheKey = `staff:dashboard-overview:${college_id || 'any'}:${department_id || 'any'}:${uid}`;
       
       const cached = await cacheService.get(cacheKey);
       if (cached) {

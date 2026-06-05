@@ -2,6 +2,7 @@ import { Express } from 'express';
 import { db } from './db';
 import { analyzeStudentGap, aggregateDepartmentAnalytics } from './ai_engine';
 import { queueService } from './queue';
+import { authenticate, checkRole } from './middleware';
 
 // Register AI Gap Analysis background worker handler
 queueService.registerHandler('ai-analysis', async (jobData: any) => {
@@ -11,9 +12,31 @@ queueService.registerHandler('ai-analysis', async (jobData: any) => {
 
 export function setupAiApi(app: Express) {
   // Get AI insights for a student
-  app.get('/api/ai/insights/:studentId', async (req, res) => {
+  app.get('/api/ai/insights/:studentId', authenticate, async (req: any, res) => {
     try {
       const { studentId } = req.params;
+      const callerRole = req.user.role;
+      const callerCollegeId = req.user.collegeId;
+      const callerDeptId = req.user.departmentId;
+      const callerUid = req.user.uid;
+
+      // Fetch student details to verify college/dept
+      const student = db.prepare('SELECT college_id, department_id FROM users WHERE uid = ?').get(studentId) as any;
+      if (!student) {
+        return res.status(404).json({ success: false, error: "Student not found" });
+      }
+
+      if (callerRole !== 'super_admin') {
+        if (callerRole === 'student' && studentId !== callerUid) {
+          return res.status(403).json({ success: false, error: "Forbidden: You cannot access other student insights" });
+        }
+        if (student.college_id !== callerCollegeId) {
+          return res.status(403).json({ success: false, error: "Forbidden: College mismatch" });
+        }
+        if ((callerRole === 'staff' || callerRole === 'hod') && student.department_id !== callerDeptId) {
+          return res.status(403).json({ success: false, error: "Forbidden: Department mismatch" });
+        }
+      }
       
       // Try to get existing insights
       let insights = db.prepare('SELECT * FROM ai_career_insights WHERE student_id = ?').get(studentId) as any;
@@ -48,9 +71,32 @@ export function setupAiApi(app: Express) {
   });
 
   // Force recalculate insights in background worker
-  app.post('/api/ai/recalculate/:studentId', async (req, res) => {
+  app.post('/api/ai/recalculate/:studentId', authenticate, async (req: any, res) => {
     try {
       const { studentId } = req.params;
+      const callerRole = req.user.role;
+      const callerCollegeId = req.user.collegeId;
+      const callerDeptId = req.user.departmentId;
+      const callerUid = req.user.uid;
+
+      // Fetch student details to verify college/dept
+      const student = db.prepare('SELECT college_id, department_id FROM users WHERE uid = ?').get(studentId) as any;
+      if (!student) {
+        return res.status(404).json({ success: false, error: "Student not found" });
+      }
+
+      if (callerRole !== 'super_admin') {
+        if (callerRole === 'student' && studentId !== callerUid) {
+          return res.status(403).json({ success: false, error: "Forbidden: You cannot trigger recalculation for other students" });
+        }
+        if (student.college_id !== callerCollegeId) {
+          return res.status(403).json({ success: false, error: "Forbidden: College mismatch" });
+        }
+        if ((callerRole === 'staff' || callerRole === 'hod') && student.department_id !== callerDeptId) {
+          return res.status(403).json({ success: false, error: "Forbidden: Department mismatch" });
+        }
+      }
+
       const jobId = await queueService.addJob('ai-analysis', { studentId });
       const result = await queueService.waitForJobResult(jobId);
       res.json({ success: true, data: result });
@@ -60,9 +106,24 @@ export function setupAiApi(app: Express) {
   });
 
   // Get department AI analytics
-  app.get('/api/ai/department/:deptId', async (req, res) => {
+  app.get('/api/ai/department/:deptId', authenticate, checkRole(['super_admin', 'admin', 'hod', 'staff']), async (req: any, res) => {
     try {
       const { deptId } = req.params;
+      const callerRole = req.user.role;
+      const callerCollegeId = req.user.collegeId;
+      const callerDeptId = req.user.departmentId;
+
+      if (callerRole !== 'super_admin') {
+        // Verify dept belongs to caller's college
+        const dept = db.prepare('SELECT college_id FROM departments WHERE id = ?').get(deptId) as any;
+        if (!dept || dept.college_id !== callerCollegeId) {
+          return res.status(403).json({ success: false, error: "Forbidden: College mismatch" });
+        }
+        // Staff/HOD must belong to the same department
+        if ((callerRole === 'staff' || callerRole === 'hod') && deptId !== callerDeptId) {
+          return res.status(403).json({ success: false, error: "Forbidden: Department mismatch" });
+        }
+      }
       
       let analytics = db.prepare("SELECT * FROM ai_analytics_summary WHERE scope_type = 'department' AND scope_id = ?").get(deptId) as any;
       
@@ -86,9 +147,17 @@ export function setupAiApi(app: Express) {
   });
 
   // Get college-wide AI analytics
-  app.get('/api/ai/college/:collegeId', async (req, res) => {
+  app.get('/api/ai/college/:collegeId', authenticate, checkRole(['super_admin', 'admin']), async (req: any, res) => {
     try {
       const { collegeId } = req.params;
+      const callerRole = req.user.role;
+      const callerCollegeId = req.user.collegeId;
+
+      if (callerRole !== 'super_admin') {
+        if (collegeId !== callerCollegeId) {
+          return res.status(403).json({ success: false, error: "Forbidden: College mismatch" });
+        }
+      }
       
       // Get all departments in this college
       const depts = db.prepare('SELECT id FROM departments WHERE college_id = ?').all() as any[];

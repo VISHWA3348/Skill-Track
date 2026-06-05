@@ -56,7 +56,11 @@ export const createLimiter = (limit: number, windowMs: number, errorMessage: str
 };
 
 export const apiRateLimiter = createLimiter(300, 60 * 1000, 'API request limit exceeded. Please slow down.');
-export const authRateLimiter = createLimiter(15, 60 * 1000, 'Too many login/auth requests. Please try again after 1 minute.');
+export const authRateLimiter = createLimiter(
+  process.env.NODE_ENV === 'production' ? 15 : 1000,
+  60 * 1000,
+  'Too many login/auth requests. Please try again after 1 minute.'
+);
 
 // Legacy fallback to maintain existing API imports
 export const rateLimiter = authRateLimiter;
@@ -66,57 +70,52 @@ const tokenCache = new Map<string, { decoded: any; expiry: number }>();
 export const authenticate = async (req: any, res: any, next: any) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    req.user = null;
-    return res.status(401).json({ error: 'Unauthorized', message: 'Unauthorized' });
+    return res.status(401).json({ success: false, error: 'Unauthorized', message: 'Unauthorized' });
   }
   const token = authHeader.split("Bearer ")[1];
-  
-  if (!token || token === "undefined" || token === "null") {
-    req.user = null;
-    return res.status(401).json({ error: 'Unauthorized', message: 'Unauthorized' });
-  }
-
   try {
     const cached = tokenCache.get(token);
-    let decoded: any;
     if (cached && Date.now() < cached.expiry) {
-      decoded = cached.decoded;
-    } else {
-      decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
-      tokenCache.set(token, { decoded, expiry: Date.now() + 5000 }); // 5 seconds token verification caching
+      req.user = cached.decoded;
+      return next();
     }
     
-    if (!decoded || !decoded.uid) {
-      req.user = null;
-      return res.status(401).json({ error: 'Invalid token', message: 'Invalid token' });
+    // Explicitly verify using HS256 to block token algorithm manipulation exploits
+    const decoded: any = jwt.verify(token, JWT_SECRET as string, { algorithms: ['HS256'] });
+    if (!decoded || (!decoded.uid && !decoded.id)) {
+      return res.status(401).json({ success: false, error: 'Unauthorized', message: 'Unauthorized' });
     }
-
-    // Load and validate user database presence, role, and collegeId
-    let userData = await cacheService.get(`user:${decoded.uid}`);
+    
+    const uid = decoded.uid || decoded.id;
+    
+    // Get fresh user from cache/db to construct request-scoped identity
+    let userData = await cacheService.get(`user:${uid}`);
     if (!userData) {
-      const stmt = db.prepare('SELECT * FROM users WHERE uid = ?');
-      userData = stmt.get(decoded.uid) as any;
+      const stmt = db.prepare('SELECT uid, email, role, college_id, department_id FROM users WHERE uid = ?');
+      userData = stmt.get(uid) as any;
       if (userData) {
-        await cacheService.set(`user:${decoded.uid}`, userData, 60); // Cache user for 60 seconds
+        await cacheService.set(`user:${uid}`, userData, 60); // Cache user for 60 seconds
       }
     }
-
-    if (!userData || userData.status === 'suspended' || userData.is_active === 0) {
-      req.user = null;
-      return res.status(401).json({ error: 'Unauthorized', message: 'Unauthorized' });
+    
+    if (!userData) {
+      return res.status(401).json({ success: false, error: 'Unauthorized', message: 'Unauthorized' });
     }
-
+    
+    // Construct absolute request-scoped user object
     req.user = {
       id: userData.uid,
       uid: userData.uid,
       email: userData.email,
       role: userData.role,
-      collegeId: userData.college_id || null
+      collegeId: userData.college_id,
+      departmentId: userData.department_id
     };
+    
+    tokenCache.set(token, { decoded: req.user, expiry: Date.now() + 5000 }); // 5 seconds token verification caching
     next();
   } catch (e) {
-    req.user = null; // NEVER reuse previous user session on failure
-    return res.status(401).json({ error: 'Invalid token', message: 'Invalid token' });
+    return res.status(401).json({ success: false, error: 'Unauthorized', message: 'Unauthorized' });
   }
 };
 
@@ -127,24 +126,24 @@ export function invalidateUserCache(uid: string): void {
 
 export const checkRole = (roles: string[]) => {
   return async (req: any, res: any, next: any) => {
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    const uid = req.user.id;
     try {
-      if (!req.user || !req.user.role) {
-        return res.status(403).json({ error: "Forbidden", message: "Forbidden" });
-      }
-
-      if (!roles.includes(req.user.role)) {
-        return res.status(403).json({ error: "Forbidden", message: "Forbidden" });
-      }
-
-      let userData = await cacheService.get(`user:${req.user.uid}`);
+      // Try cache first to avoid a DB query on every authenticated request
+      let userData = await cacheService.get(`user:${uid}`);
       if (!userData) {
         const stmt = db.prepare('SELECT * FROM users WHERE uid = ?');
-        userData = stmt.get(req.user.uid) as any;
+        userData = stmt.get(uid) as any;
         if (userData) {
-          await cacheService.set(`user:${req.user.uid}`, userData, 60); // Cache user for 60 seconds
+          await cacheService.set(`user:${uid}`, userData, 60); // Cache user for 60 seconds
         }
       }
 
+      if (!userData || !roles.includes(userData.role)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
       req.userData = userData;
       next();
     } catch (error) {
@@ -197,52 +196,25 @@ export const getDataIsolationFilters = (collectionName: string, userData: any) =
   }
 
   if (role === 'super_admin') return conditions;
-
-  const tablesWithCollegeId = [
-    'users', 'students', 'colleges', 'departments', 'certifications', 
-    'career_activities', 'audit_logs', 'student_academic_profile', 
-    'department_invite_codes', 'signup_codes'
-  ];
-  const tablesWithDepartmentId = [
-    'users', 'students', 'departments', 'certifications', 
-    'career_activities', 'student_academic_profile', 
-    'department_invite_codes', 'signup_codes'
-  ];
-
-  if (role === 'student') {
-    if (collectionName === 'certifications' || collectionName === 'career_activities') {
-      conditions.push({ field: 'user_id', operator: '==', value: userData.uid });
-    } else if (collectionName === 'users') {
-      conditions.push({ field: 'uid', operator: '==', value: userData.uid });
-    } else if (collectionName === 'students') {
-      conditions.push({ field: 'user_id', operator: '==', value: userData.uid });
-    } else if ([
-      'student_academic_profile', 'student_skills', 'student_goals', 
-      'student_notifications', 'student_resume_data', 'student_attendance', 
-      'student_performance_logs'
-    ].includes(collectionName)) {
-      conditions.push({ field: 'student_id', operator: '==', value: userData.uid });
-    }
-  }
-
-  if (role === 'admin') {
-    if (tablesWithCollegeId.includes(collectionName)) {
-      conditions.push({ field: 'college_id', operator: '==', value: userData.college_id || userData.collegeId });
-    }
-  }
-
+  if (role === 'admin') conditions.push({ field: 'college_id', operator: '==', value: userData.college_id });
   if (role === 'staff' || role === 'hod') {
-    if (tablesWithCollegeId.includes(collectionName)) {
-      conditions.push({ field: 'college_id', operator: '==', value: userData.college_id || userData.collegeId });
-    }
-    if (tablesWithDepartmentId.includes(collectionName)) {
-      conditions.push({ field: 'department_id', operator: '==', value: userData.department_id || userData.departmentId });
-    }
+    conditions.push({ field: 'college_id', operator: '==', value: userData.college_id });
+    conditions.push({ field: 'department_id', operator: '==', value: userData.department_id });
     if (role === 'staff') {
       const assignedYear = userData.assigned_academic_year || userData.assignedAcademicYear;
       if (assignedYear && assignedYear !== 'All Years' && ['certifications', 'career_activities', 'students', 'users'].includes(collectionName)) {
         conditions.push({ field: 'academic_year', operator: '==', value: assignedYear });
       }
+    }
+  }
+
+  if (collectionName === 'certifications' || collectionName === 'career_activities') {
+    if (role === 'student') {
+      conditions.push({ field: 'user_id', operator: '==', value: userData.uid });
+    }
+  } else if (collectionName === 'users') {
+    if (role === 'student') {
+       conditions.push({ field: 'uid', operator: '==', value: userData.uid });
     }
   }
 

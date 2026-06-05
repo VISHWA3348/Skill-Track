@@ -94,6 +94,16 @@ const Login: React.FC = () => {
     e.preventDefault();
     setError('');
     setIsSubmitting(true);
+
+    // Absolute user isolation: Clear previous sessions and caches
+    localStorage.clear();
+    sessionStorage.clear();
+    if ((window as any).socket) {
+      try {
+        (window as any).socket.disconnect();
+      } catch (e) {}
+    }
+
     try {
       const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
@@ -128,6 +138,16 @@ const Login: React.FC = () => {
     e.preventDefault();
     setError('');
     setIsSubmitting(true);
+
+    // Absolute user isolation: Clear previous sessions and caches
+    localStorage.clear();
+    sessionStorage.clear();
+    if ((window as any).socket) {
+      try {
+        (window as any).socket.disconnect();
+      } catch (e) {}
+    }
+
     try {
       const response = await fetch(`${API_BASE_URL}/api/verify-otp`, {
         method: 'POST',
@@ -201,6 +221,16 @@ const Login: React.FC = () => {
     }
     setError('');
     setIsSubmitting(true);
+
+    // Absolute user isolation: Clear previous sessions and caches
+    localStorage.clear();
+    sessionStorage.clear();
+    if ((window as any).socket) {
+      try {
+        (window as any).socket.disconnect();
+      } catch (e) {}
+    }
+
     try {
       const upperCode = signupCode.trim().toUpperCase();
       await createUserWithEmailAndPassword(auth, email.trim(), password.trim(), {

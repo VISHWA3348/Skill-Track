@@ -14,8 +14,8 @@ export function setupHODFeatures(app: express.Express) {
 
   app.get('/api/hod/dashboard-stats', authenticate, checkRole(['hod', 'super_admin']), async (req: any, res) => {
     try {
-      const { college_id, department_id, uid } = req.userData;
-      const cacheKey = `dashboard:${uid}:hod`;
+      const { college_id, department_id, uid, role } = req.userData;
+      const cacheKey = `dashboard:${uid}:${role}`;
       const cached = await cacheService.get(cacheKey);
       if (cached) {
         return res.json({ success: true, data: cached, _cached: true });
@@ -59,7 +59,7 @@ export function setupHODFeatures(app: express.Express) {
   app.get('/api/hod/department-analytics', authenticate, checkRole(['hod', 'super_admin']), async (req: any, res) => {
     try {
       const { college_id, department_id, uid } = req.userData;
-      const cacheKey = `analytics:${college_id || 'any'}:hod:${uid}`;
+      const cacheKey = `department:${department_id || 'any'}:analytics`;
       const cached = await cacheService.get(cacheKey);
       if (cached) {
         return res.json({ success: true, data: cached, _cached: true });
@@ -233,7 +233,13 @@ export function setupHODFeatures(app: express.Express) {
   app.post('/api/hod/student-flag', authenticate, checkRole(['hod']), (req: any, res) => {
     try {
       const { student_id, flag_type, reason, severity } = req.body;
-      const { uid: hod_id } = req.userData;
+      const { uid: hod_id, college_id, department_id } = req.userData;
+
+      // Verify student belongs to the HOD's college and department
+      const student = db.prepare('SELECT college_id, department_id FROM users WHERE uid = ? AND role = "student"').get(student_id) as any;
+      if (!student || student.college_id !== college_id || student.department_id !== department_id) {
+        return res.status(403).json({ error: "Forbidden: Student is not in your department/college" });
+      }
 
       const id = 'flag_' + Date.now();
       db.prepare(`

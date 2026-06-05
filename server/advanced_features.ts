@@ -245,6 +245,19 @@ export function setupAdvancedFeatures(app: express.Express) {
       const student = getDocument('users', id) as any;
       if (!student || student.role !== 'student') return res.status(404).json({ error: "Student not found" });
 
+      const caller = req.user;
+      if (caller.role !== 'super_admin') {
+        if (student.college_id !== caller.collegeId) {
+          return res.status(403).json({ error: "Forbidden: College mismatch" });
+        }
+        if ((caller.role === 'staff' || caller.role === 'hod') && student.department_id !== caller.departmentId) {
+          return res.status(403).json({ error: "Forbidden: Department mismatch" });
+        }
+        if (caller.role === 'student' && id !== caller.uid) {
+          return res.status(403).json({ error: "Forbidden: You cannot access other students' profiles" });
+        }
+      }
+
       const certs = queryDocuments('certifications', [{ field: 'user_id', operator: '==', value: id }, { field: 'status', operator: 'in', value: ['approved', 'verified'] }]);
       const activities = queryDocuments('career_activities', [{ field: 'user_id', operator: '==', value: id }, { field: 'status', operator: '==', value: 'approved' }]);
       
@@ -283,6 +296,22 @@ export function setupAdvancedFeatures(app: express.Express) {
   app.get("/api/students/:id/resume", authenticate, async (req: any, res) => {
     try {
       const { id } = req.params;
+      const student = getDocument('users', id) as any;
+      if (!student) return res.status(404).json({ error: "Student not found" });
+
+      const caller = req.user;
+      if (caller.role !== 'super_admin') {
+        if (student.college_id !== caller.collegeId) {
+          return res.status(403).json({ error: "Forbidden: College mismatch" });
+        }
+        if ((caller.role === 'staff' || caller.role === 'hod') && student.department_id !== caller.departmentId) {
+          return res.status(403).json({ error: "Forbidden: Department mismatch" });
+        }
+        if (caller.role === 'student' && id !== caller.uid) {
+          return res.status(403).json({ error: "Forbidden: You cannot access other students' resumes" });
+        }
+      }
+
       const jobId = await queueService.addJob('generate-resume-pdf', { studentId: id });
       const base64Data = await queueService.waitForJobResult(jobId);
       const buffer = Buffer.from(base64Data, 'base64');

@@ -51,7 +51,15 @@ export function setupAcademicFeatures(app: express.Express) {
 
   app.delete("/api/admin/academic/subjects/:id", authenticate, checkRole(["admin", "super_admin"]), (req: any, res) => {
     try {
-      db.prepare("DELETE FROM academic_subjects WHERE id = ?").run(req.params.id);
+      const subjectId = req.params.id;
+      const adminUser = req.userData;
+      if (adminUser.role !== 'super_admin') {
+        const subject = db.prepare("SELECT college_id FROM academic_subjects WHERE id = ?").get(subjectId) as any;
+        if (!subject || subject.college_id !== (adminUser.collegeId || adminUser.college_id)) {
+          return res.status(403).json({ error: "Forbidden: You cannot delete another college's subject" });
+        }
+      }
+      db.prepare("DELETE FROM academic_subjects WHERE id = ?").run(subjectId);
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -65,10 +73,11 @@ export function setupAcademicFeatures(app: express.Express) {
   app.get("/api/staff/academic/students", authenticate, checkRole(["staff", "hod"]), (req: any, res) => {
     try {
       const departmentId = req.userData.departmentId || req.userData.department_id;
+      const collegeId = req.userData.collegeId || req.userData.college_id;
       const { year, section } = req.query;
 
-      let query = "SELECT uid, name, roll_no, class, year, section, academic_year FROM users WHERE role = 'student' AND department_id = ?";
-      const params: any[] = [departmentId];
+      let query = "SELECT uid, name, roll_no, class, year, section, academic_year FROM users WHERE role = 'student' AND college_id = ? AND department_id = ?";
+      const params: any[] = [collegeId, departmentId];
 
       const assignedYear = req.userData.assigned_academic_year || req.userData.assignedAcademicYear;
       if (req.userData.role === 'staff' && assignedYear && assignedYear !== 'All Years') {
@@ -95,7 +104,26 @@ export function setupAcademicFeatures(app: express.Express) {
   app.post("/api/staff/academic/marks/save", authenticate, checkRole(["staff", "hod"]), (req: any, res) => {
     try {
       const { subject_id, semester, records } = req.body; // records: [{student_id, internal_marks, attendance_percentage, grade, result_status}]
-      
+      const callerDeptId = req.userData.departmentId || req.userData.department_id;
+      const callerCollegeId = req.userData.collegeId || req.userData.college_id;
+      const role = req.userData.role;
+
+      // Verify all student IDs belong to staff's college/dept
+      if (role !== 'super_admin') {
+        for (const record of records) {
+          const student = db.prepare("SELECT college_id, department_id FROM users WHERE uid = ? AND role = 'student'").get(record.student_id) as any;
+          if (!student) {
+            return res.status(404).json({ error: `Student ${record.student_id} not found` });
+          }
+          if (student.college_id !== callerCollegeId) {
+            return res.status(403).json({ error: "Forbidden: Student is from another college" });
+          }
+          if ((role === 'staff' || role === 'hod') && student.department_id !== callerDeptId) {
+            return res.status(403).json({ error: "Forbidden: Student is from another department" });
+          }
+        }
+      }
+
       const subject = db.prepare("SELECT * FROM academic_subjects WHERE id = ?").get(subject_id) as any;
       if (!subject) return res.status(404).json({ error: "Subject not found" });
 
@@ -177,6 +205,13 @@ export function setupAcademicFeatures(app: express.Express) {
     try {
       const collegeId = req.userData.collegeId || req.userData.college_id;
       const departmentId = req.userData.role === 'hod' ? (req.userData.departmentId || req.userData.department_id) : req.query.department_id;
+
+      if (departmentId && req.userData.role !== 'super_admin') {
+        const dept = db.prepare("SELECT college_id FROM departments WHERE id = ?").get(departmentId) as any;
+        if (!dept || dept.college_id !== collegeId) {
+          return res.status(403).json({ error: "Forbidden: Department belongs to another college" });
+        }
+      }
 
       let studentQuery = "SELECT uid FROM users WHERE role = 'student' AND college_id = ?";
       const params: any[] = [collegeId];

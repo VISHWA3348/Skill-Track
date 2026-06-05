@@ -1994,7 +1994,7 @@ export function setupApi(app: express.Express) {
       const { role, college_id, department_id, uid } = req.userData;
       const assignedYear = req.userData.assigned_academic_year || req.userData.assignedAcademicYear;
       
-      const cacheKey = `staff:dashboard-stats:${college_id || 'any'}:${department_id || 'any'}:${uid}:${assignedYear || 'any'}`;
+      const cacheKey = `dashboard:${uid}:staff:${assignedYear || 'any'}`;
       const cached = await cacheService.get(cacheKey);
       if (cached) {
         return res.json({ success: true, data: cached, _cached: true });
@@ -2115,7 +2115,7 @@ export function setupApi(app: express.Express) {
       const { role, college_id, department_id, uid } = req.userData;
       const assignedYear = req.userData.assigned_academic_year || req.userData.assignedAcademicYear;
       
-      const cacheKey = `staff:analytics:${college_id || 'any'}:${department_id || 'any'}:${uid}:${assignedYear || 'any'}`;
+      const cacheKey = `analytics:${college_id || 'any'}:staff:${uid}:${assignedYear || 'any'}`;
       const cached = await cacheService.get(cacheKey);
       if (cached) {
         return res.json({ success: true, data: cached, _cached: true });
@@ -2382,7 +2382,7 @@ export function setupApi(app: express.Express) {
   app.get('/api/staff/dashboard-overview', authenticate, checkRole(['staff', 'hod', 'admin']), async (req: any, res) => {
     try {
       const { college_id, department_id, uid } = req.userData;
-      const cacheKey = `staff:dashboard-overview:${college_id || 'any'}:${department_id || 'any'}:${uid}`;
+      const cacheKey = `dashboard:${uid}:staff:overview`;
       
       const cached = await cacheService.get(cacheKey);
       if (cached) {

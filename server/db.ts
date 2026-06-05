@@ -143,6 +143,7 @@ export function initDb() {
       ALTER TABLE career_activities ADD COLUMN IF NOT EXISTS academic_year VARCHAR(20);
       ALTER TABLE student_academic_profile ADD COLUMN IF NOT EXISTS academic_year VARCHAR(20);
       ALTER TABLE department_invite_codes ADD COLUMN IF NOT EXISTS academic_year VARCHAR(20);
+      ALTER TABLE notifications ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
     `);
   } catch(e){}
   
@@ -797,6 +798,12 @@ export function queryDocuments(collectionName: string, conditions: any[] = [], o
     };
     field = fieldMap[field] || field;
 
+    if (tableName === 'notifications' || tableName === 'audit_logs') {
+      if (field === 'created_at' || field === 'createdAt') {
+        field = 'timestamp';
+      }
+    }
+
     if (cond.operator === '==') {
       sql += ` AND ${field} = ?`;
       params.push(cond.value);
@@ -818,8 +825,14 @@ export function queryDocuments(collectionName: string, conditions: any[] = [], o
     sql += ' ORDER BY ';
     const clauses = orderBys.map(ob => {
        let f = ob.field;
-       if (f === 'createdAt') f = 'created_at';
-       if (f === 'timestamp') f = 'created_at';
+       if (tableName === 'notifications' || tableName === 'audit_logs') {
+         if (f === 'createdAt' || f === 'created_at' || f === 'timestamp') {
+           f = 'timestamp';
+         }
+       } else {
+         if (f === 'createdAt') f = 'created_at';
+         if (f === 'timestamp') f = 'created_at';
+       }
        return `${f} ${ob.direction === 'desc' ? 'DESC' : 'ASC'}`;
     });
     sql += clauses.join(', ');
@@ -831,8 +844,35 @@ export function queryDocuments(collectionName: string, conditions: any[] = [], o
   }
 
   try {
-    const stmt = db.prepare(sql);
-    const rows = stmt.all(...params) as any[];
+    let rows: any[] = [];
+    try {
+      const stmt = db.prepare(sql);
+      rows = stmt.all(...params) as any[];
+    } catch (err: any) {
+      if (orderBys.length > 0) {
+        console.warn(`⚠️ Query on ${tableName} failed with ORDER BY, attempting fallback without ORDER BY:`, err.message);
+        let fallbackSql = sql;
+        const orderByIdx = sql.lastIndexOf(' ORDER BY ');
+        if (orderByIdx !== -1) {
+          const beforeOrder = sql.substring(0, orderByIdx);
+          const limitIdx = sql.indexOf(' LIMIT ', orderByIdx);
+          if (limitIdx !== -1) {
+            fallbackSql = beforeOrder + sql.substring(limitIdx);
+          } else {
+            fallbackSql = beforeOrder;
+          }
+        }
+        try {
+          const stmt = db.prepare(fallbackSql);
+          rows = stmt.all(...params) as any[];
+        } catch (fallbackErr: any) {
+          console.error("❌ Fallback query also failed:", fallbackErr.message);
+          throw fallbackErr;
+        }
+      } else {
+        throw err;
+      }
+    }
     
     // For legacy 'documents' table, we return the parsed JSON 'data'
     if (tableName === 'documents') {

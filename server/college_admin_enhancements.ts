@@ -55,7 +55,7 @@ export function setupCollegeAdminEnhancements(app: express.Express) {
         return res.status(400).json({ error: "College context missing" });
       }
 
-      const cacheKey = `admin:dashboard-stats:${req.userData.role}:${collegeId || 'super'}:${req.userData.uid}`;
+      const cacheKey = `dashboard:${req.userData.uid}:${req.userData.role}`;
       const cached = await cacheService.get(cacheKey);
       if (cached) {
         return res.json({ success: true, data: cached, _cached: true });
@@ -143,7 +143,7 @@ export function setupCollegeAdminEnhancements(app: express.Express) {
     try {
       const collegeId = req.userData.collegeId || req.userData.college_id;
 
-      const cacheKey = `admin:college-analytics:${req.userData.role}:${collegeId || 'super'}:${req.userData.uid}`;
+      const cacheKey = `analytics:${collegeId || 'super'}:${req.userData.role}:${req.userData.uid}`;
       const cached = await cacheService.get(cacheKey);
       if (cached) {
         return res.json({ success: true, data: cached, _cached: true });

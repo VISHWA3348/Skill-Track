@@ -63,24 +63,60 @@ export const rateLimiter = authRateLimiter;
 
 const tokenCache = new Map<string, { decoded: any; expiry: number }>();
 
-export const authenticate = (req: any, res: any, next: any) => {
+export const authenticate = async (req: any, res: any, next: any) => {
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith("Bearer ")) return res.status(401).json({ error: 'Unauthorized' });
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    req.user = null;
+    return res.status(401).json({ error: 'Unauthorized', message: 'Unauthorized' });
+  }
   const token = authHeader.split("Bearer ")[1];
+  
+  if (!token || token === "undefined" || token === "null") {
+    req.user = null;
+    return res.status(401).json({ error: 'Unauthorized', message: 'Unauthorized' });
+  }
+
   try {
     const cached = tokenCache.get(token);
+    let decoded: any;
     if (cached && Date.now() < cached.expiry) {
-      req.user = cached.decoded;
-      return next();
+      decoded = cached.decoded;
+    } else {
+      decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
+      tokenCache.set(token, { decoded, expiry: Date.now() + 5000 }); // 5 seconds token verification caching
     }
     
-    // Explicitly verify using HS256 to block token algorithm manipulation exploits
-    const decoded: any = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
-    tokenCache.set(token, { decoded, expiry: Date.now() + 5000 }); // 5 seconds token verification caching
-    req.user = decoded; // { uid, email }
+    if (!decoded || !decoded.uid) {
+      req.user = null;
+      return res.status(401).json({ error: 'Invalid token', message: 'Invalid token' });
+    }
+
+    // Load and validate user database presence, role, and collegeId
+    let userData = await cacheService.get(`user:${decoded.uid}`);
+    if (!userData) {
+      const stmt = db.prepare('SELECT * FROM users WHERE uid = ?');
+      userData = stmt.get(decoded.uid) as any;
+      if (userData) {
+        await cacheService.set(`user:${decoded.uid}`, userData, 60); // Cache user for 60 seconds
+      }
+    }
+
+    if (!userData || userData.status === 'suspended' || userData.is_active === 0) {
+      req.user = null;
+      return res.status(401).json({ error: 'Unauthorized', message: 'Unauthorized' });
+    }
+
+    req.user = {
+      id: userData.uid,
+      uid: userData.uid,
+      email: userData.email,
+      role: userData.role,
+      collegeId: userData.college_id || null
+    };
     next();
   } catch (e) {
-    return res.status(401).json({ error: 'Invalid token' });
+    req.user = null; // NEVER reuse previous user session on failure
+    return res.status(401).json({ error: 'Invalid token', message: 'Invalid token' });
   }
 };
 
@@ -91,21 +127,24 @@ export function invalidateUserCache(uid: string): void {
 
 export const checkRole = (roles: string[]) => {
   return async (req: any, res: any, next: any) => {
-    const uid = req.user.uid;
     try {
-      // Try cache first to avoid a DB query on every authenticated request
-      let userData = await cacheService.get(`user:${uid}`);
+      if (!req.user || !req.user.role) {
+        return res.status(403).json({ error: "Forbidden", message: "Forbidden" });
+      }
+
+      if (!roles.includes(req.user.role)) {
+        return res.status(403).json({ error: "Forbidden", message: "Forbidden" });
+      }
+
+      let userData = await cacheService.get(`user:${req.user.uid}`);
       if (!userData) {
         const stmt = db.prepare('SELECT * FROM users WHERE uid = ?');
-        userData = stmt.get(uid) as any;
+        userData = stmt.get(req.user.uid) as any;
         if (userData) {
-          await cacheService.set(`user:${uid}`, userData, 60); // Cache user for 60 seconds
+          await cacheService.set(`user:${req.user.uid}`, userData, 60); // Cache user for 60 seconds
         }
       }
 
-      if (!userData || !roles.includes(userData.role)) {
-        return res.status(403).json({ error: "Forbidden" });
-      }
       req.userData = userData;
       next();
     } catch (error) {
@@ -158,25 +197,52 @@ export const getDataIsolationFilters = (collectionName: string, userData: any) =
   }
 
   if (role === 'super_admin') return conditions;
-  if (role === 'admin') conditions.push({ field: 'college_id', operator: '==', value: userData.college_id });
+
+  const tablesWithCollegeId = [
+    'users', 'students', 'colleges', 'departments', 'certifications', 
+    'career_activities', 'audit_logs', 'student_academic_profile', 
+    'department_invite_codes', 'signup_codes'
+  ];
+  const tablesWithDepartmentId = [
+    'users', 'students', 'departments', 'certifications', 
+    'career_activities', 'student_academic_profile', 
+    'department_invite_codes', 'signup_codes'
+  ];
+
+  if (role === 'student') {
+    if (collectionName === 'certifications' || collectionName === 'career_activities') {
+      conditions.push({ field: 'user_id', operator: '==', value: userData.uid });
+    } else if (collectionName === 'users') {
+      conditions.push({ field: 'uid', operator: '==', value: userData.uid });
+    } else if (collectionName === 'students') {
+      conditions.push({ field: 'user_id', operator: '==', value: userData.uid });
+    } else if ([
+      'student_academic_profile', 'student_skills', 'student_goals', 
+      'student_notifications', 'student_resume_data', 'student_attendance', 
+      'student_performance_logs'
+    ].includes(collectionName)) {
+      conditions.push({ field: 'student_id', operator: '==', value: userData.uid });
+    }
+  }
+
+  if (role === 'admin') {
+    if (tablesWithCollegeId.includes(collectionName)) {
+      conditions.push({ field: 'college_id', operator: '==', value: userData.college_id || userData.collegeId });
+    }
+  }
+
   if (role === 'staff' || role === 'hod') {
-    conditions.push({ field: 'college_id', operator: '==', value: userData.college_id });
-    conditions.push({ field: 'department_id', operator: '==', value: userData.department_id });
+    if (tablesWithCollegeId.includes(collectionName)) {
+      conditions.push({ field: 'college_id', operator: '==', value: userData.college_id || userData.collegeId });
+    }
+    if (tablesWithDepartmentId.includes(collectionName)) {
+      conditions.push({ field: 'department_id', operator: '==', value: userData.department_id || userData.departmentId });
+    }
     if (role === 'staff') {
       const assignedYear = userData.assigned_academic_year || userData.assignedAcademicYear;
       if (assignedYear && assignedYear !== 'All Years' && ['certifications', 'career_activities', 'students', 'users'].includes(collectionName)) {
         conditions.push({ field: 'academic_year', operator: '==', value: assignedYear });
       }
-    }
-  }
-
-  if (collectionName === 'certifications' || collectionName === 'career_activities') {
-    if (role === 'student') {
-      conditions.push({ field: 'user_id', operator: '==', value: userData.uid });
-    }
-  } else if (collectionName === 'users') {
-    if (role === 'student') {
-       conditions.push({ field: 'uid', operator: '==', value: userData.uid });
     }
   }
 

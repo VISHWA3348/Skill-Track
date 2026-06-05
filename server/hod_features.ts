@@ -15,7 +15,7 @@ export function setupHODFeatures(app: express.Express) {
   app.get('/api/hod/dashboard-stats', authenticate, checkRole(['hod', 'super_admin']), async (req: any, res) => {
     try {
       const { college_id, department_id, uid } = req.userData;
-      const cacheKey = `hod:dashboard-stats:${college_id || 'any'}:${department_id || 'any'}:${uid}`;
+      const cacheKey = `dashboard:${uid}:hod`;
       const cached = await cacheService.get(cacheKey);
       if (cached) {
         return res.json({ success: true, data: cached, _cached: true });
@@ -59,7 +59,7 @@ export function setupHODFeatures(app: express.Express) {
   app.get('/api/hod/department-analytics', authenticate, checkRole(['hod', 'super_admin']), async (req: any, res) => {
     try {
       const { college_id, department_id, uid } = req.userData;
-      const cacheKey = `hod:department-analytics:${college_id || 'any'}:${department_id || 'any'}:${uid}`;
+      const cacheKey = `analytics:${college_id || 'any'}:hod:${uid}`;
       const cached = await cacheService.get(cacheKey);
       if (cached) {
         return res.json({ success: true, data: cached, _cached: true });

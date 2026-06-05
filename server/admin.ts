@@ -9,11 +9,11 @@ import { calculateResumeScore } from './resume_features';
 const JWT_SECRET = process.env.JWT_SECRET;
 
 function getStatsCacheKey(userData: any): string {
-  return `stats:${userData.role}:${userData.college_id || ''}:${userData.department_id || ''}:${userData.uid || ''}`;
+  return `dashboard:${userData.uid || ''}:${userData.role || ''}`;
 }
 
 export function invalidateStatsCache(): void {
-  cacheService.clearPattern('stats:*').catch(() => { });
+  cacheService.clearPattern('dashboard:*').catch(() => { });
 }
 
 export function setupAdmin(app: express.Express) {

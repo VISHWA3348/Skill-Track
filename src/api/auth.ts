@@ -61,6 +61,11 @@ export function onAuthStateChanged(auth: any, callback: (user: any) => void) {
 }
 
 export async function signInWithEmailAndPassword(auth: any, email: string, password: string) {
+  // Clear previous session/store on login
+  localStorage.clear();
+  sessionStorage.clear();
+  auth.currentUser = null;
+
   const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -79,6 +84,11 @@ export async function signInWithEmailAndPassword(auth: any, email: string, passw
 }
 
 export async function createUserWithEmailAndPassword(auth: any, email: string, password: string, extraFields: any = {}) {
+  // Clear previous session/store on login
+  localStorage.clear();
+  sessionStorage.clear();
+  auth.currentUser = null;
+
   const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -97,7 +107,13 @@ export async function createUserWithEmailAndPassword(auth: any, email: string, p
 }
 
 export async function signOut(auth: any) {
-  localStorage.removeItem('token');
+  localStorage.clear();
+  sessionStorage.clear();
+  if ((window as any).socket) {
+    try {
+      (window as any).socket.disconnect();
+    } catch (e) {}
+  }
   auth.currentUser = null;
   auth.notify();
 }

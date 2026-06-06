@@ -3,6 +3,9 @@ export type UserRole = 'super_admin' | 'admin' | 'hod' | 'staff' | 'student' | (
 export type CertificateStatus = 'pending' | 'staff_reviewed' | 'staff_approved' | 'hod_approved' | 'verified' | 'approved' | 'rejected';
 
 export interface UserProfile {
+  id?: string;
+  admission_year?: string;
+  date_of_birth?: string;
   uid: string;
   name: string;
   email: string;
@@ -11,7 +14,12 @@ export interface UserProfile {
   profilePhoto?: string;
   collegeId?: string;
   college_id?: string;
+  college_name?: string;
   departmentId?: string;
+  department_id?: string;
+  department_name?: string;
+  roll_no?: string;
+  current_semester?: number | null;
   preferences?: {
     emailNotifications?: boolean;
     smsNotifications?: boolean;
@@ -116,7 +124,7 @@ export interface Certificate {
     lat: number;
     lng: number;
   };
-  
+
   // New fields for winners
   prizePosition?: PrizePosition;
   customPrizePosition?: string;

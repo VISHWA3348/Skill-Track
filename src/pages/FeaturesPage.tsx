@@ -54,7 +54,7 @@ const FeaturesPage: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-950 transition-colors duration-500">
+    <div className="min-h-screen bg-white transition-colors duration-500">
       <Navbar />
       
       <main className="pt-32 pb-20 px-4">
@@ -64,11 +64,11 @@ const FeaturesPage: React.FC = () => {
             <motion.h1 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="text-4xl md:text-5xl font-black text-gray-900 dark:text-white mb-4"
+              className="text-4xl md:text-5xl font-black text-gray-900 mb-4"
             >
-              Enterprise-Grade <span className="text-indigo-600 dark:text-indigo-400">Features</span>
+              Enterprise-Grade <span className="text-indigo-600">Features</span>
             </motion.h1>
-            <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
               Explore the advanced features powering the Skill Track certificate tracking, verification, and academic management system.
             </p>
           </div>
@@ -76,12 +76,12 @@ const FeaturesPage: React.FC = () => {
           {/* Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-20">
             {features.map((f, i) => (
-              <div key={i} className="bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800 p-8 rounded-3xl hover:shadow-lg hover:-translate-y-0.5 transition-all">
-                <div className="p-3 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-2xl w-fit mb-6">
+              <div key={i} className="bg-slate-50 border border-slate-100 p-8 rounded-3xl hover:shadow-lg hover:-translate-y-0.5 transition-all">
+                <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl w-fit mb-6">
                   <f.icon className="w-6 h-6" />
                 </div>
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">{f.title}</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">{f.desc}</p>
+                <h3 className="text-lg font-bold text-gray-900 mb-3">{f.title}</h3>
+                <p className="text-sm text-gray-600 leading-relaxed">{f.desc}</p>
               </div>
             ))}
           </div>

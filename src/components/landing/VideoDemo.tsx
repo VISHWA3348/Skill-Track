@@ -6,7 +6,7 @@ const VideoDemo: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <section className="py-24 bg-white dark:bg-gray-950 transition-colors">
+    <section className="py-24 bg-white transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="bg-gradient-to-r from-indigo-900 to-slate-900 rounded-[3rem] text-white p-8 md:p-16 flex flex-col lg:flex-row items-center gap-12 overflow-hidden relative shadow-2xl">
           {/* Details */}

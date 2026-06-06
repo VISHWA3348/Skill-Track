@@ -13,12 +13,12 @@ const reasons = [
 
 const WhyChoose: React.FC = () => {
   return (
-    <section className="py-24 bg-gray-50 dark:bg-gray-900/50 transition-colors">
+    <section className="py-24 bg-gray-50 transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="text-center mb-16">
-          <h2 className="text-3xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-6">Why Choose Skill Track?</h2>
-          <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+          <h2 className="text-3xl lg:text-5xl font-bold text-gray-900 mb-6">Why Choose Skill Track?</h2>
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
             A secure, automated credential tracking system tailored for institutions, HODs, students, and recruiters.
           </p>
         </div>
@@ -32,13 +32,13 @@ const WhyChoose: React.FC = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: index * 0.05 }}
-              className="bg-white dark:bg-gray-800 p-8 rounded-3xl border border-gray-100 dark:border-gray-700 hover:shadow-lg hover:-translate-y-0.5 transition-all"
+              className="bg-white p-8 rounded-3xl border border-gray-100 hover:shadow-lg hover:-translate-y-0.5 transition-all"
             >
-              <div className="p-3 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-2xl w-fit mb-6">
+              <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl w-fit mb-6">
                 {React.createElement(r.icon, { className: "w-6 h-6" })}
               </div>
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3">{r.title}</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">{r.desc}</p>
+              <h3 className="text-xl font-bold text-gray-900 mb-3">{r.title}</h3>
+              <p className="text-sm text-gray-600 leading-relaxed">{r.desc}</p>
             </motion.div>
           ))}
         </div>

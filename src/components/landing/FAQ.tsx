@@ -73,14 +73,14 @@ const FAQ: React.FC = () => {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   return (
-    <section id="faq" className="py-24 bg-gray-50 dark:bg-gray-900 transition-colors">
+    <section id="faq" className="py-24 bg-gray-50 transition-colors">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
-          <div className="inline-flex p-3 rounded-2xl bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 mb-6">
+          <div className="inline-flex p-3 rounded-2xl bg-indigo-100 text-indigo-600 mb-6">
             <HelpCircle className="w-8 h-8" />
           </div>
-          <h2 className="text-3xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-6">Frequently Asked Questions</h2>
-          <p className="text-lg text-gray-600 dark:text-gray-400">
+          <h2 className="text-3xl lg:text-5xl font-bold text-gray-900 mb-6">Frequently Asked Questions</h2>
+          <p className="text-lg text-gray-600">
             Everything you need to know about the Skill Track platform.
           </p>
         </div>
@@ -89,16 +89,16 @@ const FAQ: React.FC = () => {
           {faqs.map((faq, i) => (
             <div 
               key={i}
-              className="bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 overflow-hidden shadow-sm hover:shadow-md transition-all"
+              className="bg-white rounded-3xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-md transition-all"
             >
               <button
                 onClick={() => setOpenIndex(openIndex === i ? null : i)}
                 className="w-full p-6 lg:p-8 text-left flex justify-between items-center group"
               >
-                <span className="text-base sm:text-lg font-bold text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                <span className="text-base sm:text-lg font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">
                   {faq.q}
                 </span>
-                <div className={`p-2 rounded-xl bg-gray-50 dark:bg-gray-700 text-gray-400 group-hover:bg-indigo-50 dark:group-hover:bg-indigo-900/30 transition-all ${openIndex === i ? 'rotate-180 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600' : ''}`}>
+                <div className={`p-2 rounded-xl bg-gray-50 text-gray-400 group-hover:bg-indigo-50 transition-all ${openIndex === i ? 'rotate-180 bg-indigo-50 text-indigo-600' : ''}`}>
                   <ChevronDown className="w-5 h-5 flex-shrink-0" />
                 </div>
               </button>
@@ -111,7 +111,7 @@ const FAQ: React.FC = () => {
                     exit={{ height: 0, opacity: 0 }}
                     transition={{ duration: 0.3 }}
                   >
-                    <div className="px-6 lg:px-8 pb-8 text-sm text-gray-600 dark:text-gray-400 leading-relaxed border-t border-gray-50 dark:border-gray-700 pt-6">
+                    <div className="px-6 lg:px-8 pb-8 text-sm text-gray-600 leading-relaxed border-t border-gray-50 pt-6">
                       {faq.a}
                     </div>
                   </motion.div>

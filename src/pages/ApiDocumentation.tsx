@@ -43,36 +43,36 @@ const ApiDocumentation: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-950 transition-colors duration-500">
+    <div className="min-h-screen bg-white transition-colors duration-500">
       <Navbar />
       
       <main className="pt-32 pb-20 px-4">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
           <div className="text-center mb-16">
-            <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center justify-center mx-auto mb-6">
+            <div className="w-16 h-16 bg-slate-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-6">
               <Cpu className="w-8 h-8" />
             </div>
             <motion.h1 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="text-4xl md:text-5xl font-black text-gray-900 dark:text-white mb-4"
+              className="text-4xl md:text-5xl font-black text-gray-900 mb-4"
             >
-              Developer <span className="text-indigo-600 dark:text-indigo-400">API Reference</span>
+              Developer <span className="text-indigo-600">API Reference</span>
             </motion.h1>
-            <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
               Integrate Skill Track verification checks and student portfolio data directly into your HR portals and databases.
             </p>
           </div>
 
           {/* Quickstart details */}
-          <div className="bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800 rounded-3xl p-8 mb-12 grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="bg-slate-50 border border-slate-100 rounded-3xl p-8 mb-12 grid grid-cols-1 md:grid-cols-2 gap-8">
             <div>
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
                 <Key className="w-5 h-5 mr-2 text-indigo-500" />
                 API Authentication
               </h2>
-              <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed mb-4">
+              <p className="text-xs text-gray-600 leading-relaxed mb-4">
                 Most API requests require a valid JSON Web Token (JWT) sent in the HTTP headers. You can retrieve a token by hitting the login endpoint.
               </p>
               <pre className="p-4 bg-gray-950 text-gray-300 rounded-xl text-xs font-mono">
@@ -80,11 +80,11 @@ const ApiDocumentation: React.FC = () => {
               </pre>
             </div>
             <div>
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
                 <ShieldCheck className="w-5 h-5 mr-2 text-emerald-500" />
                 Rate Limits & CORS
               </h2>
-              <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
+              <p className="text-xs text-gray-600 leading-relaxed">
                 Standard institution API keys are limited to 1,000 requests per minute. Background check crawlers are subject to CORS protection and should register origin domains in the Admin Settings panel.
               </p>
             </div>
@@ -92,14 +92,14 @@ const ApiDocumentation: React.FC = () => {
 
           {/* Endpoints */}
           <div className="space-y-12">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Endpoint Reference</h2>
+            <h2 className="text-2xl font-bold text-gray-900">Endpoint Reference</h2>
             {endpoints.map((ep, i) => (
-              <div key={i} className="bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800 rounded-3xl p-6 sm:p-8">
+              <div key={i} className="bg-slate-50 border border-slate-100 rounded-3xl p-6 sm:p-8">
                 <div className="flex flex-wrap items-center gap-3 mb-4">
                   <span className={`px-3 py-1 rounded-lg text-xs font-black ${ep.method === 'POST' ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700'}`}>{ep.method}</span>
-                  <code className="text-sm font-mono font-bold text-gray-900 dark:text-white">{ep.path}</code>
+                  <code className="text-sm font-mono font-bold text-gray-900">{ep.path}</code>
                 </div>
-                <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed mb-6">{ep.desc}</p>
+                <p className="text-xs text-gray-600 leading-relaxed mb-6">{ep.desc}</p>
                 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <div>

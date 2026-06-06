@@ -74,7 +74,7 @@ const SolutionsPage: React.FC = () => {
   const currentSol = solutions[activeTab];
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-950 transition-colors duration-500">
+    <div className="min-h-screen bg-white transition-colors duration-500">
       <Navbar />
       
       <main className="pt-32 pb-20 px-4">
@@ -84,11 +84,11 @@ const SolutionsPage: React.FC = () => {
             <motion.h1 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="text-4xl md:text-5xl font-black text-gray-900 dark:text-white mb-4"
+              className="text-4xl md:text-5xl font-black text-gray-900 mb-4"
             >
-              Tailored <span className="text-indigo-600 dark:text-indigo-400">Solutions</span>
+              Tailored <span className="text-indigo-600">Solutions</span>
             </motion.h1>
-            <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
               Choose your profile type to explore how Skill Track optimizes certificate tracking and career building for you.
             </p>
           </div>
@@ -101,8 +101,8 @@ const SolutionsPage: React.FC = () => {
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center space-x-2 px-6 py-3 rounded-2xl text-sm font-bold transition-all border ${
                   activeTab === tab.id
-                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-200 dark:shadow-none'
-                    : 'bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-200'
+                    : 'bg-slate-50 border-slate-100 text-slate-600 hover:bg-slate-100'
                 }`}
               >
                 <tab.icon className="w-5 h-5" />
@@ -112,15 +112,15 @@ const SolutionsPage: React.FC = () => {
           </div>
 
           {/* Display Solutions */}
-          <div className="bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800 rounded-3xl p-8 sm:p-12 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+          <div className="bg-slate-50 border border-slate-100 rounded-3xl p-8 sm:p-12 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
-              <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">{currentSol.title}</h2>
-              <p className="text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">{currentSol.desc}</p>
+              <h2 className="text-3xl font-bold text-gray-900 mb-4">{currentSol.title}</h2>
+              <p className="text-gray-600 mb-8 leading-relaxed">{currentSol.desc}</p>
               
               <ul className="space-y-4 mb-8">
                 {currentSol.bullets.map((b, i) => (
-                  <li key={i} className="flex items-start space-x-3 text-sm text-gray-700 dark:text-gray-300">
-                    <CheckCircle className="w-5 h-5 text-indigo-600 dark:text-indigo-400 flex-shrink-0 mt-0.5" />
+                  <li key={i} className="flex items-start space-x-3 text-sm text-gray-700">
+                    <CheckCircle className="w-5 h-5 text-indigo-600 flex-shrink-0 mt-0.5" />
                     <span>{b}</span>
                   </li>
                 ))}
@@ -128,7 +128,7 @@ const SolutionsPage: React.FC = () => {
 
               <Link 
                 to={currentSol.link}
-                className="inline-flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3.5 rounded-xl text-sm font-bold shadow-lg shadow-indigo-200 dark:shadow-none hover:-translate-y-0.5 active:translate-y-0 transition-all"
+                className="inline-flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3.5 rounded-xl text-sm font-bold shadow-lg shadow-indigo-200 hover:-translate-y-0.5 active:translate-y-0 transition-all"
               >
                 <span>{currentSol.cta}</span>
                 <ArrowRight className="w-4 h-4" />
@@ -136,14 +136,14 @@ const SolutionsPage: React.FC = () => {
             </div>
             
             {/* Visual Panel Mock */}
-            <div className="bg-white dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700 p-6 sm:p-8 rounded-2xl shadow-xl flex flex-col justify-between aspect-video relative overflow-hidden">
-              <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-xl flex items-center justify-center mb-6">
+            <div className="bg-white border border-gray-100 p-6 sm:p-8 rounded-2xl shadow-xl flex flex-col justify-between aspect-video relative overflow-hidden">
+              <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center mb-6">
                 {React.createElement(tabs.find(t => t.id === activeTab)!.icon, { className: "w-6 h-6" })}
               </div>
               <div>
                 <p className="text-xs font-bold text-indigo-500 uppercase tracking-widest">Skill Track Module</p>
-                <p className="text-xl font-bold text-gray-900 dark:text-white mt-1 mb-2">Verifiable Credential Ledger</p>
-                <div className="w-full bg-gray-100 dark:bg-gray-700 h-2.5 rounded-full overflow-hidden">
+                <p className="text-xl font-bold text-gray-900 mt-1 mb-2">Verifiable Credential Ledger</p>
+                <div className="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden">
                   <div className="bg-indigo-600 h-full w-[88%] animate-pulse" />
                 </div>
               </div>

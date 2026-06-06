@@ -36,7 +36,7 @@ const LandingPage: React.FC = () => {
   }, []);
 
   return (
-    <div className="relative bg-white dark:bg-gray-950 font-sans selection:bg-indigo-100 selection:text-indigo-900 transition-colors duration-500">
+    <div className="relative bg-white font-sans selection:bg-indigo-100 selection:text-indigo-900 transition-colors duration-500">
       {/* Scroll Progress Bar */}
       <motion.div
         className="fixed top-0 left-0 right-0 h-1.5 bg-indigo-600 z-[100] origin-left shadow-[0_0_10px_rgba(79,70,229,0.5)]"
@@ -70,7 +70,7 @@ const LandingPage: React.FC = () => {
       <ConversionWidgets />
 
       {/* Modern Gradient Overlays for smoother transitions */}
-      <div className="fixed bottom-0 left-0 w-full h-32 bg-gradient-to-t from-white dark:from-gray-950 to-transparent pointer-events-none z-40 opacity-20 transition-colors duration-500"></div>
+      <div className="fixed bottom-0 left-0 w-full h-32 bg-gradient-to-t from-white to-transparent pointer-events-none z-40 opacity-20 transition-colors duration-500"></div>
     </div>
   );
 };

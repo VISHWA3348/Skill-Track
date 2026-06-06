@@ -55,7 +55,7 @@ const stats = [
 
 const Stats: React.FC = () => {
   return (
-    <section id="stats" className="py-24 bg-gray-50 dark:bg-gray-900/50 transition-colors">
+    <section id="stats" className="py-24 bg-gray-50 transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
           {stats.map((stat, index) => (
@@ -65,15 +65,15 @@ const Stats: React.FC = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: index * 0.1 }}
-              className="text-center p-8 bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-xl transition-all"
+              className="text-center p-8 bg-white rounded-3xl shadow-sm border border-gray-100 hover:shadow-xl transition-all"
             >
-              <div className={`inline-flex p-4 rounded-2xl bg-gray-50 dark:bg-gray-900 ${stat.color} mb-6`}>
+              <div className={`inline-flex p-4 rounded-2xl bg-gray-50 ${stat.color} mb-6`}>
                 {React.createElement(stat.icon, { className: "w-8 h-8" })}
               </div>
-              <h3 className="text-4xl font-extrabold text-gray-900 dark:text-white mb-2">
+              <h3 className="text-4xl font-extrabold text-gray-900 mb-2">
                 <CountUp end={stat.end} suffix={stat.suffix} decimals={stat.decimals || 0} />
               </h3>
-              <p className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">{stat.label}</p>
+              <p className="text-sm font-bold text-gray-500 uppercase tracking-widest">{stat.label}</p>
             </motion.div>
           ))}
         </div>

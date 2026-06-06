@@ -82,7 +82,7 @@ async function runE2ETests() {
     const addCollegeRes = await fetch(`${BASE_URL}/api/superadmin/colleges`, {
       method: 'POST',
       headers: saHeaders,
-      body: JSON.stringify({ id: newCollegeId, name: 'E2E Test College', location: 'E2E City', type: 'Engineering' })
+      body: JSON.stringify({ id: newCollegeId, name: 'E2E Test College', location: 'E2E City', type: 'Engineering', college_duration_years: 4 })
     });
     await assertResponse(addCollegeRes, 200, 'Super Admin add new college');
 

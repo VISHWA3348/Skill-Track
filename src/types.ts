@@ -23,7 +23,7 @@ export interface UserProfile {
   preferences?: {
     emailNotifications?: boolean;
     smsNotifications?: boolean;
-    theme?: 'light' | 'dark' | 'system';
+    theme?: 'light';
     careerInterests?: string[];
     hobbies?: string;
   };

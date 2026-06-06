@@ -7,13 +7,13 @@ const CTABanner: React.FC = () => {
   const navigate = useNavigate();
 
   return (
-    <section className="py-24 bg-white dark:bg-gray-950 transition-colors">
+    <section className="py-24 bg-white transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
           whileInView={{ opacity: 1, scale: 1 }}
           viewport={{ once: true }}
-          className="relative rounded-[3rem] bg-indigo-600 dark:bg-indigo-900 p-12 lg:p-24 overflow-hidden text-center shadow-2xl"
+          className="relative rounded-[3rem] bg-indigo-600 p-12 lg:p-24 overflow-hidden text-center shadow-2xl"
         >
           {/* Background Elements */}
           <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.1),transparent)]"></div>

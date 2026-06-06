@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { useTheme } from '../../context/ThemeContext';
-import { Menu, X, GraduationCap, ArrowRight, ChevronDown, Sun, Moon, Shield, BarChart2, BookOpen, Users, Building, HelpCircle, Layout, Bell, Cpu } from 'lucide-react';
+import { Menu, X, GraduationCap, ArrowRight, ChevronDown, Shield, BarChart2, BookOpen, Users, Building, HelpCircle, Layout, Bell, Cpu } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 const Navbar: React.FC = () => {
   const { user, profile } = useAuth();
-  const { theme, toggleTheme } = useTheme();
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
@@ -63,7 +61,7 @@ const Navbar: React.FC = () => {
       onMouseEnter={() => setActiveDropdown(id)}
       onMouseLeave={() => setActiveDropdown(null)}
     >
-      <button className="flex items-center space-x-1 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors py-2">
+      <button className="flex items-center space-x-1 text-sm font-medium text-gray-600 hover:text-indigo-600 transition-colors py-2">
         <span>{label}</span>
         <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${activeDropdown === id ? 'rotate-180' : ''}`} />
       </button>
@@ -75,22 +73,22 @@ const Navbar: React.FC = () => {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
             transition={{ duration: 0.2 }}
-            className="absolute left-0 mt-2 w-80 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-800 p-4 z-[100]"
+            className="absolute left-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 p-4 z-[100]"
           >
             <div className="grid gap-4">
               {items.map((item) => (
                 <Link
                   key={item.name}
                   to={item.href}
-                  className="flex items-start space-x-4 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group/item"
+                  className="flex items-start space-x-4 p-3 rounded-xl hover:bg-gray-50 transition-colors group/item"
                   onClick={() => setActiveDropdown(null)}
                 >
-                  <div className="p-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg group-hover/item:bg-indigo-600 group-hover/item:text-white transition-colors">
+                  <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg group-hover/item:bg-indigo-600 group-hover/item:text-white transition-colors">
                     {React.createElement(item.icon, { className: "w-5 h-5" })}
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-gray-900 dark:text-white">{item.name}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{item.desc}</p>
+                    <p className="text-sm font-semibold text-gray-900">{item.name}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{item.desc}</p>
                   </div>
                 </Link>
               ))}
@@ -105,7 +103,7 @@ const Navbar: React.FC = () => {
     <nav
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
         isScrolled 
-          ? 'bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg shadow-lg py-3' 
+          ? 'bg-white/80 backdrop-blur-lg shadow-lg py-3' 
           : 'bg-transparent py-6'
       }`}
     >
@@ -124,11 +122,11 @@ const Navbar: React.FC = () => {
               }
             }}
           >
-            <div className="p-2 bg-indigo-600 dark:bg-indigo-500 rounded-xl text-white shadow-lg shadow-indigo-200 dark:shadow-none group-hover:scale-110 transition-transform">
+            <div className="p-2 bg-indigo-600 rounded-xl text-white shadow-lg shadow-indigo-200 group-hover:scale-110 transition-transform">
               <GraduationCap className="w-6 h-6" />
             </div>
-            <span className={`text-2xl font-bold tracking-tight ${isScrolled ? 'text-gray-900 dark:text-white' : 'text-gray-900 dark:text-white'}`}>
-              Skill <span className="text-indigo-600 dark:text-indigo-400">Track</span>
+            <span className={`text-2xl font-bold tracking-tight text-gray-900`}>
+              Skill <span className="text-indigo-600">Track</span>
             </span>
           </div>
 
@@ -138,21 +136,12 @@ const Navbar: React.FC = () => {
             <NavItem label="Solutions" items={menuItems.solutions.items} id="solutions" />
             <NavItem label="Resources" items={menuItems.resources.items} id="resources" />
             
-            <div className="h-6 w-px bg-gray-200 dark:bg-gray-800 mx-2" />
+            <div className="h-6 w-px bg-gray-200 mx-2" />
 
-            {/* Theme Toggle */}
-            <button
-              onClick={toggleTheme}
-              className="p-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
-              aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
-            >
-              {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
-            </button>
-            
             {user ? (
               <button
                 onClick={() => navigate(getDashboardPath())}
-                className="flex items-center space-x-2 bg-indigo-600 text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 dark:shadow-none hover:-translate-y-0.5 active:translate-y-0"
+                className="flex items-center space-x-2 bg-indigo-600 text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 hover:-translate-y-0.5 active:translate-y-0"
               >
                 <span>Dashboard</span>
                 <ArrowRight className="w-4 h-4" />
@@ -161,13 +150,13 @@ const Navbar: React.FC = () => {
               <div className="flex items-center space-x-4">
                 <button
                   onClick={() => navigate('/login')}
-                  className="text-sm font-bold text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                  className="text-sm font-bold text-gray-600 hover:text-indigo-600 transition-colors"
                 >
                   Login
                 </button>
                 <button
                   onClick={() => navigate('/login')}
-                  className="flex items-center space-x-2 bg-indigo-600 text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 dark:shadow-none hover:-translate-y-0.5"
+                  className="flex items-center space-x-2 bg-indigo-600 text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 hover:-translate-y-0.5"
                 >
                   <span>Sign Up</span>
                   <ArrowRight className="w-4 h-4" />
@@ -179,14 +168,8 @@ const Navbar: React.FC = () => {
           {/* Mobile Actions */}
           <div className="flex lg:hidden items-center space-x-4">
             <button
-              onClick={toggleTheme}
-              className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
-            >
-              {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
-            </button>
-            <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              className="p-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
@@ -202,7 +185,7 @@ const Navbar: React.FC = () => {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="fixed inset-0 top-0 left-0 w-full h-screen bg-white dark:bg-gray-900 z-[100] overflow-y-auto lg:hidden"
+            className="fixed inset-0 top-0 left-0 w-full h-screen bg-white z-[100] overflow-y-auto lg:hidden"
           >
             <div className="p-6">
               <div className="flex justify-between items-center mb-8">
@@ -210,11 +193,11 @@ const Navbar: React.FC = () => {
                   <div className="p-2 bg-indigo-600 rounded-lg text-white">
                     <GraduationCap className="w-6 h-6" />
                   </div>
-                  <span className="text-xl font-bold dark:text-white text-gray-900">Skill Track</span>
+                  <span className="text-xl font-bold text-gray-900">Skill Track</span>
                 </div>
                 <button
                   onClick={() => setMobileMenuOpen(false)}
-                  className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="p-2 rounded-lg bg-gray-100 text-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   aria-label="Close menu"
                 >
                   <X className="w-6 h-6" />
@@ -230,20 +213,20 @@ const Navbar: React.FC = () => {
                         <Link
                           key={item.name}
                           to={item.href}
-                          className="flex items-center space-x-4 p-3 rounded-xl hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
+                          className="flex items-center space-x-4 p-3 rounded-xl hover:bg-indigo-50 transition-colors"
                           onClick={() => setMobileMenuOpen(false)}
                         >
-                          <div className="p-2 bg-gray-100 dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 rounded-lg">
+                          <div className="p-2 bg-gray-100 text-indigo-600 rounded-lg">
                             {React.createElement(item.icon, { className: "w-5 h-5" })}
                           </div>
-                          <span className="text-base font-medium text-gray-700 dark:text-gray-200">{item.name}</span>
+                          <span className="text-base font-medium text-gray-700">{item.name}</span>
                         </Link>
                       ))}
                     </div>
                   </div>
                 ))}
 
-                <div className="pt-6 border-t border-gray-100 dark:border-gray-800 space-y-4">
+                <div className="pt-6 border-t border-gray-100 space-y-4">
                   <button
                     onClick={() => {
                       setMobileMenuOpen(false);
@@ -260,7 +243,7 @@ const Navbar: React.FC = () => {
                         setMobileMenuOpen(false);
                         navigate('/login');
                       }}
-                      className="w-full py-4 text-gray-600 dark:text-gray-400 font-bold"
+                      className="w-full py-4 text-gray-600 font-bold"
                     >
                       Sign In to Account
                     </button>

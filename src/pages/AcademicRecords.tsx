@@ -1,7 +1,7 @@
 import { API_BASE_URL } from '@/config/api';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
+
 import { 
   FileSpreadsheet, 
   Upload, 
@@ -58,7 +58,7 @@ const GRADE_POINTS: Record<string, number> = {
 
 const AcademicRecords: React.FC = () => {
   const { profile } = useAuth();
-  const { theme } = useTheme();
+
   
   const role = profile?.role || 'student';
   const collegeId = profile?.collegeId || profile?.college_id;
@@ -668,12 +668,12 @@ const AcademicRecords: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col lg:flex-row gap-8 min-h-[calc(100vh-120px)] antialiased text-slate-800 dark:text-slate-100">
+    <div className="flex flex-col lg:flex-row gap-8 min-h-[calc(100vh-120px)] antialiased text-slate-800">
       
       {/* ─── LEFT SUB-SIDEBAR ─────────────────────────────────── */}
-      <aside className="w-full lg:w-64 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 rounded-3xl p-5 flex flex-col gap-2 shadow-xl shadow-slate-100/30 dark:shadow-none h-fit">
-        <div className="pb-3 border-b border-slate-100 dark:border-slate-850 mb-2 px-2">
-          <h3 className="font-black text-slate-900 dark:text-white tracking-tight uppercase text-xs">Navigation</h3>
+      <aside className="w-full lg:w-64 bg-white border border-slate-200/80 rounded-3xl p-5 flex flex-col gap-2 shadow-xl shadow-slate-100/30 h-fit">
+        <div className="pb-3 border-b border-slate-100 mb-2 px-2">
+          <h3 className="font-black text-slate-900 tracking-tight uppercase text-xs">Navigation</h3>
           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">{role.replace('_', ' ')} Dashboard</p>
         </div>
         
@@ -685,8 +685,8 @@ const AcademicRecords: React.FC = () => {
               onClick={() => setSubTab(tab.id)}
               className={`flex items-center gap-3 px-4 py-3 rounded-2xl font-bold text-xs transition-all duration-200 ${
                 isActive 
-                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200 dark:shadow-none' 
-                  : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white'
+                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' 
+                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
               }`}
             >
               {tab.icon}
@@ -697,7 +697,7 @@ const AcademicRecords: React.FC = () => {
       </aside>
 
       {/* ─── RIGHT CONTENT PANEL ─────────────────────────────── */}
-      <main className="flex-1 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 rounded-3xl p-6 lg:p-8 shadow-xl shadow-slate-100/30 dark:shadow-none min-h-[500px]">
+      <main className="flex-1 bg-white border border-slate-200/80 rounded-3xl p-6 lg:p-8 shadow-xl shadow-slate-100/30 min-h-[500px]">
         {loading ? (
           <div className="flex flex-col items-center justify-center h-full min-h-[350px]">
             <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-indigo-600 mb-3" />
@@ -713,22 +713,22 @@ const AcademicRecords: React.FC = () => {
                 {subTab === 'dashboard' && (
                   <div className="space-y-8">
                     <div>
-                      <h2 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">Academic Summary</h2>
+                      <h2 className="text-2xl font-black tracking-tight text-slate-900">Academic Summary</h2>
                       <p className="text-xs text-slate-400 mt-1">Real-time breakdown of GPA, CGPA, Attendance and earned credits.</p>
                     </div>
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       {/* Current Sem Widget */}
-                      <div className="bg-gradient-to-br from-indigo-50 to-indigo-100/30 dark:from-indigo-950/20 dark:to-slate-900 p-5 rounded-2xl border border-indigo-100/50 dark:border-indigo-950 flex flex-col justify-between shadow-sm">
-                        <Calendar className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                      <div className="bg-gradient-to-br from-indigo-50 to-indigo-100/30 p-5 rounded-2xl border border-indigo-100/50 flex flex-col justify-between shadow-sm">
+                        <Calendar className="w-5 h-5 text-indigo-600" />
                         <div className="mt-4">
                           <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Current Sem</span>
-                          <span className="text-2xl font-black text-slate-900 dark:text-white mt-1 block">Semester {profile?.semester || 3}</span>
+                          <span className="text-2xl font-black text-slate-900 mt-1 block">Semester {profile?.semester || 3}</span>
                         </div>
                       </div>
 
                       {/* CGPA Widget */}
-                      <div className="bg-gradient-to-br from-indigo-600 to-indigo-700 p-5 rounded-2xl text-white flex flex-col justify-between shadow-lg shadow-indigo-100 dark:shadow-none">
+                      <div className="bg-gradient-to-br from-indigo-600 to-indigo-700 p-5 rounded-2xl text-white flex flex-col justify-between shadow-lg shadow-indigo-100">
                         <Award className="w-5 h-5 text-indigo-200" />
                         <div className="mt-4">
                           <span className="text-xs font-bold text-indigo-200 uppercase tracking-widest block">Cumulative CGPA</span>
@@ -740,11 +740,11 @@ const AcademicRecords: React.FC = () => {
                       </div>
 
                       {/* GPA Widget */}
-                      <div className="bg-gradient-to-br from-violet-50 to-violet-100/30 dark:from-violet-950/20 dark:to-slate-900 p-5 rounded-2xl border border-violet-100/50 dark:border-violet-950 flex flex-col justify-between shadow-sm">
-                        <TrendingUp className="w-5 h-5 text-violet-600 dark:text-violet-400" />
+                      <div className="bg-gradient-to-br from-violet-50 to-violet-100/30 p-5 rounded-2xl border border-violet-100/50 flex flex-col justify-between shadow-sm">
+                        <TrendingUp className="w-5 h-5 text-violet-600" />
                         <div className="mt-4">
                           <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Latest Sem GPA</span>
-                          <span className="text-2xl font-black text-slate-900 dark:text-white mt-1 block">
+                          <span className="text-2xl font-black text-slate-900 mt-1 block">
                             {analyticsData?.semesters && analyticsData.semesters.length > 0 
                               ? analyticsData.semesters[analyticsData.semesters.length - 1].gpa.toFixed(2) 
                               : '0.00'}
@@ -753,11 +753,11 @@ const AcademicRecords: React.FC = () => {
                       </div>
 
                       {/* Attendance Widget */}
-                      <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/30 dark:from-emerald-950/20 dark:to-slate-900 p-5 rounded-2xl border border-emerald-100/50 dark:border-emerald-950 flex flex-col justify-between shadow-sm">
-                        <Activity className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                      <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/30 p-5 rounded-2xl border border-emerald-100/50 flex flex-col justify-between shadow-sm">
+                        <Activity className="w-5 h-5 text-emerald-600" />
                         <div className="mt-4">
                           <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Attendance</span>
-                          <span className="text-2xl font-black text-slate-900 dark:text-white mt-1 block">
+                          <span className="text-2xl font-black text-slate-900 mt-1 block">
                             {attendanceRecords.length > 0
                               ? (attendanceRecords.reduce((acc, curr) => acc + curr.attendance_percentage, 0) / attendanceRecords.length).toFixed(1) + '%'
                               : '100%'}
@@ -768,7 +768,7 @@ const AcademicRecords: React.FC = () => {
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
                       {/* Backlogs Widget */}
-                      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-5 rounded-2xl flex flex-col justify-between">
+                      <div className="bg-white border border-slate-200/80 p-5 rounded-2xl flex flex-col justify-between">
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Active Backlogs</span>
                           <span className="px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-black rounded-full">Alert</span>
@@ -780,10 +780,10 @@ const AcademicRecords: React.FC = () => {
                       </div>
 
                       {/* Credits Earned */}
-                      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-5 rounded-2xl flex flex-col justify-between">
+                      <div className="bg-white border border-slate-200/80 p-5 rounded-2xl flex flex-col justify-between">
                         <span className="text-xs font-black text-slate-400 uppercase tracking-widest block">Credits Earned</span>
                         <div className="mt-6">
-                          <span className="text-3xl font-black text-indigo-600 dark:text-indigo-400">
+                          <span className="text-3xl font-black text-indigo-600">
                             {academicRecords.filter(r => r.status === 'published' && !['U', 'RA', 'F'].includes(r.grade)).reduce((acc, curr) => acc + curr.credits, 0)}
                           </span>
                           <span className="text-[10px] text-slate-400 block mt-1 font-bold">Earned toward degree</span>
@@ -791,7 +791,7 @@ const AcademicRecords: React.FC = () => {
                       </div>
 
                       {/* Credits Pending */}
-                      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-5 rounded-2xl flex flex-col justify-between">
+                      <div className="bg-white border border-slate-200/80 p-5 rounded-2xl flex flex-col justify-between">
                         <span className="text-xs font-black text-slate-400 uppercase tracking-widest block">Credits Pending</span>
                         <div className="mt-6">
                           <span className="text-3xl font-black text-amber-500">
@@ -808,26 +808,26 @@ const AcademicRecords: React.FC = () => {
                   <div className="space-y-6">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div>
-                        <h2 className="text-2xl font-black text-slate-900 dark:text-white">Academic Marksheets</h2>
+                        <h2 className="text-2xl font-black text-slate-900">Academic Marksheets</h2>
                         <p className="text-xs text-slate-400 mt-1">Official semester-wise results published by college administration.</p>
                       </div>
                       <select 
                         value={filterSemester}
                         onChange={(e) => setFilterSemester(e.target.value)}
-                        className="px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs bg-slate-50 dark:bg-slate-900 font-bold cursor-pointer"
+                        className="px-3 py-2 border border-slate-200 rounded-xl text-xs bg-slate-50 font-bold cursor-pointer"
                       >
                         <option value="">All Semesters</option>
                         {[1, 2, 3, 4, 5, 6, 7, 8].map(s => <option key={s} value={s}>Semester {s}</option>)}
                       </select>
                     </div>
 
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+                    <div className="bg-white border border-slate-200/60 rounded-2xl overflow-hidden shadow-sm">
                       {academicRecords.length === 0 ? (
                         <div className="p-12 text-center text-slate-450 text-sm">No published marksheet records.</div>
                       ) : (
                         <div className="overflow-x-auto">
-                          <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
-                            <thead className="bg-slate-50 dark:bg-slate-950">
+                          <table className="min-w-full divide-y divide-slate-200">
+                            <thead className="bg-slate-50">
                               <tr>
                                 <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase">Subject</th>
                                 <th className="px-6 py-4 text-center text-xs font-bold text-slate-500 uppercase">Semester</th>
@@ -839,30 +839,30 @@ const AcademicRecords: React.FC = () => {
                                 <th className="px-6 py-4 text-center text-xs font-bold text-slate-500 uppercase">Result</th>
                               </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-200 dark:divide-slate-800 bg-white dark:bg-slate-900">
+                            <tbody className="divide-y divide-slate-200 bg-white">
                               {academicRecords.map((rec) => {
                                 const isFail = ['U', 'RA', 'F'].includes(rec.grade) || rec.result === 'Fail';
                                 return (
-                                  <tr key={rec.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
+                                  <tr key={rec.id} className="hover:bg-slate-50/50 transition-colors">
                                     <td className="px-6 py-4 whitespace-nowrap">
-                                      <div className="font-bold text-slate-900 dark:text-white">{rec.subject_name}</div>
+                                      <div className="font-bold text-slate-900">{rec.subject_name}</div>
                                       <div className="text-[10px] text-slate-400 font-mono mt-0.5">{rec.subject_code}</div>
                                     </td>
-                                    <td className="px-6 py-4 text-center whitespace-nowrap text-xs text-slate-600 dark:text-slate-300">
+                                    <td className="px-6 py-4 text-center whitespace-nowrap text-xs text-slate-600">
                                       Sem {rec.semester}
                                     </td>
-                                    <td className="px-6 py-4 text-center whitespace-nowrap text-xs text-slate-600 dark:text-slate-300 font-mono">
+                                    <td className="px-6 py-4 text-center whitespace-nowrap text-xs text-slate-600 font-mono">
                                       {rec.internal_mark}
                                     </td>
-                                    <td className="px-6 py-4 text-center whitespace-nowrap text-xs text-slate-600 dark:text-slate-300 font-mono">
+                                    <td className="px-6 py-4 text-center whitespace-nowrap text-xs text-slate-600 font-mono">
                                       {rec.external_mark}
                                     </td>
-                                    <td className="px-6 py-4 text-center whitespace-nowrap text-sm font-black text-slate-900 dark:text-white font-mono">
+                                    <td className="px-6 py-4 text-center whitespace-nowrap text-sm font-black text-slate-900 font-mono">
                                       {rec.total_mark}
                                     </td>
                                     <td className="px-6 py-4 text-center whitespace-nowrap">
                                       <span className={`inline-flex px-2 py-0.5 rounded text-xs font-black ${
-                                        isFail ? 'bg-red-50 text-red-600 dark:bg-red-950/20 dark:text-red-400 border border-red-100/50' : 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/20 dark:text-indigo-400 border border-indigo-100/50'
+                                        isFail ? 'bg-red-50 text-red-600 border border-red-100/50' : 'bg-indigo-50 text-indigo-600 border border-indigo-100/50'
                                       }`}>
                                         {rec.grade}
                                       </span>
@@ -872,7 +872,7 @@ const AcademicRecords: React.FC = () => {
                                     </td>
                                     <td className="px-6 py-4 text-center whitespace-nowrap">
                                       <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tight ${
-                                        isFail ? 'bg-red-50 text-red-700 dark:bg-red-950/20' : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20'
+                                        isFail ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'
                                       }`}>
                                         {rec.result || (isFail ? 'Fail' : 'Pass')}
                                       </span>
@@ -891,17 +891,17 @@ const AcademicRecords: React.FC = () => {
                 {subTab === 'attendance' && (
                   <div className="space-y-6">
                     <div>
-                      <h2 className="text-2xl font-black text-slate-900 dark:text-white">Attendance Tracking</h2>
+                      <h2 className="text-2xl font-black text-slate-900">Attendance Tracking</h2>
                       <p className="text-xs text-slate-400 mt-1">Detailed stats of classes conducted, attended and subject-wise averages.</p>
                     </div>
 
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+                    <div className="bg-white border border-slate-200/60 rounded-2xl overflow-hidden shadow-sm">
                       {attendanceRecords.length === 0 ? (
                         <div className="p-12 text-center text-slate-450 text-sm">No published attendance details found.</div>
                       ) : (
                         <div className="overflow-x-auto">
-                          <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
-                            <thead className="bg-slate-50 dark:bg-slate-950">
+                          <table className="min-w-full divide-y divide-slate-200">
+                            <thead className="bg-slate-50">
                               <tr>
                                 <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase">Subject</th>
                                 <th className="px-6 py-4 text-center text-xs font-bold text-slate-500 uppercase">Semester</th>
@@ -911,22 +911,22 @@ const AcademicRecords: React.FC = () => {
                                 <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase">Trend</th>
                               </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-200 dark:divide-slate-800 bg-white dark:bg-slate-900">
+                            <tbody className="divide-y divide-slate-200 bg-white">
                               {attendanceRecords.map((att) => {
                                 const isLow = att.attendance_percentage < 75;
                                 return (
-                                  <tr key={att.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
+                                  <tr key={att.id} className="hover:bg-slate-50/50 transition-colors">
                                     <td className="px-6 py-4 whitespace-nowrap">
-                                      <div className="font-bold text-slate-900 dark:text-white">{att.subject_name}</div>
+                                      <div className="font-bold text-slate-900">{att.subject_name}</div>
                                       <div className="text-[10px] text-slate-400 font-mono mt-0.5">{att.subject_code}</div>
                                     </td>
-                                    <td className="px-6 py-4 text-center whitespace-nowrap text-xs text-slate-600 dark:text-slate-300">
+                                    <td className="px-6 py-4 text-center whitespace-nowrap text-xs text-slate-600">
                                       Sem {att.semester}
                                     </td>
-                                    <td className="px-6 py-4 text-center whitespace-nowrap text-xs text-slate-650 dark:text-slate-350 font-mono font-bold">
+                                    <td className="px-6 py-4 text-center whitespace-nowrap text-xs text-slate-650 font-mono font-bold">
                                       {att.classes_conducted}
                                     </td>
-                                    <td className="px-6 py-4 text-center whitespace-nowrap text-xs text-slate-650 dark:text-slate-350 font-mono font-bold">
+                                    <td className="px-6 py-4 text-center whitespace-nowrap text-xs text-slate-650 font-mono font-bold">
                                       {att.classes_attended}
                                     </td>
                                     <td className="px-6 py-4 text-center whitespace-nowrap">
@@ -936,14 +936,14 @@ const AcademicRecords: React.FC = () => {
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
                                       <div className="flex items-center gap-2">
-                                        <div className="w-24 bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                                        <div className="w-24 bg-slate-100 rounded-full h-1.5 overflow-hidden">
                                           <div 
                                             className={`h-full rounded-full ${isLow ? 'bg-amber-500' : 'bg-emerald-500'}`}
                                             style={{ width: `${Math.min(100, att.attendance_percentage)}%` }}
                                           />
                                         </div>
                                         {isLow && (
-                                          <span className="text-[9px] font-black text-amber-500 bg-amber-50 dark:bg-amber-950/20 px-1.5 py-0.5 rounded border border-amber-100/50 flex items-center gap-0.5">
+                                          <span className="text-[9px] font-black text-amber-500 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100/50 flex items-center gap-0.5">
                                             <AlertTriangle className="w-2.5 h-2.5" /> Low
                                           </span>
                                         )}
@@ -963,17 +963,17 @@ const AcademicRecords: React.FC = () => {
                 {subTab === 'results' && (
                   <div className="space-y-6">
                     <div>
-                      <h2 className="text-2xl font-black text-slate-900 dark:text-white">Semester Performance Reports</h2>
+                      <h2 className="text-2xl font-black text-slate-900">Semester Performance Reports</h2>
                       <p className="text-xs text-slate-400 mt-1">Consolidated transcripts showing credit allocations and GPAs.</p>
                     </div>
 
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+                    <div className="bg-white border border-slate-200/60 rounded-2xl overflow-hidden shadow-sm">
                       {(!analyticsData?.semesters || analyticsData.semesters.length === 0) ? (
                         <div className="p-12 text-center text-slate-450 text-sm">No semester results recorded.</div>
                       ) : (
                         <div className="overflow-x-auto">
-                          <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
-                            <thead className="bg-slate-50 dark:bg-slate-950">
+                          <table className="min-w-full divide-y divide-slate-200">
+                            <thead className="bg-slate-50">
                               <tr>
                                 <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase">Semester</th>
                                 <th className="px-6 py-4 text-center text-xs font-bold text-slate-500 uppercase">GPA</th>
@@ -984,25 +984,25 @@ const AcademicRecords: React.FC = () => {
                                 <th className="px-6 py-4 text-center text-xs font-bold text-slate-500 uppercase">Arrears</th>
                               </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-200 dark:divide-slate-800 bg-white dark:bg-slate-900">
+                            <tbody className="divide-y divide-slate-200 bg-white">
                               {analyticsData.semesters.map((sem: any) => (
-                                <tr key={sem.semester} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-slate-900 dark:text-white">
+                                <tr key={sem.semester} className="hover:bg-slate-50/50 transition-colors">
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-slate-900">
                                     Semester {sem.semester}
                                   </td>
-                                  <td className="px-6 py-4 text-center whitespace-nowrap text-sm font-black text-indigo-600 dark:text-indigo-400 font-mono">
+                                  <td className="px-6 py-4 text-center whitespace-nowrap text-sm font-black text-indigo-600 font-mono">
                                     {sem.gpa.toFixed(2)}
                                   </td>
-                                  <td className="px-6 py-4 text-center whitespace-nowrap text-sm font-black text-slate-800 dark:text-slate-200 font-mono">
+                                  <td className="px-6 py-4 text-center whitespace-nowrap text-sm font-black text-slate-800 font-mono">
                                     {sem.cgpa.toFixed(2)}
                                   </td>
-                                  <td className="px-6 py-4 text-center whitespace-nowrap text-xs text-slate-650 dark:text-slate-350 font-bold font-mono">
+                                  <td className="px-6 py-4 text-center whitespace-nowrap text-xs text-slate-650 font-bold font-mono">
                                     {sem.total_credits || 0}
                                   </td>
-                                  <td className="px-6 py-4 text-center whitespace-nowrap text-xs text-slate-650 dark:text-slate-350 font-bold font-mono">
+                                  <td className="px-6 py-4 text-center whitespace-nowrap text-xs text-slate-650 font-bold font-mono">
                                     {sem.credits_earned || 0}
                                   </td>
-                                  <td className="px-6 py-4 text-center whitespace-nowrap text-xs text-slate-600 dark:text-slate-400 font-mono">
+                                  <td className="px-6 py-4 text-center whitespace-nowrap text-xs text-slate-600 font-mono">
                                     {sem.credits_pending || 0}
                                   </td>
                                   <td className="px-6 py-4 text-center whitespace-nowrap">
@@ -1025,11 +1025,11 @@ const AcademicRecords: React.FC = () => {
                 {subTab === 'cgpa' && (
                   <div className="space-y-6">
                     <div>
-                      <h2 className="text-2xl font-black text-slate-900 dark:text-white">CGPA Progress Tracker</h2>
+                      <h2 className="text-2xl font-black text-slate-900">CGPA Progress Tracker</h2>
                       <p className="text-xs text-slate-400 mt-1">Growth chart showing CGPA curves over semesters.</p>
                     </div>
 
-                    <div className="bg-slate-50 dark:bg-slate-950 p-6 rounded-2xl border border-slate-250/50 dark:border-slate-850 flex flex-col items-center">
+                    <div className="bg-slate-50 p-6 rounded-2xl border border-slate-250/50 flex flex-col items-center">
                       {(!analyticsData?.semesters || analyticsData.semesters.length === 0) ? (
                         <div className="p-12 text-slate-400 text-sm">No semesters records available to plot CGPA curves.</div>
                       ) : (
@@ -1047,7 +1047,7 @@ const AcademicRecords: React.FC = () => {
                               return (
                                 <g key={i}>
                                   <line x1="40" y1={yPos} x2="480" y2={yPos} stroke="#cbd5e1" strokeWidth="0.5" strokeDasharray="4" />
-                                  <text x="15" y={yPos + 4} className="text-[10px] font-bold fill-slate-450 dark:fill-slate-500 font-mono">{y}</text>
+                                  <text x="15" y={yPos + 4} className="text-[10px] font-bold fill-slate-450 font-mono">{y}</text>
                                 </g>
                               );
                             })}
@@ -1077,8 +1077,8 @@ const AcademicRecords: React.FC = () => {
                                   {points.map((p: any, i: number) => (
                                     <g key={i}>
                                       <circle cx={p.x} cy={p.y} r="5" fill="#4f46e5" stroke="#ffffff" strokeWidth="2" />
-                                      <text x={p.x} y={p.y - 12} textAnchor="middle" className="text-[10px] font-black fill-slate-800 dark:fill-slate-200 font-mono">{p.cgpa.toFixed(2)}</text>
-                                      <text x={p.x} y="195" textAnchor="middle" className="text-[9px] font-bold fill-slate-400 dark:fill-slate-500">Sem {p.sem}</text>
+                                      <text x={p.x} y={p.y - 12} textAnchor="middle" className="text-[10px] font-black fill-slate-800 font-mono">{p.cgpa.toFixed(2)}</text>
+                                      <text x={p.x} y="195" textAnchor="middle" className="text-[9px] font-bold fill-slate-400">Sem {p.sem}</text>
                                     </g>
                                   ))}
                                 </>
@@ -1094,17 +1094,17 @@ const AcademicRecords: React.FC = () => {
                 {subTab === 'backlogs' && (
                   <div className="space-y-6">
                     <div>
-                      <h2 className="text-2xl font-black text-slate-900 dark:text-white">Active Backlogs List</h2>
+                      <h2 className="text-2xl font-black text-slate-900">Active Backlogs List</h2>
                       <p className="text-xs text-slate-400 mt-1">Pending backlogs requiring registration and re-examination.</p>
                     </div>
 
-                    <div className="bg-white dark:bg-slate-900 border border-slate-250/60 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+                    <div className="bg-white border border-slate-250/60 rounded-2xl overflow-hidden shadow-sm">
                       {academicRecords.filter(r => r.status === 'published' && ['U', 'RA', 'F'].includes(r.grade)).length === 0 ? (
                         <div className="p-12 text-center text-slate-450 text-sm">Congratulations! No active backlogs.</div>
                       ) : (
                         <div className="overflow-x-auto">
-                          <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
-                            <thead className="bg-slate-50 dark:bg-slate-950">
+                          <table className="min-w-full divide-y divide-slate-200">
+                            <thead className="bg-slate-50">
                               <tr>
                                 <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase">Subject Code</th>
                                 <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase">Subject Name</th>
@@ -1113,16 +1113,16 @@ const AcademicRecords: React.FC = () => {
                                 <th className="px-6 py-4 text-center text-xs font-bold text-slate-500 uppercase">Total Marks</th>
                               </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-200 dark:divide-slate-800 bg-white dark:bg-slate-900">
+                            <tbody className="divide-y divide-slate-200 bg-white">
                               {academicRecords.filter(r => r.status === 'published' && ['U', 'RA', 'F'].includes(r.grade)).map((rec) => (
                                 <tr key={rec.id} className="hover:bg-red-50/10 transition-colors">
                                   <td className="px-6 py-4 whitespace-nowrap text-sm font-mono font-bold text-red-600">
                                     {rec.subject_code}
                                   </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-slate-900 dark:text-white">
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-slate-900">
                                     {rec.subject_name}
                                   </td>
-                                  <td className="px-6 py-4 text-center whitespace-nowrap text-xs text-slate-650 dark:text-slate-350">
+                                  <td className="px-6 py-4 text-center whitespace-nowrap text-xs text-slate-650">
                                     Semester {rec.semester}
                                   </td>
                                   <td className="px-6 py-4 text-center whitespace-nowrap">
@@ -1130,7 +1130,7 @@ const AcademicRecords: React.FC = () => {
                                       {rec.grade}
                                     </span>
                                   </td>
-                                  <td className="px-6 py-4 text-center whitespace-nowrap font-mono font-black text-slate-900 dark:text-white">
+                                  <td className="px-6 py-4 text-center whitespace-nowrap font-mono font-black text-slate-900">
                                     {rec.total_mark}
                                   </td>
                                 </tr>
@@ -1146,12 +1146,12 @@ const AcademicRecords: React.FC = () => {
                 {subTab === 'analytics' && (
                   <div className="space-y-6">
                     <div>
-                      <h2 className="text-2xl font-black text-slate-900 dark:text-white">Academic Analytics Dashboard</h2>
+                      <h2 className="text-2xl font-black text-slate-900">Academic Analytics Dashboard</h2>
                       <p className="text-xs text-slate-400 mt-1">Breakdown distributions of grades and achievements.</p>
                     </div>
 
-                    <div className="bg-slate-50 dark:bg-slate-950 p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800/80">
-                      <h3 className="text-sm font-black text-slate-900 dark:text-white mb-4 uppercase tracking-wider">Grades Allocation Count</h3>
+                    <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200/60">
+                      <h3 className="text-sm font-black text-slate-900 mb-4 uppercase tracking-wider">Grades Allocation Count</h3>
                       <div className="flex flex-wrap gap-4 items-end justify-center min-h-[150px] pt-6">
                         {['O', 'A+', 'A', 'B+', 'B', 'C', 'U', 'RA', 'F'].map(gr => {
                           const count = academicRecords.filter(r => r.grade === gr && r.status === 'published').length;
@@ -1159,8 +1159,8 @@ const AcademicRecords: React.FC = () => {
                           const heightPct = (count / maxCount) * 100;
                           return (
                             <div key={gr} className="flex flex-col items-center gap-2 w-12">
-                              <span className="text-[10px] font-black text-slate-800 dark:text-slate-200 font-mono">{count}</span>
-                              <div className="w-8 bg-slate-200 dark:bg-slate-800 rounded-t-lg h-24 relative overflow-hidden">
+                              <span className="text-[10px] font-black text-slate-800 font-mono">{count}</span>
+                              <div className="w-8 bg-slate-200 rounded-t-lg h-24 relative overflow-hidden">
                                 <div 
                                   className={`absolute bottom-0 left-0 right-0 rounded-t-lg transition-all duration-500 ${
                                     ['U','RA','F'].includes(gr) ? 'bg-red-500' : 'bg-indigo-600'
@@ -1181,7 +1181,7 @@ const AcademicRecords: React.FC = () => {
                   <div className="space-y-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <h2 className="text-2xl font-black text-slate-900 dark:text-white">Report Card Downloads</h2>
+                        <h2 className="text-2xl font-black text-slate-900">Report Card Downloads</h2>
                         <p className="text-xs text-slate-400 mt-1">Generate print-ready transcripts and consolidated marksheets.</p>
                       </div>
                       <button
@@ -1263,29 +1263,29 @@ const AcademicRecords: React.FC = () => {
                 {subTab === 'dashboard' && (
                   <div className="space-y-6">
                     <div>
-                      <h2 className="text-2xl font-black text-slate-900 dark:text-white">Staff Roster & Summary</h2>
+                      <h2 className="text-2xl font-black text-slate-900">Staff Roster & Summary</h2>
                       <p className="text-xs text-slate-400 mt-1">Manage uploads, attendance entry logs, and subject performance dashboards.</p>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className="bg-slate-50 dark:bg-slate-950 p-5 rounded-2xl border border-slate-200/50 dark:border-slate-850 flex flex-col justify-between shadow-sm">
-                        <Users className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                      <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/50 flex flex-col justify-between shadow-sm">
+                        <Users className="w-5 h-5 text-indigo-600" />
                         <div className="mt-4">
                           <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Assigned Class</span>
-                          <span className="text-xl font-black text-slate-900 dark:text-white block mt-1">Semester {profile?.current_semester || profile?.semester || '3'}</span>
+                          <span className="text-xl font-black text-slate-900 block mt-1">Semester {profile?.current_semester || profile?.semester || '3'}</span>
                           <span className="text-[10px] text-indigo-500 font-mono font-bold block mt-1">{profile?.academic_year || '2024-2028'} Batch</span>
                         </div>
                       </div>
 
-                      <div className="bg-slate-50 dark:bg-slate-950 p-5 rounded-2xl border border-slate-200/50 dark:border-slate-850 flex flex-col justify-between shadow-sm">
-                        <FileSpreadsheet className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                      <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/50 flex flex-col justify-between shadow-sm">
+                        <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
                         <div className="mt-4">
                           <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Total Uploads</span>
-                          <span className="text-2xl font-black text-slate-900 dark:text-white block mt-1">{academicRecords.length} Records</span>
+                          <span className="text-2xl font-black text-slate-900 block mt-1">{academicRecords.length} Records</span>
                         </div>
                       </div>
 
-                      <div className="bg-slate-50 dark:bg-slate-950 p-5 rounded-2xl border border-slate-200/50 dark:border-slate-850 flex flex-col justify-between shadow-sm">
+                      <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/50 flex flex-col justify-between shadow-sm">
                         <AlertTriangle className="w-5 h-5 text-amber-500" />
                         <div className="mt-4">
                           <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Pending Reviews</span>
@@ -1300,7 +1300,7 @@ const AcademicRecords: React.FC = () => {
                   <div className="space-y-6">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div>
-                        <h2 className="text-2xl font-black text-slate-900 dark:text-white">Assigned Student Roster</h2>
+                        <h2 className="text-2xl font-black text-slate-900">Assigned Student Roster</h2>
                         <p className="text-xs text-slate-400 mt-1"> Roster list locked to your assigned semester and academic year batch.</p>
                       </div>
                       <div className="relative">
@@ -1310,18 +1310,18 @@ const AcademicRecords: React.FC = () => {
                           placeholder="Search register no or name..."
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
-                          className="pl-9 pr-4 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs bg-white dark:bg-slate-900 w-full sm:w-64"
+                          className="pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-xs bg-white w-full sm:w-64"
                         />
                       </div>
                     </div>
 
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+                    <div className="bg-white border border-slate-200/60 rounded-2xl overflow-hidden shadow-sm">
                       {directoryUsers.filter(u => u.role === 'student').length === 0 ? (
                         <div className="p-12 text-center text-slate-450 text-sm">No assigned students found in database.</div>
                       ) : (
                         <div className="overflow-x-auto">
-                          <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
-                            <thead className="bg-slate-50 dark:bg-slate-950">
+                          <table className="min-w-full divide-y divide-slate-200">
+                            <thead className="bg-slate-50">
                               <tr>
                                 <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase">Register No / Roll No</th>
                                 <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase">Student Name</th>
@@ -1330,18 +1330,18 @@ const AcademicRecords: React.FC = () => {
                                 <th className="px-6 py-4 text-center text-xs font-bold text-slate-500 uppercase">Academic Year</th>
                               </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-200 dark:divide-slate-800 bg-white dark:bg-slate-900">
+                            <tbody className="divide-y divide-slate-200 bg-white">
                               {directoryUsers
                                 .filter(u => u.role === 'student' && (
                                   u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                                   (u.roll_no && u.roll_no.toLowerCase().includes(searchQuery.toLowerCase()))
                                 ))
                                 .map((st) => (
-                                  <tr key={st.uid || st.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
-                                    <td className="px-6 py-4 whitespace-nowrap text-xs font-mono font-bold text-slate-700 dark:text-slate-300">
+                                  <tr key={st.uid || st.id} className="hover:bg-slate-50/50 transition-colors">
+                                    <td className="px-6 py-4 whitespace-nowrap text-xs font-mono font-bold text-slate-700">
                                       {st.roll_no || 'N/A'}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-slate-900 dark:text-white">
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-slate-900">
                                       {st.name}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-xs text-slate-500">
@@ -1350,7 +1350,7 @@ const AcademicRecords: React.FC = () => {
                                     <td className="px-6 py-4 text-center whitespace-nowrap text-xs font-bold text-slate-650">
                                       Sem {st.semester || 3}
                                     </td>
-                                    <td className="px-6 py-4 text-center whitespace-nowrap text-xs font-mono text-indigo-600 dark:text-indigo-400">
+                                    <td className="px-6 py-4 text-center whitespace-nowrap text-xs font-mono text-indigo-600">
                                       {st.academic_year || '2024-2028'}
                                     </td>
                                   </tr>
@@ -1366,11 +1366,11 @@ const AcademicRecords: React.FC = () => {
                 {subTab === 'attendance' && (
                   <div className="space-y-6">
                     <div>
-                      <h2 className="text-2xl font-black text-slate-900 dark:text-white">Attendance Roster Entry</h2>
+                      <h2 className="text-2xl font-black text-slate-900">Attendance Roster Entry</h2>
                       <p className="text-xs text-slate-400 mt-1">Configure subjects and upload attendance stats for isolation-approved students.</p>
                     </div>
 
-                    <div className="bg-slate-50 dark:bg-slate-950 p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 space-y-4">
+                    <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200/60 space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div>
                           <label className="block text-[10px] font-black uppercase text-slate-400 mb-1">Subject Code</label>
@@ -1379,7 +1379,7 @@ const AcademicRecords: React.FC = () => {
                             placeholder="e.g. CS301"
                             value={attSubjectCode}
                             onChange={(e) => setAttSubjectCode(e.target.value)}
-                            className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs bg-white dark:bg-slate-900 font-bold uppercase"
+                            className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white font-bold uppercase"
                           />
                         </div>
                         <div>
@@ -1389,7 +1389,7 @@ const AcademicRecords: React.FC = () => {
                             placeholder="e.g. Database Systems"
                             value={attSubjectName}
                             onChange={(e) => setAttSubjectName(e.target.value)}
-                            className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs bg-white dark:bg-slate-900 font-bold"
+                            className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white font-bold"
                           />
                         </div>
                         <div>
@@ -1397,7 +1397,7 @@ const AcademicRecords: React.FC = () => {
                           <select
                             value={attSem}
                             onChange={(e) => setAttSem(e.target.value)}
-                            className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs bg-white dark:bg-slate-900 font-bold"
+                            className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white font-bold"
                           >
                             {[1,2,3,4,5,6,7,8].map(s => <option key={s} value={s}>Semester {s}</option>)}
                           </select>
@@ -1408,15 +1408,15 @@ const AcademicRecords: React.FC = () => {
                             type="number"
                             value={commonConducted}
                             onChange={(e) => applyCommonConducted(e.target.value)}
-                            className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs bg-white dark:bg-slate-900 font-mono font-bold"
+                            className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white font-mono font-bold"
                           />
                         </div>
                       </div>
                     </div>
 
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-                      <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
-                        <thead className="bg-slate-50 dark:bg-slate-950">
+                    <div className="bg-white border border-slate-200/60 rounded-2xl overflow-hidden shadow-sm">
+                      <table className="min-w-full divide-y divide-slate-200">
+                        <thead className="bg-slate-50">
                           <tr>
                             <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase">Roll No</th>
                             <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase">Student Name</th>
@@ -1425,15 +1425,15 @@ const AcademicRecords: React.FC = () => {
                             <th className="px-6 py-4 text-center text-xs font-bold text-slate-500 uppercase">Attendance %</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-200 dark:divide-slate-800 bg-white dark:bg-slate-900">
+                        <tbody className="divide-y divide-slate-200 bg-white">
                           {attendanceFormRecords.map((r, index) => {
                             const pct = r.classes_conducted > 0 ? ((r.classes_attended / r.classes_conducted) * 100).toFixed(1) : '0';
                             return (
-                              <tr key={r.student_id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
+                              <tr key={r.student_id} className="hover:bg-slate-50/50 transition-colors">
                                 <td className="px-6 py-4 whitespace-nowrap text-xs font-mono font-bold text-slate-600">
                                   {r.roll_no}
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-slate-900 dark:text-white">
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-slate-900">
                                   {r.name}
                                 </td>
                                 <td className="px-6 py-4 text-center whitespace-nowrap">
@@ -1441,7 +1441,7 @@ const AcademicRecords: React.FC = () => {
                                     type="number"
                                     value={r.classes_conducted}
                                     onChange={(e) => handleAttendanceRowChange(index, 'classes_conducted', Number(e.target.value))}
-                                    className="w-16 px-2 py-1 border border-slate-200 dark:border-slate-800 rounded text-center text-xs font-mono font-bold"
+                                    className="w-16 px-2 py-1 border border-slate-200 rounded text-center text-xs font-mono font-bold"
                                   />
                                 </td>
                                 <td className="px-6 py-4 text-center whitespace-nowrap">
@@ -1449,10 +1449,10 @@ const AcademicRecords: React.FC = () => {
                                     type="number"
                                     value={r.classes_attended}
                                     onChange={(e) => handleAttendanceRowChange(index, 'classes_attended', Number(e.target.value))}
-                                    className="w-16 px-2 py-1 border border-slate-200 dark:border-slate-800 rounded text-center text-xs font-mono font-bold"
+                                    className="w-16 px-2 py-1 border border-slate-200 rounded text-center text-xs font-mono font-bold"
                                   />
                                 </td>
-                                <td className="px-6 py-4 text-center whitespace-nowrap font-black font-mono text-indigo-600 dark:text-indigo-400">
+                                <td className="px-6 py-4 text-center whitespace-nowrap font-black font-mono text-indigo-600">
                                   {pct}%
                                 </td>
                               </tr>
@@ -1478,20 +1478,20 @@ const AcademicRecords: React.FC = () => {
                   <div className="space-y-6">
                     <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                       <div>
-                        <h2 className="text-2xl font-black text-slate-900 dark:text-white">Marksheets Upload System</h2>
+                        <h2 className="text-2xl font-black text-slate-900">Marksheets Upload System</h2>
                         <p className="text-xs text-slate-400 mt-1">Upload grade reports or enter details manually below.</p>
                       </div>
                       <button
                         onClick={() => setIsManualEntry(!isManualEntry)}
-                        className="px-4 py-2 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-850 rounded-xl text-xs font-bold transition-all"
+                        className="px-4 py-2 border border-slate-200 hover:bg-slate-50 rounded-xl text-xs font-bold transition-all"
                       >
                         {isManualEntry ? 'Upload Files Instead' : 'Manual Form Entry'}
                       </button>
                     </div>
 
                     {isManualEntry ? (
-                      <form onSubmit={handleManualMarksSubmit} className="max-w-xl mx-auto bg-slate-50 dark:bg-slate-950 p-6 rounded-2xl border border-slate-200/50 dark:border-slate-800/80 space-y-4">
-                        <h3 className="font-black text-slate-900 dark:text-white text-sm">Add Academic Record</h3>
+                      <form onSubmit={handleManualMarksSubmit} className="max-w-xl mx-auto bg-slate-50 p-6 rounded-2xl border border-slate-200/50 space-y-4">
+                        <h3 className="font-black text-slate-900 text-sm">Add Academic Record</h3>
                         <div className="grid grid-cols-2 gap-4">
                           <div>
                             <label className="block text-[10px] font-black uppercase text-slate-400 mb-1">Student Register No</label>
@@ -1501,7 +1501,7 @@ const AcademicRecords: React.FC = () => {
                               placeholder="e.g. E2E_ROLL_123"
                               value={manualRegNo}
                               onChange={(e) => setManualRegNo(e.target.value)}
-                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white dark:bg-slate-900 font-bold"
+                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white font-bold"
                             />
                           </div>
                           <div>
@@ -1509,7 +1509,7 @@ const AcademicRecords: React.FC = () => {
                             <select
                               value={manualSem}
                               onChange={(e) => setManualSem(e.target.value)}
-                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white dark:bg-slate-900 font-bold"
+                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white font-bold"
                             >
                               {[1,2,3,4,5,6,7,8].map(s => <option key={s} value={s}>Semester {s}</option>)}
                             </select>
@@ -1525,7 +1525,7 @@ const AcademicRecords: React.FC = () => {
                               placeholder="e.g. CS301"
                               value={manualSubCode}
                               onChange={(e) => setManualSubCode(e.target.value)}
-                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white dark:bg-slate-900 font-bold uppercase"
+                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white font-bold uppercase"
                             />
                           </div>
                           <div>
@@ -1536,7 +1536,7 @@ const AcademicRecords: React.FC = () => {
                               placeholder="e.g. Database Systems"
                               value={manualSubName}
                               onChange={(e) => setManualSubName(e.target.value)}
-                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white dark:bg-slate-900 font-bold"
+                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white font-bold"
                             />
                           </div>
                         </div>
@@ -1550,7 +1550,7 @@ const AcademicRecords: React.FC = () => {
                               placeholder="Max 20"
                               value={manualInternal}
                               onChange={(e) => setManualInternal(e.target.value)}
-                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white dark:bg-slate-900 font-mono font-bold"
+                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white font-mono font-bold"
                             />
                           </div>
                           <div>
@@ -1561,7 +1561,7 @@ const AcademicRecords: React.FC = () => {
                               placeholder="Max 80"
                               value={manualExternal}
                               onChange={(e) => setManualExternal(e.target.value)}
-                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white dark:bg-slate-900 font-mono font-bold"
+                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white font-mono font-bold"
                             />
                           </div>
                           <div>
@@ -1572,7 +1572,7 @@ const AcademicRecords: React.FC = () => {
                               placeholder="e.g. 90"
                               value={manualAttendance}
                               onChange={(e) => setManualAttendance(e.target.value)}
-                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white dark:bg-slate-900 font-mono font-bold"
+                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white font-mono font-bold"
                             />
                           </div>
                         </div>
@@ -1583,7 +1583,7 @@ const AcademicRecords: React.FC = () => {
                             <select
                               value={manualCredits}
                               onChange={(e) => setManualCredits(e.target.value)}
-                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white dark:bg-slate-900 font-bold"
+                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white font-bold"
                             >
                               {[1,2,3,4,5].map(c => <option key={c} value={c}>{c} Credits</option>)}
                             </select>
@@ -1593,7 +1593,7 @@ const AcademicRecords: React.FC = () => {
                             <select
                               value={manualGrade}
                               onChange={(e) => setManualGrade(e.target.value)}
-                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white dark:bg-slate-900 font-bold"
+                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white font-bold"
                             >
                               {['O', 'A+', 'A', 'B+', 'B', 'C', 'U', 'RA', 'F'].map(g => <option key={g} value={g}>{g}</option>)}
                             </select>
@@ -1609,10 +1609,10 @@ const AcademicRecords: React.FC = () => {
                       </form>
                     ) : (
                       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <div className="lg:col-span-1 bg-slate-50 dark:bg-slate-950 p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 h-fit">
-                          <h3 className="text-sm font-black text-slate-900 dark:text-white mb-4 uppercase tracking-wider">Select Files</h3>
+                        <div className="lg:col-span-1 bg-slate-50 p-6 rounded-2xl border border-slate-200/60 h-fit">
+                          <h3 className="text-sm font-black text-slate-900 mb-4 uppercase tracking-wider">Select Files</h3>
                           <form onSubmit={handleUploadFileSubmit} className="space-y-4">
-                            <div className="border-2 border-dashed border-slate-250 dark:border-slate-800 hover:border-indigo-400 rounded-2xl p-6 text-center cursor-pointer relative flex flex-col items-center justify-center bg-white dark:bg-slate-900 transition-colors">
+                            <div className="border-2 border-dashed border-slate-250 hover:border-indigo-400 rounded-2xl p-6 text-center cursor-pointer relative flex flex-col items-center justify-center bg-white transition-colors">
                               <input 
                                 type="file" 
                                 accept=".xlsx, .xls, .csv, .pdf"
@@ -1620,7 +1620,7 @@ const AcademicRecords: React.FC = () => {
                                 onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
                               />
                               <FileSpreadsheet className="w-8 h-8 text-slate-400 mb-2" />
-                              <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block truncate w-full">
+                              <span className="text-xs font-bold text-slate-800 block truncate w-full">
                                 {uploadFile ? uploadFile.name : 'Choose File'}
                               </span>
                               <span className="text-[10px] text-slate-400 mt-1 block">Supports XLSX, CSV or PDF. Max 10MB.</span>
@@ -1635,10 +1635,10 @@ const AcademicRecords: React.FC = () => {
                           </form>
                         </div>
 
-                        <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-850 p-5 rounded-2xl">
+                        <div className="lg:col-span-2 bg-white border border-slate-200/60 p-5 rounded-2xl">
                           <div className="flex justify-between items-center mb-4">
                             <div>
-                              <h3 className="font-black text-slate-950 dark:text-white text-sm">Upload Preview List</h3>
+                              <h3 className="font-black text-slate-950 text-sm">Upload Preview List</h3>
                               <p className="text-[10px] text-slate-400 font-medium">Verify auto-matched database students before saving.</p>
                             </div>
                             {uploadPreview.length > 0 && (
@@ -1656,9 +1656,9 @@ const AcademicRecords: React.FC = () => {
                               Upload a grade file to render the verification mappings.
                             </div>
                           ) : (
-                            <div className="overflow-x-auto border border-slate-100 dark:border-slate-800 rounded-xl">
-                              <table className="min-w-full divide-y divide-slate-100 dark:divide-slate-850 text-xs">
-                                <thead className="bg-slate-55 dark:bg-slate-950">
+                            <div className="overflow-x-auto border border-slate-100 rounded-xl">
+                              <table className="min-w-full divide-y divide-slate-100 text-xs">
+                                <thead className="bg-slate-55">
                                   <tr>
                                     <th className="px-4 py-3 text-left font-bold text-slate-500">Reg No</th>
                                     <th className="px-4 py-3 text-left font-bold text-slate-500">Student Profile Match</th>
@@ -1667,13 +1667,13 @@ const AcademicRecords: React.FC = () => {
                                     <th className="px-4 py-3 text-center font-bold text-slate-500">Grade</th>
                                   </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-100 dark:divide-slate-850 bg-white dark:bg-slate-900">
+                                <tbody className="divide-y divide-slate-100 bg-white">
                                   {uploadPreview.map((rec, idx) => (
                                     <tr key={idx} className={rec.matched ? 'hover:bg-slate-50/30' : 'bg-red-50/15'}>
                                       <td className="px-4 py-3 font-mono font-bold text-slate-650">{rec.register_no}</td>
                                       <td className="px-4 py-3">
                                         {rec.matched ? (
-                                          <div className="flex items-center gap-1.5 text-slate-900 dark:text-slate-100 font-bold">
+                                          <div className="flex items-center gap-1.5 text-slate-900 font-bold">
                                             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> {rec.student_name}
                                           </div>
                                         ) : (
@@ -1701,18 +1701,18 @@ const AcademicRecords: React.FC = () => {
                   <div className="space-y-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <h2 className="text-2xl font-black text-slate-900 dark:text-white">Uploaded Records List</h2>
+                        <h2 className="text-2xl font-black text-slate-900">Uploaded Records List</h2>
                         <p className="text-xs text-slate-400 mt-1">Review status details of marks sheets uploaded for review.</p>
                       </div>
                     </div>
 
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+                    <div className="bg-white border border-slate-200/60 rounded-2xl overflow-hidden shadow-sm">
                       {academicRecords.length === 0 ? (
                         <div className="p-12 text-center text-slate-450 text-sm">No uploaded records found.</div>
                       ) : (
                         <div className="overflow-x-auto">
-                          <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800 text-xs">
-                            <thead className="bg-slate-50 dark:bg-slate-950">
+                          <table className="min-w-full divide-y divide-slate-200 text-xs">
+                            <thead className="bg-slate-50">
                               <tr>
                                 <th className="px-6 py-4 text-left font-bold text-slate-500 uppercase">Student</th>
                                 <th className="px-6 py-4 text-left font-bold text-slate-500 uppercase">Subject</th>
@@ -1722,15 +1722,15 @@ const AcademicRecords: React.FC = () => {
                                 <th className="px-6 py-4 text-center font-bold text-slate-500 uppercase">Status</th>
                               </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-200 dark:divide-slate-800 bg-white dark:bg-slate-900">
+                            <tbody className="divide-y divide-slate-200 bg-white">
                               {academicRecords.map((rec) => (
                                 <tr key={rec.id} className="hover:bg-slate-55/20 transition-colors">
                                   <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="font-bold text-slate-900 dark:text-white">{rec.student_name}</div>
+                                    <div className="font-bold text-slate-900">{rec.student_name}</div>
                                     <div className="text-[10px] text-slate-400 font-mono mt-0.5">{rec.roll_no || rec.student_id}</div>
                                   </td>
                                   <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="font-bold text-slate-900 dark:text-white">{rec.subject_name}</div>
+                                    <div className="font-bold text-slate-900">{rec.subject_name}</div>
                                     <div className="text-[10px] text-slate-400 font-mono mt-0.5">{rec.subject_code}</div>
                                   </td>
                                   <td className="px-6 py-4 text-center whitespace-nowrap">Sem {rec.semester}</td>
@@ -1756,11 +1756,11 @@ const AcademicRecords: React.FC = () => {
                 {subTab === 'results' && (
                   <div className="space-y-6">
                     <div>
-                      <h2 className="text-2xl font-black text-slate-900 dark:text-white">Semester GPAs Overview</h2>
+                      <h2 className="text-2xl font-black text-slate-900">Semester GPAs Overview</h2>
                       <p className="text-xs text-slate-400 mt-1">GPAs lists of active students in your department.</p>
                     </div>
 
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+                    <div className="bg-white border border-slate-200/60 rounded-2xl overflow-hidden shadow-sm">
                       {academicRecords.length === 0 ? (
                         <div className="p-12 text-center text-slate-450 text-sm">No published student results available.</div>
                       ) : (
@@ -1775,26 +1775,26 @@ const AcademicRecords: React.FC = () => {
                 {subTab === 'analytics' && (
                   <div className="space-y-6">
                     <div>
-                      <h2 className="text-2xl font-black text-slate-900 dark:text-white">Assigned Subject analytics</h2>
+                      <h2 className="text-2xl font-black text-slate-900">Assigned Subject analytics</h2>
                       <p className="text-xs text-slate-400 mt-1">Review comparative pass percentages and student distributions.</p>
                     </div>
 
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 p-6 rounded-2xl">
-                      <h3 className="font-black text-slate-950 dark:text-white text-sm mb-6 uppercase tracking-wider">Pass Rate per Subject</h3>
+                    <div className="bg-white border border-slate-200/60 p-6 rounded-2xl">
+                      <h3 className="font-black text-slate-950 text-sm mb-6 uppercase tracking-wider">Pass Rate per Subject</h3>
                       {(!analyticsData || !Array.isArray(analyticsData)) ? (
                         <div className="p-12 text-center text-slate-400 text-xs">No active subject analytics.</div>
                       ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                           {analyticsData.map((sub: any) => (
-                            <div key={sub.subject_code} className="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-150">
+                            <div key={sub.subject_code} className="bg-slate-50 p-4 rounded-xl border border-slate-150">
                               <span className="text-[10px] font-black font-mono text-indigo-600 uppercase tracking-widest">{sub.subject_code}</span>
-                              <h4 className="font-black text-xs text-slate-900 dark:text-white mt-1 truncate">{sub.subject_name}</h4>
+                              <h4 className="font-black text-xs text-slate-900 mt-1 truncate">{sub.subject_name}</h4>
                               <div className="mt-6">
                                 <div className="flex justify-between items-baseline text-xs mb-1.5">
                                   <span className="text-slate-450 font-bold">Pass Rate</span>
                                   <span className="font-black text-slate-900">{sub.pass_percentage}%</span>
                                 </div>
-                                <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
+                                <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
                                   <div className="h-full bg-indigo-600 rounded-full" style={{ width: `${sub.pass_percentage}%` }} />
                                 </div>
                                 <span className="text-[10px] text-slate-400 font-bold block mt-2">Total Students: {sub.total_students}</span>
@@ -1817,22 +1817,22 @@ const AcademicRecords: React.FC = () => {
                 {subTab === 'dashboard' && (
                   <div className="space-y-6">
                     <div>
-                      <h2 className="text-2xl font-black text-slate-900 dark:text-white">Department Overview</h2>
+                      <h2 className="text-2xl font-black text-slate-900">Department Overview</h2>
                       <p className="text-xs text-slate-400 mt-1">Overview analytics and approval trackers for HOD.</p>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className="bg-slate-50 dark:bg-slate-950 p-5 rounded-2xl border border-slate-150 flex flex-col justify-between">
+                      <div className="bg-slate-50 p-5 rounded-2xl border border-slate-150 flex flex-col justify-between">
                         <Users className="w-5 h-5 text-indigo-650" />
                         <div className="mt-4">
                           <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Total Students</span>
-                          <span className="text-2xl font-black text-slate-900 dark:text-white block mt-1">
+                          <span className="text-2xl font-black text-slate-900 block mt-1">
                             {directoryUsers.filter(u => u.role === 'student').length} Registered
                           </span>
                         </div>
                       </div>
 
-                      <div className="bg-slate-50 dark:bg-slate-950 p-5 rounded-2xl border border-slate-150 flex flex-col justify-between">
+                      <div className="bg-slate-50 p-5 rounded-2xl border border-slate-150 flex flex-col justify-between">
                         <TrendingUp className="w-5 h-5 text-emerald-600" />
                         <div className="mt-4">
                           <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Average CGPA</span>
@@ -1842,7 +1842,7 @@ const AcademicRecords: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="bg-slate-50 dark:bg-slate-950 p-5 rounded-2xl border border-slate-150 flex flex-col justify-between">
+                      <div className="bg-slate-50 p-5 rounded-2xl border border-slate-150 flex flex-col justify-between">
                         <AlertTriangle className="w-5 h-5 text-red-500" />
                         <div className="mt-4">
                           <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Department Backlogs</span>
@@ -1859,7 +1859,7 @@ const AcademicRecords: React.FC = () => {
                   <div className="space-y-6">
                     <div className="flex justify-between items-center">
                       <div>
-                        <h2 className="text-2xl font-black text-slate-900 dark:text-white">Department Students Directory</h2>
+                        <h2 className="text-2xl font-black text-slate-900">Department Students Directory</h2>
                         <p className="text-xs text-slate-400 mt-1">Roster of all students enrolled in your department.</p>
                       </div>
                       <input
@@ -1867,13 +1867,13 @@ const AcademicRecords: React.FC = () => {
                         placeholder="Search student..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="px-3 py-2 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-xl text-xs w-64"
+                        className="px-3 py-2 border border-slate-200 bg-white rounded-xl text-xs w-64"
                       />
                     </div>
 
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-                      <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800 text-xs">
-                        <thead className="bg-slate-50 dark:bg-slate-950">
+                    <div className="bg-white border border-slate-200/60 rounded-2xl overflow-hidden shadow-sm">
+                      <table className="min-w-full divide-y divide-slate-200 text-xs">
+                        <thead className="bg-slate-50">
                           <tr>
                             <th className="px-6 py-4 text-left font-bold text-slate-500 uppercase">Roll No</th>
                             <th className="px-6 py-4 text-left font-bold text-slate-500 uppercase">Student Name</th>
@@ -1882,13 +1882,13 @@ const AcademicRecords: React.FC = () => {
                             <th className="px-6 py-4 text-center font-bold text-slate-500 uppercase">Academic Year</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-200 dark:divide-slate-800 bg-white dark:bg-slate-900">
+                        <tbody className="divide-y divide-slate-200 bg-white">
                           {directoryUsers
                             .filter(u => u.role === 'student' && u.name.toLowerCase().includes(searchQuery.toLowerCase()))
                             .map((st) => (
                               <tr key={st.uid || st.id} className="hover:bg-slate-50/50 transition-colors">
                                 <td className="px-6 py-4 whitespace-nowrap font-mono font-bold text-slate-650">{st.roll_no || 'N/A'}</td>
-                                <td className="px-6 py-4 whitespace-nowrap font-bold text-slate-900 dark:text-white">{st.name}</td>
+                                <td className="px-6 py-4 whitespace-nowrap font-bold text-slate-900">{st.name}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-slate-450">{st.email}</td>
                                 <td className="px-6 py-4 text-center whitespace-nowrap">Sem {st.semester || 3}</td>
                                 <td className="px-6 py-4 text-center whitespace-nowrap font-mono text-indigo-650">{st.academic_year}</td>
@@ -1903,13 +1903,13 @@ const AcademicRecords: React.FC = () => {
                 {subTab === 'staff' && (
                   <div className="space-y-6">
                     <div>
-                      <h2 className="text-2xl font-black text-slate-900 dark:text-white">Department Staff Directory</h2>
+                      <h2 className="text-2xl font-black text-slate-900">Department Staff Directory</h2>
                       <p className="text-xs text-slate-400 mt-1">Listing of academic staff and their course batches assignments.</p>
                     </div>
 
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-                      <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800 text-xs">
-                        <thead className="bg-slate-50 dark:bg-slate-950">
+                    <div className="bg-white border border-slate-200/60 rounded-2xl overflow-hidden shadow-sm">
+                      <table className="min-w-full divide-y divide-slate-200 text-xs">
+                        <thead className="bg-slate-50">
                           <tr>
                             <th className="px-6 py-4 text-left font-bold text-slate-500 uppercase">Staff Name</th>
                             <th className="px-6 py-4 text-left font-bold text-slate-500 uppercase">Email</th>
@@ -1917,10 +1917,10 @@ const AcademicRecords: React.FC = () => {
                             <th className="px-6 py-4 text-center font-bold text-slate-500 uppercase">Assigned Semester</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-200 dark:divide-slate-800 bg-white dark:bg-slate-900">
+                        <tbody className="divide-y divide-slate-200 bg-white">
                           {directoryUsers.filter(u => u.role === 'staff').map((st) => (
                             <tr key={st.uid || st.id} className="hover:bg-slate-50/50 transition-colors">
-                              <td className="px-6 py-4 whitespace-nowrap font-bold text-slate-900 dark:text-white">{st.name}</td>
+                              <td className="px-6 py-4 whitespace-nowrap font-bold text-slate-900">{st.name}</td>
                               <td className="px-6 py-4 whitespace-nowrap text-slate-450">{st.email}</td>
                               <td className="px-6 py-4 text-center whitespace-nowrap font-mono text-indigo-650">{st.academic_year || 'All Years'}</td>
                               <td className="px-6 py-4 text-center whitespace-nowrap">Sem {st.semester || 'All Semesters'}</td>
@@ -1936,14 +1936,14 @@ const AcademicRecords: React.FC = () => {
                   <div className="space-y-6">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
                       <div>
-                        <h2 className="text-2xl font-black text-slate-900 dark:text-white">Academic Verification Queue</h2>
+                        <h2 className="text-2xl font-black text-slate-900">Academic Verification Queue</h2>
                         <p className="text-xs text-slate-400 mt-1">Review pending marksheets and attendance uploaded by your department staff.</p>
                       </div>
-                      <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-950 rounded-xl">
+                      <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl">
                         <button 
                           onClick={() => setVerificationMode('marks')}
                           className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                            verificationMode === 'marks' ? 'bg-white dark:bg-slate-900 text-indigo-600 shadow' : 'text-slate-500'
+                            verificationMode === 'marks' ? 'bg-white text-indigo-600 shadow' : 'text-slate-500'
                           }`}
                         >
                           Marksheets
@@ -1951,7 +1951,7 @@ const AcademicRecords: React.FC = () => {
                         <button 
                           onClick={() => setVerificationMode('attendance')}
                           className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                            verificationMode === 'attendance' ? 'bg-white dark:bg-slate-900 text-indigo-600 shadow' : 'text-slate-500'
+                            verificationMode === 'attendance' ? 'bg-white text-indigo-600 shadow' : 'text-slate-500'
                           }`}
                         >
                           Attendance
@@ -1981,12 +1981,12 @@ const AcademicRecords: React.FC = () => {
                           )}
                         </div>
 
-                        <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+                        <div className="bg-white border border-slate-200/60 rounded-2xl overflow-hidden shadow-sm">
                           {pendingMarks.length === 0 ? (
                             <div className="p-12 text-center text-slate-400 text-xs">No pending marksheets.</div>
                           ) : (
-                            <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800 text-xs">
-                              <thead className="bg-slate-50 dark:bg-slate-950">
+                            <table className="min-w-full divide-y divide-slate-200 text-xs">
+                              <thead className="bg-slate-50">
                                 <tr>
                                   <th className="w-10 px-6 py-4">
                                     <input 
@@ -2005,7 +2005,7 @@ const AcademicRecords: React.FC = () => {
                                   <th className="px-6 py-4 text-center font-bold text-slate-500 uppercase">Grade</th>
                                 </tr>
                               </thead>
-                              <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                              <tbody className="divide-y divide-slate-200">
                                 {pendingMarks.map((rec) => (
                                   <tr key={rec.id} className="hover:bg-slate-50/50">
                                     <td className="px-6 py-4 text-center">
@@ -2020,11 +2020,11 @@ const AcademicRecords: React.FC = () => {
                                       />
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
-                                      <div className="font-bold text-slate-900 dark:text-white">{rec.student_name}</div>
+                                      <div className="font-bold text-slate-900">{rec.student_name}</div>
                                       <div className="text-[10px] text-slate-450 font-mono mt-0.5">{rec.roll_no}</div>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
-                                      <div className="font-bold text-slate-900 dark:text-white">{rec.subject_name}</div>
+                                      <div className="font-bold text-slate-900">{rec.subject_name}</div>
                                       <div className="text-[10px] text-slate-450 font-mono mt-0.5">{rec.subject_code}</div>
                                     </td>
                                     <td className="px-6 py-4 text-center">Sem {rec.semester}</td>
@@ -2059,12 +2059,12 @@ const AcademicRecords: React.FC = () => {
                           )}
                         </div>
 
-                        <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+                        <div className="bg-white border border-slate-200/60 rounded-2xl overflow-hidden shadow-sm">
                           {pendingAttendance.length === 0 ? (
                             <div className="p-12 text-center text-slate-400 text-xs">No pending attendance entries.</div>
                           ) : (
-                            <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800 text-xs">
-                              <thead className="bg-slate-50 dark:bg-slate-950">
+                            <table className="min-w-full divide-y divide-slate-200 text-xs">
+                              <thead className="bg-slate-50">
                                 <tr>
                                   <th className="w-10 px-6 py-4">
                                     <input 
@@ -2083,7 +2083,7 @@ const AcademicRecords: React.FC = () => {
                                   <th className="px-6 py-4 text-center font-bold text-slate-500 uppercase">Percentage</th>
                                 </tr>
                               </thead>
-                              <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                              <tbody className="divide-y divide-slate-200">
                                 {pendingAttendance.map((rec) => (
                                   <tr key={rec.id} className="hover:bg-slate-50/50">
                                     <td className="px-6 py-4 text-center">
@@ -2098,11 +2098,11 @@ const AcademicRecords: React.FC = () => {
                                       />
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
-                                      <div className="font-bold text-slate-900 dark:text-white">{rec.student_name}</div>
+                                      <div className="font-bold text-slate-900">{rec.student_name}</div>
                                       <div className="text-[10px] text-slate-450 font-mono mt-0.5">{rec.roll_no}</div>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
-                                      <div className="font-bold text-slate-900 dark:text-white">{rec.subject_name}</div>
+                                      <div className="font-bold text-slate-900">{rec.subject_name}</div>
                                       <div className="text-[10px] text-slate-450 font-mono mt-0.5">{rec.subject_code}</div>
                                     </td>
                                     <td className="px-6 py-4 text-center">{rec.classes_conducted}</td>
@@ -2122,16 +2122,16 @@ const AcademicRecords: React.FC = () => {
                 {subTab === 'attendance_analytics' && (
                   <div className="space-y-6">
                     <div>
-                      <h2 className="text-2xl font-black text-slate-900 dark:text-white">Department Attendance warning flags</h2>
+                      <h2 className="text-2xl font-black text-slate-900">Department Attendance warning flags</h2>
                       <p className="text-xs text-slate-400 mt-1">List of students falling below standard 75% attendance criteria.</p>
                     </div>
 
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+                    <div className="bg-white border border-slate-200/60 rounded-2xl overflow-hidden shadow-sm">
                       {attendanceRecords.filter(a => a.status === 'published' && a.attendance_percentage < 75).length === 0 ? (
                         <div className="p-12 text-center text-slate-450 text-xs">All department students exceed attendance thresholds.</div>
                       ) : (
-                        <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800 text-xs">
-                          <thead className="bg-slate-55 dark:bg-slate-950">
+                        <table className="min-w-full divide-y divide-slate-200 text-xs">
+                          <thead className="bg-slate-55">
                             <tr>
                               <th className="px-6 py-4 text-left font-bold text-slate-500">Student Roll No</th>
                               <th className="px-6 py-4 text-left font-bold text-slate-500">Student Name</th>
@@ -2140,11 +2140,11 @@ const AcademicRecords: React.FC = () => {
                               <th className="px-6 py-4 text-center font-bold text-slate-500">Percentage</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                          <tbody className="divide-y divide-slate-200">
                             {attendanceRecords.filter(a => a.status === 'published' && a.attendance_percentage < 75).map(att => (
                               <tr key={att.id} className="bg-red-50/10 hover:bg-red-50/20">
                                 <td className="px-6 py-4 font-mono font-bold text-slate-650">{att.roll_no}</td>
-                                <td className="px-6 py-4 font-bold text-slate-900 dark:text-white">{att.student_name}</td>
+                                <td className="px-6 py-4 font-bold text-slate-900">{att.student_name}</td>
                                 <td className="px-6 py-4 font-bold">{att.subject_name} ({att.subject_code})</td>
                                 <td className="px-6 py-4 text-center">{att.classes_conducted} / {att.classes_attended}</td>
                                 <td className="px-6 py-4 text-center font-black text-red-600">{att.attendance_percentage}%</td>
@@ -2160,11 +2160,11 @@ const AcademicRecords: React.FC = () => {
                 {subTab === 'analytics' && (
                   <div className="space-y-6">
                     <div>
-                      <h2 className="text-2xl font-black text-slate-900 dark:text-white">Department Performance Metrics</h2>
+                      <h2 className="text-2xl font-black text-slate-900">Department Performance Metrics</h2>
                       <p className="text-xs text-slate-400 mt-1">Review average CGPAs and achievement records.</p>
                     </div>
 
-                    <div className="bg-white dark:bg-slate-900 border border-slate-205 p-6 rounded-2xl">
+                    <div className="bg-white border border-slate-205 p-6 rounded-2xl">
                       <div className="text-center p-12 text-slate-400 text-xs">
                         Department comparative analysis graphs and CGPA charts can be structured here based on published records.
                       </div>
@@ -2182,40 +2182,40 @@ const AcademicRecords: React.FC = () => {
                 {subTab === 'dashboard' && (
                   <div className="space-y-6">
                     <div>
-                      <h2 className="text-2xl font-black text-slate-900 dark:text-white">College Admin Console</h2>
+                      <h2 className="text-2xl font-black text-slate-900">College Admin Console</h2>
                       <p className="text-xs text-slate-400 mt-1">Manage departmental hierarchies, HODs, staff, and publish results.</p>
                     </div>
 
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                      <div className="bg-slate-50 dark:bg-slate-950 p-5 rounded-2xl border border-slate-150 flex flex-col justify-between">
+                      <div className="bg-slate-50 p-5 rounded-2xl border border-slate-150 flex flex-col justify-between">
                         <Network className="w-5 h-5 text-indigo-650" />
                         <div className="mt-4">
                           <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Departments</span>
-                          <span className="text-xl font-black text-slate-900 dark:text-white block mt-1">{departments.length} Active</span>
+                          <span className="text-xl font-black text-slate-900 block mt-1">{departments.length} Active</span>
                         </div>
                       </div>
 
-                      <div className="bg-slate-50 dark:bg-slate-950 p-5 rounded-2xl border border-slate-150 flex flex-col justify-between">
+                      <div className="bg-slate-50 p-5 rounded-2xl border border-slate-150 flex flex-col justify-between">
                         <Users className="w-5 h-5 text-emerald-650" />
                         <div className="mt-4">
                           <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Staff Members</span>
-                          <span className="text-xl font-black text-slate-900 dark:text-white block mt-1">
+                          <span className="text-xl font-black text-slate-900 block mt-1">
                             {directoryUsers.filter(u => u.role === 'staff').length} Active
                           </span>
                         </div>
                       </div>
 
-                      <div className="bg-slate-50 dark:bg-slate-950 p-5 rounded-2xl border border-slate-150 flex flex-col justify-between">
+                      <div className="bg-slate-50 p-5 rounded-2xl border border-slate-150 flex flex-col justify-between">
                         <Users className="w-5 h-5 text-violet-650" />
                         <div className="mt-4">
                           <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Students</span>
-                          <span className="text-xl font-black text-slate-900 dark:text-white block mt-1">
+                          <span className="text-xl font-black text-slate-900 block mt-1">
                             {directoryUsers.filter(u => u.role === 'student').length} Registered
                           </span>
                         </div>
                       </div>
 
-                      <div className="bg-slate-50 dark:bg-slate-950 p-5 rounded-2xl border border-slate-150 flex flex-col justify-between">
+                      <div className="bg-slate-50 p-5 rounded-2xl border border-slate-150 flex flex-col justify-between">
                         <Layers className="w-5 h-5 text-amber-500" />
                         <div className="mt-4">
                           <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Approvals Queue</span>
@@ -2231,23 +2231,23 @@ const AcademicRecords: React.FC = () => {
                 {subTab === 'departments' && (
                   <div className="space-y-6">
                     <div>
-                      <h2 className="text-2xl font-black text-slate-900 dark:text-white">College Departments</h2>
+                      <h2 className="text-2xl font-black text-slate-900">College Departments</h2>
                       <p className="text-xs text-slate-400 mt-1">Departments configured under this college.</p>
                     </div>
 
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-                      <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800 text-xs">
-                        <thead className="bg-slate-50 dark:bg-slate-950">
+                    <div className="bg-white border border-slate-200/60 rounded-2xl overflow-hidden shadow-sm">
+                      <table className="min-w-full divide-y divide-slate-200 text-xs">
+                        <thead className="bg-slate-50">
                           <tr>
                             <th className="px-6 py-4 text-left font-bold text-slate-500 uppercase">Department ID</th>
                             <th className="px-6 py-4 text-left font-bold text-slate-500 uppercase">Department Name</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-200 dark:divide-slate-800 bg-white dark:bg-slate-900">
+                        <tbody className="divide-y divide-slate-200 bg-white">
                           {departments.map((dept) => (
                             <tr key={dept.id}>
-                              <td className="px-6 py-4 whitespace-nowrap font-mono font-bold text-indigo-600 dark:text-indigo-400">{dept.id}</td>
-                              <td className="px-6 py-4 whitespace-nowrap font-bold text-slate-900 dark:text-white">{dept.name}</td>
+                              <td className="px-6 py-4 whitespace-nowrap font-mono font-bold text-indigo-600">{dept.id}</td>
+                              <td className="px-6 py-4 whitespace-nowrap font-bold text-slate-900">{dept.name}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -2259,23 +2259,23 @@ const AcademicRecords: React.FC = () => {
                 {subTab === 'hod' && (
                   <div className="space-y-6">
                     <div>
-                      <h2 className="text-2xl font-black text-slate-900 dark:text-white">Head of Department (HOD) Roster</h2>
+                      <h2 className="text-2xl font-black text-slate-900">Head of Department (HOD) Roster</h2>
                       <p className="text-xs text-slate-400 mt-1">List of departments heads managed under this college.</p>
                     </div>
 
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-                      <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800 text-xs">
-                        <thead className="bg-slate-50 dark:bg-slate-950">
+                    <div className="bg-white border border-slate-200/60 rounded-2xl overflow-hidden shadow-sm">
+                      <table className="min-w-full divide-y divide-slate-200 text-xs">
+                        <thead className="bg-slate-50">
                           <tr>
                             <th className="px-6 py-4 text-left font-bold text-slate-500 uppercase">HOD Name</th>
                             <th className="px-6 py-4 text-left font-bold text-slate-500 uppercase">Email</th>
                             <th className="px-6 py-4 text-left font-bold text-slate-500 uppercase">Department</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-200 dark:divide-slate-800 bg-white dark:bg-slate-900">
+                        <tbody className="divide-y divide-slate-200 bg-white">
                           {directoryUsers.filter(u => u.role === 'hod').map((h) => (
                             <tr key={h.uid || h.id}>
-                              <td className="px-6 py-4 whitespace-nowrap font-bold text-slate-900 dark:text-white">{h.name}</td>
+                              <td className="px-6 py-4 whitespace-nowrap font-bold text-slate-900">{h.name}</td>
                               <td className="px-6 py-4 whitespace-nowrap text-slate-450">{h.email}</td>
                               <td className="px-6 py-4 whitespace-nowrap font-bold text-indigo-650">{h.department_id || h.departmentId}</td>
                             </tr>
@@ -2289,23 +2289,23 @@ const AcademicRecords: React.FC = () => {
                 {subTab === 'staff' && (
                   <div className="space-y-6">
                     <div>
-                      <h2 className="text-2xl font-black text-slate-900 dark:text-white">College Staff Management</h2>
+                      <h2 className="text-2xl font-black text-slate-900">College Staff Management</h2>
                       <p className="text-xs text-slate-400 mt-1"> Roster of academic teachers and staff directory.</p>
                     </div>
 
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-                      <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800 text-xs">
-                        <thead className="bg-slate-50 dark:bg-slate-950">
+                    <div className="bg-white border border-slate-200/60 rounded-2xl overflow-hidden shadow-sm">
+                      <table className="min-w-full divide-y divide-slate-200 text-xs">
+                        <thead className="bg-slate-50">
                           <tr>
                             <th className="px-6 py-4 text-left font-bold text-slate-500 uppercase">Staff Name</th>
                             <th className="px-6 py-4 text-left font-bold text-slate-500 uppercase">Email</th>
                             <th className="px-6 py-4 text-center font-bold text-slate-500 uppercase">Department</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-200 dark:divide-slate-800 bg-white dark:bg-slate-900">
+                        <tbody className="divide-y divide-slate-200 bg-white">
                           {directoryUsers.filter(u => u.role === 'staff').map((s) => (
                             <tr key={s.uid || s.id}>
-                              <td className="px-6 py-4 whitespace-nowrap font-bold text-slate-900 dark:text-white">{s.name}</td>
+                              <td className="px-6 py-4 whitespace-nowrap font-bold text-slate-900">{s.name}</td>
                               <td className="px-6 py-4 whitespace-nowrap text-slate-450">{s.email}</td>
                               <td className="px-6 py-4 text-center whitespace-nowrap font-bold text-indigo-650">{s.department_id || s.departmentId}</td>
                             </tr>
@@ -2319,13 +2319,13 @@ const AcademicRecords: React.FC = () => {
                 {subTab === 'students' && (
                   <div className="space-y-6">
                     <div>
-                      <h2 className="text-2xl font-black text-slate-900 dark:text-white">College Students Roster</h2>
+                      <h2 className="text-2xl font-black text-slate-900">College Students Roster</h2>
                       <p className="text-xs text-slate-400 mt-1">Directory of students registered in your college.</p>
                     </div>
 
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-                      <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800 text-xs">
-                        <thead className="bg-slate-50 dark:bg-slate-950">
+                    <div className="bg-white border border-slate-200/60 rounded-2xl overflow-hidden shadow-sm">
+                      <table className="min-w-full divide-y divide-slate-200 text-xs">
+                        <thead className="bg-slate-50">
                           <tr>
                             <th className="px-6 py-4 text-left font-bold text-slate-500 uppercase">Roll No</th>
                             <th className="px-6 py-4 text-left font-bold text-slate-500 uppercase">Name</th>
@@ -2333,11 +2333,11 @@ const AcademicRecords: React.FC = () => {
                             <th className="px-6 py-4 text-center font-bold text-slate-500 uppercase">Semester</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-200 dark:divide-slate-800 bg-white dark:bg-slate-900">
+                        <tbody className="divide-y divide-slate-200 bg-white">
                           {directoryUsers.filter(u => u.role === 'student').map((st) => (
                             <tr key={st.uid || st.id}>
                               <td className="px-6 py-4 whitespace-nowrap font-mono font-bold text-slate-650">{st.roll_no || 'N/A'}</td>
-                              <td className="px-6 py-4 whitespace-nowrap font-bold text-slate-900 dark:text-white">{st.name}</td>
+                              <td className="px-6 py-4 whitespace-nowrap font-bold text-slate-900">{st.name}</td>
                               <td className="px-6 py-4 whitespace-nowrap font-bold text-indigo-650">{st.department_id || st.departmentId}</td>
                               <td className="px-6 py-4 text-center whitespace-nowrap">Sem {st.semester || 3}</td>
                             </tr>
@@ -2351,13 +2351,13 @@ const AcademicRecords: React.FC = () => {
                 {subTab === 'records' && (
                   <div className="space-y-6">
                     <div>
-                      <h2 className="text-2xl font-black text-slate-900 dark:text-white">Academic Records Directory</h2>
+                      <h2 className="text-2xl font-black text-slate-900">Academic Records Directory</h2>
                       <p className="text-xs text-slate-400 mt-1">Global view of all published and pending academic records.</p>
                     </div>
 
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-                      <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800 text-xs">
-                        <thead className="bg-slate-50 dark:bg-slate-950">
+                    <div className="bg-white border border-slate-200/60 rounded-2xl overflow-hidden shadow-sm">
+                      <table className="min-w-full divide-y divide-slate-200 text-xs">
+                        <thead className="bg-slate-50">
                           <tr>
                             <th className="px-6 py-4 text-left font-bold text-slate-500 uppercase">Student</th>
                             <th className="px-6 py-4 text-left font-bold text-slate-500 uppercase">Subject</th>
@@ -2365,11 +2365,11 @@ const AcademicRecords: React.FC = () => {
                             <th className="px-6 py-4 text-center font-bold text-slate-500 uppercase">Status</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-200 dark:divide-slate-800 bg-white dark:bg-slate-900">
+                        <tbody className="divide-y divide-slate-200 bg-white">
                           {academicRecords.map(rec => (
                             <tr key={rec.id}>
                               <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="font-bold text-slate-900 dark:text-white">{rec.student_name}</div>
+                                <div className="font-bold text-slate-900">{rec.student_name}</div>
                                 <div className="text-[10px] text-slate-400 font-mono mt-0.5">{rec.roll_no}</div>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap font-bold">{rec.subject_name} ({rec.subject_code})</td>
@@ -2393,14 +2393,14 @@ const AcademicRecords: React.FC = () => {
                   <div className="space-y-6">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
                       <div>
-                        <h2 className="text-2xl font-black text-slate-900 dark:text-white">Academic Result Publishing Wizard</h2>
+                        <h2 className="text-2xl font-black text-slate-900">Academic Result Publishing Wizard</h2>
                         <p className="text-xs text-slate-400 mt-1">Publish results to calculate GPAs, CGPAs and release report cards.</p>
                       </div>
-                      <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-950 rounded-xl">
+                      <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl">
                         <button 
                           onClick={() => setPublishMode('results')}
                           className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                            publishMode === 'results' ? 'bg-white dark:bg-slate-900 text-indigo-600 shadow' : 'text-slate-500'
+                            publishMode === 'results' ? 'bg-white text-indigo-600 shadow' : 'text-slate-500'
                           }`}
                         >
                           Semester Results
@@ -2408,7 +2408,7 @@ const AcademicRecords: React.FC = () => {
                         <button 
                           onClick={() => setPublishMode('attendance')}
                           className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                            publishMode === 'attendance' ? 'bg-white dark:bg-slate-900 text-indigo-600 shadow' : 'text-slate-500'
+                            publishMode === 'attendance' ? 'bg-white text-indigo-600 shadow' : 'text-slate-500'
                           }`}
                         >
                           Attendance
@@ -2416,8 +2416,8 @@ const AcademicRecords: React.FC = () => {
                       </div>
                     </div>
 
-                    <form onSubmit={handlePublishResults} className="max-w-xl mx-auto bg-slate-50 dark:bg-slate-950 p-8 rounded-3xl border border-slate-200/60 dark:border-slate-800/80 space-y-6">
-                      <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">
+                    <form onSubmit={handlePublishResults} className="max-w-xl mx-auto bg-slate-50 p-8 rounded-3xl border border-slate-200/60 space-y-6">
+                      <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">
                         Publish {publishMode === 'results' ? 'Semester Results' : 'Attendance'} Records
                       </h3>
                       <div>
@@ -2426,7 +2426,7 @@ const AcademicRecords: React.FC = () => {
                           required
                           value={publishDept}
                           onChange={(e) => setPublishDept(e.target.value)}
-                          className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-800 rounded-xl text-xs bg-white dark:bg-slate-900 font-bold"
+                          className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-xs bg-white font-bold"
                         >
                           <option value="">Choose Department</option>
                           {departments.map((dept) => (
@@ -2442,7 +2442,7 @@ const AcademicRecords: React.FC = () => {
                             required
                             value={publishSem}
                             onChange={(e) => setPublishSem(e.target.value)}
-                            className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-800 rounded-xl text-xs bg-white dark:bg-slate-900 font-bold"
+                            className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-xs bg-white font-bold"
                           >
                             {[1, 2, 3, 4, 5, 6, 7, 8].map(s => (
                               <option key={s} value={s}>Semester {s}</option>
@@ -2456,7 +2456,7 @@ const AcademicRecords: React.FC = () => {
                             required
                             value={publishYear}
                             onChange={(e) => setPublishYear(e.target.value)}
-                            className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-800 rounded-xl text-xs bg-white dark:bg-slate-900 font-mono font-bold"
+                            className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-xs bg-white font-mono font-bold"
                           >
                             <option value="">Year/Batch</option>
                             {['2023-2027', '2024-2028', '2025-2029', '2026-2030'].map(yr => (
@@ -2480,12 +2480,12 @@ const AcademicRecords: React.FC = () => {
                 {subTab === 'analytics' && (
                   <div className="space-y-6">
                     <div>
-                      <h2 className="text-2xl font-black text-slate-900 dark:text-white">College-Wide Analytics</h2>
+                      <h2 className="text-2xl font-black text-slate-900">College-Wide Analytics</h2>
                       <p className="text-xs text-slate-400 mt-1">Compare departmental academic CGPAs averages and pass rates.</p>
                     </div>
 
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 p-6 rounded-2xl">
-                      <h3 className="font-black text-slate-950 dark:text-white text-sm mb-6 uppercase tracking-wider">Average CGPA by Department</h3>
+                    <div className="bg-white border border-slate-200/60 p-6 rounded-2xl">
+                      <h3 className="font-black text-slate-950 text-sm mb-6 uppercase tracking-wider">Average CGPA by Department</h3>
                       {(!analyticsData || !Array.isArray(analyticsData)) ? (
                         <div className="p-12 text-center text-slate-400 text-xs">No active college analytics records.</div>
                       ) : (
@@ -2493,10 +2493,10 @@ const AcademicRecords: React.FC = () => {
                           {analyticsData.map((d: any) => (
                             <div key={d.department_id} className="flex flex-col gap-1.5">
                               <div className="flex justify-between items-baseline text-xs font-bold">
-                                <span className="text-slate-900 dark:text-white">{d.department_name || d.department_id} ({d.total_students} students)</span>
+                                <span className="text-slate-900">{d.department_name || d.department_id} ({d.total_students} students)</span>
                                 <span className="font-mono text-indigo-600">Avg: {(d.avg_cgpa || 0).toFixed(2)} / 10.0</span>
                               </div>
-                              <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-3 overflow-hidden">
+                              <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
                                 <div className="h-full bg-indigo-600 rounded-full" style={{ width: `${(d.avg_cgpa || 0) * 10}%` }} />
                               </div>
                             </div>
@@ -2517,28 +2517,28 @@ const AcademicRecords: React.FC = () => {
                 {subTab === 'dashboard' && (
                   <div className="space-y-6">
                     <div>
-                      <h2 className="text-2xl font-black text-slate-900 dark:text-white">Global Super Admin Console</h2>
+                      <h2 className="text-2xl font-black text-slate-900">Global Super Admin Console</h2>
                       <p className="text-xs text-slate-400 mt-1">High-level view of all registered colleges and global pass percentages.</p>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className="bg-slate-50 dark:bg-slate-950 p-5 rounded-2xl border border-slate-150 flex flex-col justify-between">
+                      <div className="bg-slate-50 p-5 rounded-2xl border border-slate-150 flex flex-col justify-between">
                         <Building2 className="w-5 h-5 text-indigo-650" />
                         <div className="mt-4">
                           <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Total Colleges</span>
-                          <span className="text-2xl font-black text-slate-900 dark:text-white block mt-1">{colleges.length} Colleges</span>
+                          <span className="text-2xl font-black text-slate-900 block mt-1">{colleges.length} Colleges</span>
                         </div>
                       </div>
 
-                      <div className="bg-slate-50 dark:bg-slate-950 p-5 rounded-2xl border border-slate-150 flex flex-col justify-between">
+                      <div className="bg-slate-50 p-5 rounded-2xl border border-slate-150 flex flex-col justify-between">
                         <Users className="w-5 h-5 text-emerald-650" />
                         <div className="mt-4">
                           <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Global Registered Users</span>
-                          <span className="text-2xl font-black text-slate-900 dark:text-white block mt-1">{directoryUsers.length} Users</span>
+                          <span className="text-2xl font-black text-slate-900 block mt-1">{directoryUsers.length} Users</span>
                         </div>
                       </div>
 
-                      <div className="bg-slate-50 dark:bg-slate-950 p-5 rounded-2xl border border-slate-150 flex flex-col justify-between">
+                      <div className="bg-slate-50 p-5 rounded-2xl border border-slate-150 flex flex-col justify-between">
                         <Award className="w-5 h-5 text-violet-650" />
                         <div className="mt-4">
                           <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Top College</span>
@@ -2554,24 +2554,24 @@ const AcademicRecords: React.FC = () => {
                 {subTab === 'colleges' && (
                   <div className="space-y-6">
                     <div>
-                      <h2 className="text-2xl font-black text-slate-900 dark:text-white">Registered Colleges</h2>
+                      <h2 className="text-2xl font-black text-slate-900">Registered Colleges</h2>
                       <p className="text-xs text-slate-400 mt-1">Directory list of academic colleges on the SkillTrack platform.</p>
                     </div>
 
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-                      <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800 text-xs">
-                        <thead className="bg-slate-50 dark:bg-slate-950">
+                    <div className="bg-white border border-slate-200/60 rounded-2xl overflow-hidden shadow-sm">
+                      <table className="min-w-full divide-y divide-slate-200 text-xs">
+                        <thead className="bg-slate-50">
                           <tr>
                             <th className="px-6 py-4 text-left font-bold text-slate-500 uppercase">College ID</th>
                             <th className="px-6 py-4 text-left font-bold text-slate-500 uppercase">College Name</th>
                             <th className="px-6 py-4 text-left font-bold text-slate-500 uppercase">Location</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-200 dark:divide-slate-800 bg-white dark:bg-slate-900">
+                        <tbody className="divide-y divide-slate-200 bg-white">
                           {colleges.map((col) => (
                             <tr key={col.id}>
-                              <td className="px-6 py-4 whitespace-nowrap font-mono font-bold text-indigo-600 dark:text-indigo-400">{col.id}</td>
-                              <td className="px-6 py-4 whitespace-nowrap font-bold text-slate-900 dark:text-white">{col.name}</td>
+                              <td className="px-6 py-4 whitespace-nowrap font-mono font-bold text-indigo-600">{col.id}</td>
+                              <td className="px-6 py-4 whitespace-nowrap font-bold text-slate-900">{col.name}</td>
                               <td className="px-6 py-4 whitespace-nowrap text-slate-450">{col.location || 'N/A'}</td>
                             </tr>
                           ))}
@@ -2584,12 +2584,12 @@ const AcademicRecords: React.FC = () => {
                 {subTab === 'analytics' && (
                   <div className="space-y-6">
                     <div>
-                      <h2 className="text-2xl font-black text-slate-900 dark:text-white">Global Academic Comparisons</h2>
+                      <h2 className="text-2xl font-black text-slate-900">Global Academic Comparisons</h2>
                       <p className="text-xs text-slate-400 mt-1">Compare average CGPAs and performance indices across colleges.</p>
                     </div>
 
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 p-6 rounded-2xl">
-                      <h3 className="font-black text-slate-950 dark:text-white text-sm mb-6 uppercase tracking-wider">Average CGPA by College</h3>
+                    <div className="bg-white border border-slate-200/60 p-6 rounded-2xl">
+                      <h3 className="font-black text-slate-950 text-sm mb-6 uppercase tracking-wider">Average CGPA by College</h3>
                       {(!analyticsData || !Array.isArray(analyticsData)) ? (
                         <div className="p-12 text-center text-slate-400 text-xs">No global comparison data available.</div>
                       ) : (
@@ -2597,10 +2597,10 @@ const AcademicRecords: React.FC = () => {
                           {analyticsData.map((col: any) => (
                             <div key={col.college_id} className="flex flex-col gap-1.5">
                               <div className="flex justify-between items-baseline text-xs font-bold">
-                                <span className="text-slate-900 dark:text-white">{col.college_name || col.college_id} ({col.total_students} students)</span>
+                                <span className="text-slate-900">{col.college_name || col.college_id} ({col.total_students} students)</span>
                                 <span className="font-mono text-indigo-600">Avg CGPA: {(col.avg_cgpa || 0).toFixed(2)}</span>
                               </div>
-                              <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-3 overflow-hidden">
+                              <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
                                 <div className="h-full bg-indigo-650 rounded-full" style={{ width: `${(col.avg_cgpa || 0) * 10}%` }} />
                               </div>
                             </div>
@@ -2614,11 +2614,11 @@ const AcademicRecords: React.FC = () => {
                 {subTab === 'reports' && (
                   <div className="space-y-6">
                     <div>
-                      <h2 className="text-2xl font-black text-slate-900 dark:text-white">Global Platform Reports</h2>
+                      <h2 className="text-2xl font-black text-slate-900">Global Platform Reports</h2>
                       <p className="text-xs text-slate-400 mt-1">Generate consolidated files and statistics reports.</p>
                     </div>
 
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200 p-6 rounded-2xl">
+                    <div className="bg-white border border-slate-200 p-6 rounded-2xl">
                       <div className="text-center p-12 text-slate-400 text-xs font-bold uppercase tracking-wider">
                         Office reports and PDF transcript exports can be generated from the global colleges metrics dashboard.
                       </div>

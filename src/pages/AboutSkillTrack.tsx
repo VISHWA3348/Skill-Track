@@ -31,7 +31,7 @@ const AboutSkillTrack: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-950 transition-colors duration-500">
+    <div className="min-h-screen bg-white transition-colors duration-500">
       <Navbar />
       
       <main className="pt-32 pb-20">
@@ -41,16 +41,16 @@ const AboutSkillTrack: React.FC = () => {
             <motion.h1 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="text-4xl md:text-6xl font-black text-gray-900 dark:text-white mb-6"
+              className="text-4xl md:text-6xl font-black text-gray-900 mb-6"
             >
               Empowering Academic & <br/>
-              <span className="text-indigo-600 dark:text-indigo-400">Verifiable Careers</span>
+              <span className="text-indigo-600">Verifiable Careers</span>
             </motion.h1>
             <motion.p 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
-              className="text-lg md:text-xl text-gray-600 dark:text-gray-400 max-w-3xl mx-auto leading-relaxed"
+              className="text-lg md:text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed"
             >
               Skill Track is a comprehensive student certificate tracking, verification, career development, and academic management platform. We believe achievements should be secure, portable, and immediately verifiable.
             </motion.p>
@@ -58,13 +58,13 @@ const AboutSkillTrack: React.FC = () => {
         </section>
 
         {/* Stats Grid */}
-        <section className="bg-slate-50 dark:bg-slate-900/40 py-16 mb-20 px-4">
+        <section className="bg-slate-50 py-16 mb-20 px-4">
           <div className="max-w-7xl mx-auto">
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
               {stats.map((stat, i) => (
                 <div key={i} className="text-center">
-                  <p className="text-4xl md:text-5xl font-black text-indigo-600 dark:text-indigo-400">{stat.value}</p>
-                  <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 mt-2">{stat.label}</p>
+                  <p className="text-4xl md:text-5xl font-black text-indigo-600">{stat.value}</p>
+                  <p className="text-sm font-semibold text-gray-500 mt-2">{stat.label}</p>
                 </div>
               ))}
             </div>
@@ -75,17 +75,17 @@ const AboutSkillTrack: React.FC = () => {
         <section className="max-w-7xl mx-auto px-4 mb-20">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
             <div>
-              <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">Our Mission</h2>
-              <p className="text-gray-600 dark:text-gray-400 leading-relaxed mb-4">
+              <h2 className="text-3xl font-bold text-gray-900 mb-6">Our Mission</h2>
+              <p className="text-gray-600 leading-relaxed mb-4">
                 Our mission is to eliminate credential inflation and streamline the verification process for students, colleges, and global recruiters. By providing a single source of truth for student extracurriculars, portfolios, and courses, we foster institutional integrity.
               </p>
-              <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
+              <p className="text-gray-600 leading-relaxed">
                 Through our multi-tier approval chains and automated fraud checking, administrators can confidently back student credentials, while students present verified records for job placements.
               </p>
             </div>
-            <div className="bg-indigo-50/50 dark:bg-slate-900 border border-indigo-100 dark:border-slate-800 p-8 rounded-3xl">
-              <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">Our Vision</h2>
-              <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
+            <div className="bg-indigo-50/50 border border-indigo-100 p-8 rounded-3xl">
+              <h2 className="text-3xl font-bold text-gray-900 mb-6">Our Vision</h2>
+              <p className="text-gray-600 leading-relaxed">
                 We envision a world where every skill and certification obtained is universally understood, cryptographically tamper-proof, and accessible in one single click. We seek to bridges the gap between educational institutions and global enterprises, enabling merit-based hires.
               </p>
             </div>
@@ -95,17 +95,17 @@ const AboutSkillTrack: React.FC = () => {
         {/* Values */}
         <section className="max-w-7xl mx-auto px-4 mb-20">
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Our Core Values</h2>
-            <p className="text-gray-500 dark:text-gray-400 mt-2">The principles that guide our product and team.</p>
+            <h2 className="text-3xl font-bold text-gray-900">Our Core Values</h2>
+            <p className="text-gray-500 mt-2">The principles that guide our product and team.</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {values.map((v, i) => (
-              <div key={i} className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 p-6 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
-                <div className="p-3 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-xl w-fit mb-6">
+              <div key={i} className="bg-white border border-gray-100 p-6 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
+                <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl w-fit mb-6">
                   <v.icon className="w-6 h-6" />
                 </div>
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">{v.title}</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">{v.desc}</p>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">{v.title}</h3>
+                <p className="text-sm text-gray-600 leading-relaxed">{v.desc}</p>
               </div>
             ))}
           </div>
@@ -114,18 +114,18 @@ const AboutSkillTrack: React.FC = () => {
         {/* Timeline */}
         <section className="max-w-4xl mx-auto px-4">
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Our Journey</h2>
-            <p className="text-gray-500 dark:text-gray-400 mt-2">How we built the tracking and verification ecosystem.</p>
+            <h2 className="text-3xl font-bold text-gray-900">Our Journey</h2>
+            <p className="text-gray-500 mt-2">How we built the tracking and verification ecosystem.</p>
           </div>
-          <div className="relative border-l border-indigo-100 dark:border-slate-800 ml-4 md:ml-32">
+          <div className="relative border-l border-indigo-100 ml-4 md:ml-32">
             {milestones.map((m, i) => (
               <div key={i} className="mb-12 last:mb-0 relative pl-8">
-                <div className="absolute -left-3 top-1.5 w-6 h-6 rounded-full bg-indigo-600 dark:bg-indigo-400 border-4 border-white dark:border-gray-950 flex items-center justify-center shadow-md" />
+                <div className="absolute -left-3 top-1.5 w-6 h-6 rounded-full bg-indigo-600 border-4 border-white flex items-center justify-center shadow-md" />
                 <div className="md:absolute md:-left-36 md:top-1 md:w-28 text-left md:text-right">
-                  <span className="text-lg font-black text-indigo-600 dark:text-indigo-400">{m.year}</span>
+                  <span className="text-lg font-black text-indigo-600">{m.year}</span>
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">{m.title}</h3>
-                <p className="text-gray-600 dark:text-gray-400 leading-relaxed">{m.desc}</p>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">{m.title}</h3>
+                <p className="text-gray-600 leading-relaxed">{m.desc}</p>
               </div>
             ))}
           </div>

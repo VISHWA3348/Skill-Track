@@ -27,7 +27,8 @@ export const ROLE_ROUTES: Record<string, string[]> = {
     '/dashboard/opportunities',
     '/dashboard/student',
     '/dashboard/users',
-    '/dashboard/academic-records'
+    '/dashboard/academic-records',
+    '/dashboard/academic-calendar'
   ],
   staff: [
     '/dashboard',
@@ -39,7 +40,8 @@ export const ROLE_ROUTES: Record<string, string[]> = {
     '/dashboard/settings',
     '/dashboard/student',
     '/dashboard/users',
-    '/dashboard/academic-records'
+    '/dashboard/academic-records',
+    '/dashboard/academic-calendar'
   ],
   student: [
     '/dashboard',

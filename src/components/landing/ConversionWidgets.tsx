@@ -53,7 +53,7 @@ const ConversionWidgets: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 100 }}
             transition={{ duration: 0.3 }}
-            className="fixed bottom-0 left-0 right-0 z-[80] bg-white dark:bg-gray-900 border-t border-slate-200 dark:border-slate-800 shadow-[0_-10px_30px_rgba(0,0,0,0.08)] py-4 px-6 transition-colors"
+            className="fixed bottom-0 left-0 right-0 z-[80] bg-white border-t border-slate-200 shadow-[0_-10px_30px_rgba(0,0,0,0.08)] py-4 px-6 transition-colors"
           >
             <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="flex items-center space-x-3">
@@ -61,7 +61,7 @@ const ConversionWidgets: React.FC = () => {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-indigo-600"></span>
                 </span>
-                <p className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white">
+                <p className="text-xs sm:text-sm font-semibold text-gray-900">
                   Ready to optimize certificate verification for your campus?
                 </p>
               </div>
@@ -69,20 +69,20 @@ const ConversionWidgets: React.FC = () => {
               <div className="flex flex-wrap items-center gap-3">
                 <button
                   onClick={() => navigate('/contact')}
-                  className="flex items-center space-x-1.5 px-4 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                  className="flex items-center space-x-1.5 px-4 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
                 >
                   <Calendar className="w-3.5 h-3.5" />
                   <span>Book Demo</span>
                 </button>
                 <button
                   onClick={() => navigate('/enterprise')}
-                  className="flex items-center space-x-1 px-4 py-2 bg-slate-900 dark:bg-slate-700 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-colors"
+                  className="flex items-center space-x-1 px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-colors"
                 >
                   <span>Request Access</span>
                 </button>
                 <button
                   onClick={() => navigate('/login')}
-                  className="flex items-center space-x-1 px-5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-100 dark:shadow-none"
+                  className="flex items-center space-x-1 px-5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-100"
                 >
                   <span>Get Started</span>
                   <ArrowRight className="w-3.5 h-3.5" />
@@ -92,7 +92,7 @@ const ConversionWidgets: React.FC = () => {
                     setShowSticky(false);
                     setClosedSticky(true);
                   }}
-                  className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-white rounded-lg transition-colors ml-2"
+                  className="p-1 text-slate-400 hover:text-slate-600 rounded-lg transition-colors ml-2"
                   title="Close banner"
                 >
                   <X className="w-4 h-4" />

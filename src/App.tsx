@@ -201,7 +201,7 @@ const App: React.FC = () => {
                   </AuthGuard>
                 } />
                 <Route path="academic-calendar" element={
-                  <AuthGuard allowedRoles={['super_admin', 'admin']}>
+                  <AuthGuard allowedRoles={['super_admin', 'admin', 'hod', 'staff']}>
                     <AcademicCalendar />
                   </AuthGuard>
                 } />

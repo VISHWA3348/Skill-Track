@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { 
   Calendar, 
   RefreshCw, 
@@ -59,6 +60,9 @@ interface PromotionLog {
 }
 
 const AcademicCalendar: React.FC = () => {
+  const { profile } = useAuth();
+  const isReadOnly = ['hod', 'staff', 'student'].includes(profile?.role || '');
+
   const [activeTab, setActiveTab] = useState<'calendar' | 'override' | 'history'>('calendar');
   const [calendarEntries, setCalendarEntries] = useState<CalendarEntry[]>([]);
   const [eligibleSemesters, setEligibleSemesters] = useState<EligibleSemester[]>([]);
@@ -90,8 +94,18 @@ const AcademicCalendar: React.FC = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
+      const token = localStorage.getItem('token');
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
+
       // Fetch calendar entries
-      const calRes = await fetch('/api/admin/academic-calendar');
+      const calRes = await fetch('/api/academic-calendar', { headers });
+      if (!calRes.ok) {
+        const errorData = await calRes.json();
+        throw new Error(errorData.message || errorData.error || 'Failed to load academic calendar data');
+      }
       const calData = await calRes.json();
       if (calData.success) {
         setCalendarEntries(calData.data);
@@ -109,23 +123,34 @@ const AcademicCalendar: React.FC = () => {
         setEditedEntries(initialEdits);
       }
 
-      // Fetch eligible promotion details
-      const eligibleRes = await fetch('/api/admin/promote/eligible');
-      const eligibleData = await eligibleRes.json();
-      if (eligibleData.success) {
-        setEligibleSemesters(eligibleData.data.eligibleSemesters);
-        setStudents(eligibleData.data.students);
-      }
+      // Non-admin roles (HOD, Staff, Student) do not fetch promotion details or history
+      if (!isReadOnly) {
+        // Fetch eligible promotion details
+        const eligibleRes = await fetch('/api/promote/eligible', { headers });
+        if (!eligibleRes.ok) {
+          const errorData = await eligibleRes.json();
+          throw new Error(errorData.message || errorData.error || 'Failed to load eligible promotion details');
+        }
+        const eligibleData = await eligibleRes.json();
+        if (eligibleData.success) {
+          setEligibleSemesters(eligibleData.data.eligibleSemesters);
+          setStudents(eligibleData.data.students);
+        }
 
-      // Fetch history logs
-      const historyRes = await fetch('/api/admin/promote/history');
-      const historyData = await historyRes.json();
-      if (historyData.success) {
-        setHistoryLogs(historyData.data);
+        // Fetch history logs
+        const historyRes = await fetch('/api/promote/history', { headers });
+        if (!historyRes.ok) {
+          const errorData = await historyRes.json();
+          throw new Error(errorData.message || errorData.error || 'Failed to load promotion history logs');
+        }
+        const historyData = await historyRes.json();
+        if (historyData.success) {
+          setHistoryLogs(historyData.data);
+        }
       }
     } catch (err: any) {
       console.error(err);
-      toast.error('Failed to load academic calendar data');
+      toast.error(err.message || 'Failed to load academic calendar data');
     } finally {
       setLoading(false);
     }
@@ -142,8 +167,10 @@ const AcademicCalendar: React.FC = () => {
   };
 
   const handleSaveCalendar = async () => {
+    if (isReadOnly) return;
     setSaving(true);
     try {
+      const token = localStorage.getItem('token');
       const payload = Object.entries(editedEntries).map(([id, values]) => {
         // Convert yyyy-MM-dd to full ISO Date string for database
         const startIso = values.semester_start_date ? new Date(values.semester_start_date).toISOString() : '';
@@ -158,11 +185,18 @@ const AcademicCalendar: React.FC = () => {
         };
       });
 
-      const res = await fetch('/api/admin/academic-calendar/save', {
+      const res = await fetch('/api/academic-calendar/save', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ entries: payload })
       });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || errorData.error || 'Failed to save academic calendar');
+      }
       const data = await res.json();
       
       if (data.success) {
@@ -172,19 +206,28 @@ const AcademicCalendar: React.FC = () => {
         toast.error(data.error || 'Failed to save academic calendar');
       }
     } catch (err: any) {
-      toast.error('Server error: Failed to save calendar');
+      toast.error(err.message || 'Server error: Failed to save calendar');
     } finally {
       setSaving(false);
     }
   };
 
   const handleGenerateCalendar = async () => {
+    if (isReadOnly) return;
     setIsGenerating(true);
     try {
-      const res = await fetch('/api/admin/academic-calendar/generate', {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/academic-calendar/generate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
       });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || errorData.error || 'Failed to generate calendar');
+      }
       const data = await res.json();
       if (data.success) {
         toast.success(data.message || 'Semesters generated successfully');
@@ -193,19 +236,28 @@ const AcademicCalendar: React.FC = () => {
         toast.error(data.error || 'Failed to generate calendar');
       }
     } catch (err: any) {
-      toast.error('Server error: Failed to generate calendar');
+      toast.error(err.message || 'Server error: Failed to generate calendar');
     } finally {
       setIsGenerating(false);
     }
   };
 
   const handleTriggerAutoEngine = async () => {
+    if (isReadOnly) return;
     setTriggeringEngine(true);
     try {
-      const res = await fetch('/api/admin/promote/trigger-auto-engine', {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/promote/trigger-auto-engine', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
       });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || errorData.error || 'Failed to run promotion engine');
+      }
       const data = await res.json();
       if (data.success) {
         const { promotedCount, errors } = data.data;
@@ -219,21 +271,29 @@ const AcademicCalendar: React.FC = () => {
         toast.error(data.error || 'Failed to run promotion engine');
       }
     } catch (err: any) {
-      toast.error('Server error: Failed to trigger promotion engine');
+      toast.error(err.message || 'Server error: Failed to trigger promotion engine');
     } finally {
       setTriggeringEngine(false);
     }
   };
 
   const handleManualPromote = async (studentId: string) => {
-    if (!studentId) return;
+    if (isReadOnly || !studentId) return;
     setOverrideActionLoading(true);
     try {
-      const res = await fetch('/api/admin/promote/manual', {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/promote/manual', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ studentId })
       });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || errorData.error || 'Failed to promote student');
+      }
       const data = await res.json();
       if (data.success) {
         toast.success('Student successfully promoted to next semester');
@@ -242,24 +302,32 @@ const AcademicCalendar: React.FC = () => {
       } else {
         toast.error(data.error || 'Failed to promote student');
       }
-    } catch (err) {
-      toast.error('Server error during manual promotion');
+    } catch (err: any) {
+      toast.error(err.message || 'Server error during manual promotion');
     } finally {
       setOverrideActionLoading(false);
     }
   };
 
   const handleRollback = async (studentId: string) => {
-    if (!studentId) return;
+    if (isReadOnly || !studentId) return;
     if (!window.confirm('Are you sure you want to roll back the last promotion for this student?')) return;
     
     setOverrideActionLoading(true);
     try {
-      const res = await fetch('/api/admin/promote/rollback', {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/promote/rollback', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ studentId })
       });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || errorData.error || 'Failed to roll back promotion');
+      }
       const data = await res.json();
       if (data.success) {
         toast.success('Student promotion rolled back successfully');
@@ -268,8 +336,8 @@ const AcademicCalendar: React.FC = () => {
       } else {
         toast.error(data.error || 'Failed to roll back promotion');
       }
-    } catch (err) {
-      toast.error('Server error during rollback');
+    } catch (err: any) {
+      toast.error(err.message || 'Server error during rollback');
     } finally {
       setOverrideActionLoading(false);
     }
@@ -352,39 +420,41 @@ const AcademicCalendar: React.FC = () => {
         </div>
 
         <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm flex items-center gap-4">
-          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black ${totalEligibleCount > 0 ? 'bg-amber-100 text-amber-600' : 'bg-green-100 text-green-600'}`}>
+          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black ${(!isReadOnly && totalEligibleCount > 0) ? 'bg-amber-100 text-amber-600' : 'bg-green-100 text-green-600'}`}>
             <UserCheck className="w-6 h-6" />
           </div>
           <div>
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Students Due For Auto-Promotion</p>
             <p className="text-xl font-black text-slate-800 mt-0.5">
-              {totalEligibleCount} Students
+              {isReadOnly ? 'N/A' : `${totalEligibleCount} Students`}
             </p>
           </div>
         </div>
       </div>
 
       {/* 📑 Tabbed Navigation */}
-      <div className="bg-slate-100 p-1.5 rounded-2xl flex gap-1 w-full max-w-lg border border-slate-200/40">
-        <button
-          onClick={() => setActiveTab('calendar')}
-          className={`flex-1 py-3 text-center text-sm font-bold rounded-xl transition-all ${activeTab === 'calendar' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
-        >
-          Calendar Config
-        </button>
-        <button
-          onClick={() => setActiveTab('override')}
-          className={`flex-1 py-3 text-center text-sm font-bold rounded-xl transition-all ${activeTab === 'override' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
-        >
-          Manual Override
-        </button>
-        <button
-          onClick={() => setActiveTab('history')}
-          className={`flex-1 py-3 text-center text-sm font-bold rounded-xl transition-all ${activeTab === 'history' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
-        >
-          Promotion Logs
-        </button>
-      </div>
+      {!isReadOnly && (
+        <div className="bg-slate-100 p-1.5 rounded-2xl flex gap-1 w-full max-w-lg border border-slate-200/40">
+          <button
+            onClick={() => setActiveTab('calendar')}
+            className={`flex-1 py-3 text-center text-sm font-bold rounded-xl transition-all ${activeTab === 'calendar' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+          >
+            Calendar Config
+          </button>
+          <button
+            onClick={() => setActiveTab('override')}
+            className={`flex-1 py-3 text-center text-sm font-bold rounded-xl transition-all ${activeTab === 'override' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+          >
+            Manual Override
+          </button>
+          <button
+            onClick={() => setActiveTab('history')}
+            className={`flex-1 py-3 text-center text-sm font-bold rounded-xl transition-all ${activeTab === 'history' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+          >
+            Promotion Logs
+          </button>
+        </div>
+      )}
 
       {/* 📦 Tab Content Panels */}
       {loading ? (
@@ -400,29 +470,35 @@ const AcademicCalendar: React.FC = () => {
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-6">
                 <div>
                   <h3 className="text-xl font-bold text-slate-900">Semester Term Configurations</h3>
-                  <p className="text-xs text-slate-400 mt-1">Set academic years, start dates, and end dates for each term.</p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    {isReadOnly 
+                      ? "View academic years, start dates, and end dates for each term." 
+                      : "Set academic years, start dates, and end dates for each term."}
+                  </p>
                 </div>
-                <div className="flex gap-3 w-full sm:w-auto">
-                  {calendarEntries.length === 0 && (
-                    <button
-                      onClick={handleGenerateCalendar}
-                      disabled={isGenerating}
-                      className="bg-indigo-600 text-white px-5 py-3 rounded-2xl hover:bg-indigo-700 active:scale-95 transition-all text-sm font-bold disabled:bg-indigo-300"
-                    >
-                      {isGenerating ? 'Generating...' : 'Auto-Generate Semesters'}
-                    </button>
-                  )}
-                  {calendarEntries.length > 0 && (
-                    <button
-                      onClick={handleSaveCalendar}
-                      disabled={saving}
-                      className="flex items-center justify-center gap-2 bg-blue-600 text-white px-5 py-3 rounded-2xl hover:bg-blue-700 active:scale-95 transition-all text-sm font-bold disabled:bg-blue-300"
-                    >
-                      <Save className="w-4 h-4" />
-                      <span>{saving ? 'Saving...' : 'Save Configuration'}</span>
-                    </button>
-                  )}
-                </div>
+                {!isReadOnly && (
+                  <div className="flex gap-3 w-full sm:w-auto">
+                    {calendarEntries.length === 0 && (
+                      <button
+                        onClick={handleGenerateCalendar}
+                        disabled={isGenerating}
+                        className="bg-indigo-600 text-white px-5 py-3 rounded-2xl hover:bg-indigo-700 active:scale-95 transition-all text-sm font-bold disabled:bg-indigo-300"
+                      >
+                        {isGenerating ? 'Generating...' : 'Auto-Generate Semesters'}
+                      </button>
+                    )}
+                    {calendarEntries.length > 0 && (
+                      <button
+                        onClick={handleSaveCalendar}
+                        disabled={saving}
+                        className="flex items-center justify-center gap-2 bg-blue-600 text-white px-5 py-3 rounded-2xl hover:bg-blue-700 active:scale-95 transition-all text-sm font-bold disabled:bg-blue-300"
+                      >
+                        <Save className="w-4 h-4" />
+                        <span>{saving ? 'Saving...' : 'Save Configuration'}</span>
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
 
               {calendarEntries.length === 0 ? (
@@ -431,18 +507,22 @@ const AcademicCalendar: React.FC = () => {
                     <Calendar className="w-8 h-8" />
                   </div>
                   <div>
-                    <h4 className="text-lg font-bold text-slate-800">No Calendar Entries Found</h4>
+                    <h4 className="text-lg font-bold text-slate-800">No Academic Calendar Found</h4>
                     <p className="text-sm text-slate-500 mt-1 max-w-sm mx-auto">
-                      Click the button above to auto-generate the semester structure for your college program duration.
+                      {isReadOnly 
+                        ? "Please contact your College Admin to configure the academic calendar." 
+                        : "Click the button below to auto-generate the semester structure for your college program duration."}
                     </p>
                   </div>
-                  <button
-                    onClick={handleGenerateCalendar}
-                    disabled={isGenerating}
-                    className="inline-flex items-center gap-2 bg-indigo-600 text-white px-5 py-3 rounded-2xl hover:bg-indigo-700 active:scale-95 transition-all text-sm font-bold disabled:bg-indigo-300"
-                  >
-                    Generate Semesters Structure
-                  </button>
+                  {!isReadOnly && (
+                    <button
+                      onClick={handleGenerateCalendar}
+                      disabled={isGenerating}
+                      className="inline-flex items-center gap-2 bg-indigo-600 text-white px-5 py-3 rounded-2xl hover:bg-indigo-700 active:scale-95 transition-all text-sm font-bold disabled:bg-indigo-300"
+                    >
+                      Generate Semesters Structure
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -478,6 +558,7 @@ const AcademicCalendar: React.FC = () => {
                                 onChange={(e) => handleFieldChange(entry.id, 'academic_year', e.target.value)}
                                 className="border border-slate-200 rounded-xl px-3 py-1.5 text-sm font-medium focus:outline-none focus:border-blue-500 w-36"
                                 required
+                                disabled={isReadOnly}
                               />
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
@@ -487,6 +568,7 @@ const AcademicCalendar: React.FC = () => {
                                 onChange={(e) => handleFieldChange(entry.id, 'semester_start_date', e.target.value)}
                                 className="border border-slate-200 rounded-xl px-3 py-1.5 text-sm font-medium focus:outline-none focus:border-blue-500"
                                 required
+                                disabled={isReadOnly}
                               />
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
@@ -496,6 +578,7 @@ const AcademicCalendar: React.FC = () => {
                                 onChange={(e) => handleFieldChange(entry.id, 'semester_end_date', e.target.value)}
                                 className="border border-slate-200 rounded-xl px-3 py-1.5 text-sm font-medium focus:outline-none focus:border-blue-500"
                                 required
+                                disabled={isReadOnly}
                               />
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
@@ -503,6 +586,7 @@ const AcademicCalendar: React.FC = () => {
                                 value={edits.status}
                                 onChange={(e) => handleFieldChange(entry.id, 'status', e.target.value)}
                                 className="border border-slate-200 rounded-xl px-3 py-1.5 text-sm font-medium focus:outline-none focus:border-blue-500 bg-white"
+                                disabled={isReadOnly}
                               >
                                 <option value="active">Active</option>
                                 <option value="scheduled">Scheduled</option>
@@ -533,7 +617,7 @@ const AcademicCalendar: React.FC = () => {
           )}
 
           {/* TAB 2: MANUAL OVERRIDES */}
-          {activeTab === 'override' && (
+          {activeTab === 'override' && !isReadOnly && (
             <div className="space-y-8">
               {/* Promotion Engine Checker Trigger Card */}
               {eligibleSemesters.length > 0 && (
@@ -671,7 +755,7 @@ const AcademicCalendar: React.FC = () => {
           )}
 
           {/* TAB 3: PROMOTION LOGS */}
-          {activeTab === 'history' && (
+          {activeTab === 'history' && !isReadOnly && (
             <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden p-6 lg:p-8 space-y-6">
               <div>
                 <h3 className="text-xl font-bold text-slate-900">Promotion History Logs</h3>

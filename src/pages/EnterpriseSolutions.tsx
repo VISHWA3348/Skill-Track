@@ -36,7 +36,7 @@ const EnterpriseSolutions: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-950 transition-colors duration-500">
+    <div className="min-h-screen bg-white transition-colors duration-500">
       <Navbar />
       
       <main className="pt-32 pb-20 px-4">
@@ -46,12 +46,12 @@ const EnterpriseSolutions: React.FC = () => {
             <motion.h1 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="text-4xl md:text-5xl font-black text-gray-900 dark:text-white mb-4"
+              className="text-4xl md:text-5xl font-black text-gray-900 mb-4"
             >
               Enterprise-Grade Onboarding for <br/>
-              <span className="text-indigo-600 dark:text-indigo-400">Universities & Recruiters</span>
+              <span className="text-indigo-600">Universities & Recruiters</span>
             </motion.h1>
-            <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
               Secure, scalable multi-campus portfolios with automated verification checks, analytics dashboards, and student placement शॉर्टलिस्ट matches.
             </p>
           </div>
@@ -59,21 +59,21 @@ const EnterpriseSolutions: React.FC = () => {
           {/* Pillars Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-20">
             {benefits.map((b, i) => (
-              <div key={i} className="bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800 p-8 rounded-3xl flex items-start space-x-5">
-                <div className="p-3 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-2xl flex-shrink-0">
+              <div key={i} className="bg-slate-50 border border-slate-100 p-8 rounded-3xl flex items-start space-x-5">
+                <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl flex-shrink-0">
                   <Check className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">{b.title}</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">{b.desc}</p>
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">{b.title}</h3>
+                  <p className="text-sm text-gray-600 leading-relaxed">{b.desc}</p>
                 </div>
               </div>
             ))}
           </div>
 
           {/* Request Info Panel */}
-          <div className="bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800 rounded-3xl p-8 sm:p-12 max-w-3xl mx-auto">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6 text-center">Request Institution Demo</h2>
+          <div className="bg-slate-50 border border-slate-100 rounded-3xl p-8 sm:p-12 max-w-3xl mx-auto">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">Request Institution Demo</h2>
             
             <form onSubmit={handleRequest} className="space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -85,7 +85,7 @@ const EnterpriseSolutions: React.FC = () => {
                     value={orgName} 
                     onChange={(e) => setOrgName(e.target.value)}
                     placeholder="e.g. Stanford University"
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-4 py-3 border border-gray-300 bg-white text-gray-900 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
                 <div>
@@ -96,7 +96,7 @@ const EnterpriseSolutions: React.FC = () => {
                     value={contactName} 
                     onChange={(e) => setContactName(e.target.value)}
                     placeholder="e.g. Dr. Sarah Jenkins"
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-4 py-3 border border-gray-300 bg-white text-gray-900 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
               </div>
@@ -109,14 +109,14 @@ const EnterpriseSolutions: React.FC = () => {
                   value={email} 
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="e.g. jenkins@university.edu"
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-4 py-3 border border-gray-300 bg-white text-gray-900 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
               
               <button 
                 type="submit" 
                 disabled={submitting}
-                className="w-full flex justify-center items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white py-3.5 rounded-xl font-bold text-sm shadow-lg shadow-indigo-200 dark:shadow-none hover:-translate-y-0.5 active:translate-y-0 transition-all"
+                className="w-full flex justify-center items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white py-3.5 rounded-xl font-bold text-sm shadow-lg shadow-indigo-200 hover:-translate-y-0.5 active:translate-y-0 transition-all"
               >
                 <span>{submitting ? 'Submitting Request...' : 'Submit Request'}</span>
                 <ArrowRight className="w-4 h-4" />

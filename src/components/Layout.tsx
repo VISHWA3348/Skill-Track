@@ -19,7 +19,8 @@ import {
   Briefcase,
   Settings as SettingsIcon,
   Menu,
-  X
+  X,
+  Calendar
 } from 'lucide-react';
 
 import { hasRouteAccess } from '../constants/permissions';
@@ -35,6 +36,7 @@ const Layout: React.FC = () => {
   const navItems = [
     { name: 'Dashboard', path: dashboardPath, icon: <LayoutDashboard className="w-5 h-5" /> },
     { name: 'Certificates', path: '/dashboard/certificates', icon: <FileCheck className="w-5 h-5" /> },
+    { name: 'Academic Records', path: '/dashboard/academic-records', icon: <ClipboardList className="w-5 h-5" /> },
     { name: 'Career Activities', path: '/dashboard/career-activities', icon: <Activity className="w-5 h-5" /> },
     { name: 'Rankings', path: '/dashboard/rankings', icon: <Trophy className="w-5 h-5" /> },
     { name: 'Students', path: '/dashboard/students', icon: <Users className="w-5 h-5" /> },
@@ -42,6 +44,7 @@ const Layout: React.FC = () => {
     { name: 'Roles', path: '/dashboard/roles', icon: <Shield className="w-5 h-5" /> },
     { name: 'Colleges', path: '/dashboard/colleges', icon: <Building2 className="w-5 h-5" /> },
     { name: 'Departments', path: '/dashboard/departments', icon: <Network className="w-5 h-5" /> },
+    { name: 'Academic Calendar', path: '/dashboard/academic-calendar', icon: <Calendar className="w-5 h-5" /> },
     { name: 'Reports', path: '/dashboard/reports', icon: <FileText className="w-5 h-5" /> },
     { name: 'Resume Builder', path: '/dashboard/resume-builder', icon: <FileText className="w-5 h-5" /> },
     { name: 'Opportunities', path: '/dashboard/opportunities', icon: <Briefcase className="w-5 h-5" /> },

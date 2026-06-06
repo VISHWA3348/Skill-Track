@@ -139,15 +139,21 @@ export function setupSuperAdminApi(app: express.Express) {
 
   router.post('/colleges', (req, res) => {
     try {
-      const { id, name, location, type } = req.body;
+      const { id, name, location, type, college_code, collegeCode, college_duration_years, collegeDurationYears } = req.body;
       const adminUser = (req as any).userData;
 
       if (!id || !name) {
         return res.status(400).json({ error: 'id and name are required to create a college' });
       }
 
+      const duration = college_duration_years ?? collegeDurationYears;
+      if (duration === undefined || duration === null || isNaN(Number(duration)) || Number(duration) < 3 || Number(duration) > 6) {
+        return res.status(400).json({ error: 'college_duration_years is mandatory and must be between 3 and 6' });
+      }
+
       // 1. Create the college
-      db.prepare('INSERT INTO colleges (id, name, location, type) VALUES (?, ?, ?, ?)').run(id, name, location, type);
+      const finalCollegeCode = collegeCode || college_code || id;
+      db.prepare('INSERT INTO colleges (id, name, location, type, college_code, college_duration_years) VALUES (?, ?, ?, ?, ?, ?)').run(id, name, location, type, finalCollegeCode, Number(duration));
 
       // 2. Auto-create 5 default departments + invite codes
       const DEFAULT_DEPARTMENTS = [
@@ -478,6 +484,51 @@ export function setupSuperAdminApi(app: express.Express) {
       const { id } = req.params;
       db.prepare('DELETE FROM signup_codes WHERE id = ?').run(id);
       res.json({ success: true, message: 'Code deleted' });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.get('/hierarchy-overview', (req, res) => {
+    try {
+      const colleges = db.prepare('SELECT id, name, location, type, college_code, college_duration_years FROM colleges').all() as any[];
+      const hierarchy = [];
+
+      for (const col of colleges) {
+        const departments = db.prepare('SELECT id, department_id as code, name FROM departments WHERE college_id = ?').all(col.id) as any[];
+        const deptTree = [];
+
+        for (const dept of departments) {
+          const hods = db.prepare('SELECT id, name, email, phone FROM hods WHERE college_id = ? AND department_id = ?').all(col.id, dept.id) as any[];
+          const staffCount = (db.prepare('SELECT COUNT(*) as count FROM staff WHERE college_id = ? AND department_id = ?').get(col.id, dept.id) as any).count;
+          const studentCount = (db.prepare('SELECT COUNT(*) as count FROM students WHERE college_id = ? AND department_id = ?').get(col.id, dept.id) as any).count;
+
+          deptTree.push({
+            id: dept.id,
+            code: dept.code,
+            name: dept.name,
+            hods,
+            staffCount,
+            studentCount
+          });
+        }
+
+        const collegeAdminCount = (db.prepare('SELECT COUNT(*) as count FROM college_admins WHERE college_id = ?').get(col.id) as any).count;
+
+        hierarchy.push({
+          id: col.id,
+          name: col.name,
+          location: col.location,
+          type: col.type,
+          collegeCode: col.college_code,
+          collegeDurationYears: col.college_duration_years,
+          college_duration_years: col.college_duration_years,
+          collegeAdminCount,
+          departments: deptTree
+        });
+      }
+
+      res.json({ success: true, data: hierarchy });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

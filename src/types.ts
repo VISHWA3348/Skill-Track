@@ -31,6 +31,7 @@ export interface UserProfile {
   class?: string;
   year?: string;
   section?: string;
+  semester?: number | string | null;
   academicYear?: string;
   academic_year?: string;
   assignedAcademicYear?: string;
@@ -44,6 +45,17 @@ export interface UserProfile {
   status?: 'active' | 'suspended' | 'inactive';
   lastLogin?: string;
   address?: string;
+  employeeId?: string;
+  designation?: string;
+  joiningDate?: string;
+  subjectSpecialization?: string;
+  gender?: string;
+  dateOfBirth?: string;
+  batch?: string;
+  admissionYear?: string;
+  departmentName?: string;
+  currentSemester?: number | null;
+  collegeCode?: string;
 }
 
 export interface College {

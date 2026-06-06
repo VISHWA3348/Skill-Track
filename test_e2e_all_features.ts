@@ -449,6 +449,7 @@ async function runE2ETests() {
         className: 'CS-A',
         year: '3rd',
         academicYear: 'III Year',
+        semester: 5,
         city: 'Bangalore',
         phoneNumber: '9876543210',
         collegeName: 'Test Engineering College',

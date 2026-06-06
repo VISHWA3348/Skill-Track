@@ -32,6 +32,9 @@ setInterval(() => {
 
 export const createLimiter = (limit: number, windowMs: number, errorMessage: string = 'Too many requests. Please try again later.') => {
   return (req: any, res: any, next: any) => {
+    if (process.env.NODE_ENV !== 'production') {
+      return next();
+    }
     const ip = getClientIp(req);
     const key = `${ip}:${req.baseUrl || ''}${req.path}`;
     const now = Date.now();
@@ -91,7 +94,7 @@ export const authenticate = async (req: any, res: any, next: any) => {
     // Get fresh user from cache/db to construct request-scoped identity
     let userData = await cacheService.get(`user:${uid}`);
     if (!userData) {
-      const stmt = db.prepare('SELECT uid, email, role, college_id, department_id FROM users WHERE uid = ?');
+      const stmt = db.prepare('SELECT uid, email, role, college_id, department_id, academic_year, semester, department_name, college_name, employee_id FROM users WHERE uid = ?');
       userData = stmt.get(uid) as any;
       if (userData) {
         await cacheService.set(`user:${uid}`, userData, 60); // Cache user for 60 seconds
@@ -109,7 +112,12 @@ export const authenticate = async (req: any, res: any, next: any) => {
       email: userData.email,
       role: userData.role,
       collegeId: userData.college_id,
-      departmentId: userData.department_id
+      departmentId: userData.department_id,
+      academicYear: userData.academic_year,
+      semester: userData.semester,
+      departmentName: userData.department_name,
+      collegeName: userData.college_name,
+      employeeId: userData.employee_id
     };
     
     tokenCache.set(token, { decoded: req.user, expiry: Date.now() + 5000 }); // 5 seconds token verification caching
@@ -201,9 +209,13 @@ export const getDataIsolationFilters = (collectionName: string, userData: any) =
     conditions.push({ field: 'college_id', operator: '==', value: userData.college_id });
     conditions.push({ field: 'department_id', operator: '==', value: userData.department_id });
     if (role === 'staff') {
-      const assignedYear = userData.assigned_academic_year || userData.assignedAcademicYear;
-      if (assignedYear && assignedYear !== 'All Years' && ['certifications', 'career_activities', 'students', 'users'].includes(collectionName)) {
+      const assignedYear = userData.academic_year || userData.academicYear || userData.assigned_academic_year || userData.assignedAcademicYear;
+      if (assignedYear && assignedYear !== 'All Years' && ['certifications', 'career_activities', 'students', 'users', 'academic_records', 'attendance_records'].includes(collectionName)) {
         conditions.push({ field: 'academic_year', operator: '==', value: assignedYear });
+      }
+      const staffSemester = userData.semester !== undefined && userData.semester !== null ? userData.semester : (userData.current_semester || userData.currentSemester);
+      if (staffSemester !== undefined && staffSemester !== null && ['students', 'users', 'certifications', 'academic_records', 'attendance_records'].includes(collectionName)) {
+        conditions.push({ field: 'semester', operator: '==', value: Number(staffSemester) });
       }
     }
   }

@@ -44,6 +44,8 @@ const ApiDocumentation    = React.lazy(() => import('./pages/ApiDocumentation'))
 const Careers             = React.lazy(() => import('./pages/Careers'));
 const SystemStatus        = React.lazy(() => import('./pages/SystemStatus'));
 const EnterpriseSolutions = React.lazy(() => import('./pages/EnterpriseSolutions'));
+const AcademicRecords     = React.lazy(() => import('./pages/AcademicRecords'));
+const AcademicCalendar    = React.lazy(() => import('./pages/AcademicCalendar'));
 
 // Shared page-level loading spinner
 const PageLoader: React.FC = () => (
@@ -191,6 +193,16 @@ const App: React.FC = () => {
                 <Route path="resume-builder" element={
                   <AuthGuard allowedRoles={['student']}>
                     <ResumeBuilderView />
+                  </AuthGuard>
+                } />
+                <Route path="academic-records" element={
+                  <AuthGuard allowedRoles={['super_admin', 'admin', 'hod', 'staff', 'student']}>
+                    <AcademicRecords />
+                  </AuthGuard>
+                } />
+                <Route path="academic-calendar" element={
+                  <AuthGuard allowedRoles={['super_admin', 'admin']}>
+                    <AcademicCalendar />
                   </AuthGuard>
                 } />
                 <Route path="student/:id/profile" element={<StudentPortfolio />} />

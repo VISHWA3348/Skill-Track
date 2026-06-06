@@ -31,6 +31,7 @@ const Login: React.FC = () => {
   const [collegeId, setCollegeId] = useState('');
   const [year, setYear] = useState('');
   const [academicYear, setAcademicYear] = useState('');
+  const [semester, setSemester] = useState('');
   const [collegeName, setCollegeName] = useState('');
   const [city, setCity] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -242,6 +243,7 @@ const Login: React.FC = () => {
         class: className,
         year,
         academicYear,
+        semester,
         section,
         city,
         phoneNumber,
@@ -467,7 +469,7 @@ const Login: React.FC = () => {
                         onChange={(e) => setAcademicYear(e.target.value)}
                       >
                         <option value="">Select Academic Year</option>
-                        {(className ? (className.match(/^(M\.|M[A-Z]|PG|Master)/i) ? ['I Year PG', 'II Year PG'] : ['I Year', 'II Year', 'III Year', 'IV Year']) : ['I Year', 'II Year', 'III Year', 'IV Year']).map((opt) => (
+                        {(className ? (className.match(/^(M\.|M[A-Z]|PG|Master)/i) ? ['I Year PG', 'II Year PG', '2024-2026', '2025-2027'] : ['I Year', 'II Year', 'III Year', 'IV Year', '2023-2027', '2024-2028', '2025-2029', '2026-2030']) : ['I Year', 'II Year', 'III Year', 'IV Year', '2023-2027', '2024-2028', '2025-2029', '2026-2030']).map((opt) => (
                           <option key={opt} value={opt}>{opt}</option>
                         ))}
                       </select>
@@ -476,6 +478,22 @@ const Login: React.FC = () => {
                           (Auto-detected from invite code)
                         </p>
                       )}
+                    </div>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <GraduationCap className="h-5 w-5 text-gray-400" />
+                      </div>
+                      <select
+                        required
+                        className="appearance-none rounded-md relative block w-full px-3 py-2 pl-10 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white"
+                        value={semester}
+                        onChange={(e) => setSemester(e.target.value)}
+                      >
+                        <option value="">Select Semester</option>
+                        {[1, 2, 3, 4, 5, 6, 7, 8].map((sem) => (
+                          <option key={sem} value={sem}>Semester {sem}</option>
+                        ))}
+                      </select>
                     </div>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">

@@ -19,6 +19,7 @@ const Colleges: React.FC = () => {
   const [country, setCountry] = useState('');
   const [pincode, setPincode] = useState('');
   const [type, setType] = useState('');
+  const [collegeDurationYears, setCollegeDurationYears] = useState(4);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -63,6 +64,7 @@ const Colleges: React.FC = () => {
       setCountry(college.country || '');
       setPincode(college.pincode || '');
       setType(college.type || '');
+      setCollegeDurationYears((college as any).college_duration_years || (college as any).collegeDurationYears || 4);
     } else {
       setIsEditing(false);
       setEditingId(null);
@@ -74,6 +76,7 @@ const Colleges: React.FC = () => {
       setCountry('');
       setPincode('');
       setType('');
+      setCollegeDurationYears(4);
     }
     setShowModal(true);
   };
@@ -91,7 +94,9 @@ const Colleges: React.FC = () => {
         city,
         state,
         country,
-        pincode
+        pincode,
+        college_duration_years: collegeDurationYears,
+        collegeDurationYears: collegeDurationYears
       };
       if (isEditing && editingId) {
         await updateDoc(doc(db, 'colleges', editingId), collegeData);
@@ -186,6 +191,7 @@ const Colleges: React.FC = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">College ID</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duration</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location / City</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">State / Country</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created At</th>
@@ -210,6 +216,9 @@ const Colleges: React.FC = () => {
                     <span className="px-2 py-1 bg-slate-100 rounded text-xs font-medium">
                       {(c as any).type || 'General'}
                     </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {(c as any).college_duration_years || (c as any).collegeDurationYears || 4} Years
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     <div>{c.location}</div>
@@ -274,6 +283,20 @@ const Colleges: React.FC = () => {
                   onChange={(e) => setType(e.target.value)}
                   className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" 
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Program Duration</label>
+                <select
+                  value={collegeDurationYears}
+                  onChange={(e) => setCollegeDurationYears(Number(e.target.value))}
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 bg-white"
+                  required
+                >
+                  <option value={3}>3 Year Program (Diploma / General)</option>
+                  <option value={4}>4 Year Program (Engineering UG)</option>
+                  <option value={5}>5 Year Program (Integrated PG)</option>
+                  <option value={6}>6 Year Program (Medical / Long Programs)</option>
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Location</label>

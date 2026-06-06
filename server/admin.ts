@@ -5,6 +5,7 @@ import { db, getCollection, setDocument, deleteDocument, queryDocuments, getDocu
 import { authenticate, checkRole, getDataIsolationFilters } from './middleware';
 import { cacheService } from './redis_cache';
 import { calculateResumeScore } from './resume_features';
+import { validateUserHierarchy, resolveOrganizationNames } from './hierarchy_validator';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -598,6 +599,27 @@ export function setupAdmin(app: express.Express) {
           const existing = queryDocuments('users', [{ field: 'email', operator: '==', value: u.email }]);
           if (existing.length > 0) throw new Error("Email already in use");
 
+          const collegeId = req.userData.role === 'super_admin' ? (u.collegeId || req.userData.collegeId) : req.userData.collegeId;
+          const departmentId = req.userData.role === 'super_admin' ? (u.departmentId || null) : (['hod', 'staff'].includes(req.userData.role) ? req.userData.departmentId : (u.departmentId || null));
+
+          // Resolve names
+          const resolvedNames = resolveOrganizationNames(db, collegeId, departmentId);
+          const collegeName = u.collegeName || u.college_name || resolvedNames.collegeName;
+          const departmentName = u.departmentName || u.department_name || resolvedNames.departmentName;
+
+          // Centralized validation check
+          const validationData = {
+            ...u,
+            college_id: collegeId,
+            department_id: departmentId,
+            collegeName,
+            departmentName
+          };
+          const validation = validateUserHierarchy(u.role || 'student', validationData);
+          if (!validation.valid) {
+            throw new Error(`Validation failed: ${validation.errors.join(', ')}`);
+          }
+
           // Academic Year selection validation and legacy mapping
           let finalYear = u.year || null;
           let finalAcademicYear = u.academicYear || u.academic_year || null;
@@ -607,36 +629,46 @@ export function setupAdmin(app: express.Express) {
           const isStaff = u.role === 'staff';
 
           if (isStudent) {
-            if (!finalAcademicYear) {
-              throw new Error("Academic Year is required for student");
+            const regNo = (u.rollNo || u.roll_no || u.register_no || u.registerNo || '').trim();
+            const dupRegister = db.prepare("SELECT user_id FROM students WHERE roll_no = ? OR register_no = ?").get(regNo, regNo);
+            const dupUser = db.prepare("SELECT uid FROM users WHERE roll_no = ?").get(regNo);
+            if (dupRegister || dupUser) {
+              throw new Error(`Duplicate register number: ${regNo} is blocked.`);
             }
-            const isPG = u.class ? /^(M\.|M[A-Z]|PG|Master)/i.test(u.class) : false;
-            const validUGYears = ['I Year', 'II Year', 'III Year', 'IV Year'];
-            const validPGYears = ['I Year PG', 'II Year PG'];
-            
-            if (isPG) {
-              if (!validPGYears.includes(finalAcademicYear)) {
-                throw new Error(`Invalid Academic Year for PG course. Must be: ${validPGYears.join(', ')}`);
+
+            const isBatch = /^\d{4}-\d{4}$/.test(finalAcademicYear);
+            if (!isBatch && finalAcademicYear) {
+              const isPG = u.class ? /^(M\.|M[A-Z]|PG|Master)/i.test(u.class) : false;
+              const validUGYears = ['I Year', 'II Year', 'III Year', 'IV Year'];
+              const validPGYears = ['I Year PG', 'II Year PG'];
+              
+              if (isPG) {
+                if (!validPGYears.includes(finalAcademicYear)) {
+                  throw new Error(`Invalid Academic Year for PG course. Must be: ${validPGYears.join(', ')}`);
+                }
+              } else {
+                if (!validUGYears.includes(finalAcademicYear)) {
+                  throw new Error(`Invalid Academic Year for UG course. Must be: ${validUGYears.join(', ')}`);
+                }
               }
-            } else {
-              if (!validUGYears.includes(finalAcademicYear)) {
-                throw new Error(`Invalid Academic Year for UG course. Must be: ${validUGYears.join(', ')}`);
-              }
+              // Map legacy year
+              if (finalAcademicYear.startsWith('I Year')) finalYear = 'I';
+              else if (finalAcademicYear.startsWith('II Year')) finalYear = 'II';
+              else if (finalAcademicYear.startsWith('III Year')) finalYear = 'III';
+              else if (finalAcademicYear.startsWith('IV Year')) finalYear = 'IV';
             }
-            // Map legacy year
-            if (finalAcademicYear.startsWith('I Year')) finalYear = 'I';
-            else if (finalAcademicYear.startsWith('II Year')) finalYear = 'II';
-            else if (finalAcademicYear.startsWith('III Year')) finalYear = 'III';
-            else if (finalAcademicYear.startsWith('IV Year')) finalYear = 'IV';
           }
 
           if (isStaff) {
             if (!finalAssignedAcademicYear) {
-              finalAssignedAcademicYear = 'All Years';
+              finalAssignedAcademicYear = finalAcademicYear;
             }
-            const validStaffYears = ['I Year', 'II Year', 'III Year', 'IV Year', 'All Years'];
-            if (!validStaffYears.includes(finalAssignedAcademicYear)) {
-              throw new Error(`Invalid Assigned Year for Staff. Must be one of: ${validStaffYears.join(', ')}`);
+            const isBatch = /^\d{4}-\d{4}$/.test(finalAssignedAcademicYear);
+            if (!isBatch && finalAssignedAcademicYear) {
+              const validStaffYears = ['I Year', 'II Year', 'III Year', 'IV Year', 'All Years'];
+              if (!validStaffYears.includes(finalAssignedAcademicYear)) {
+                throw new Error(`Invalid Assigned Year for Staff. Must be one of: ${validStaffYears.join(', ')}`);
+              }
             }
           }
 
@@ -644,8 +676,15 @@ export function setupAdmin(app: express.Express) {
           const password = u.password || Math.random().toString(36).substring(2, 10);
           const passwordHash = await bcrypt.hash(password, 10);
 
-          const collegeId = req.userData.role === 'super_admin' ? (u.collegeId || req.userData.collegeId) : req.userData.collegeId;
-          const departmentId = req.userData.role === 'super_admin' ? (u.departmentId || null) : (['hod', 'staff'].includes(req.userData.role) ? req.userData.departmentId : (u.departmentId || null));
+          const finalEmployeeId = u.employeeId || u.employee_id || null;
+          const finalDesignation = u.designation || null;
+          const finalJoiningDate = u.joiningDate || u.joining_date || null;
+          const finalSubjectSpecialization = u.subjectSpecialization || u.subject_specialization || null;
+          const finalGender = u.gender || null;
+          const finalDateOfBirth = u.dateOfBirth || u.date_of_birth || null;
+          const finalBatch = u.batch || null;
+          const finalAdmissionYear = u.admissionYear || u.admission_year || null;
+          const finalCollegeCode = u.collegeCode || u.college_code || null;
 
           const profile = {
             uid,
@@ -661,22 +700,37 @@ export function setupAdmin(app: express.Express) {
             isActive: true,
             createdAt: new Date().toISOString(),
             passwordHash,
+            semester: u.semester ? Number(u.semester) : null,
             academicYear: finalAcademicYear,
-            assignedAcademicYear: finalAssignedAcademicYear
+            assignedAcademicYear: finalAssignedAcademicYear,
+            employeeId: finalEmployeeId,
+            designation: finalDesignation,
+            joiningDate: finalJoiningDate,
+            subjectSpecialization: finalSubjectSpecialization,
+            gender: finalGender,
+            dateOfBirth: finalDateOfBirth,
+            batch: finalBatch,
+            admissionYear: finalAdmissionYear,
+            collegeCode: finalCollegeCode,
+            collegeName,
+            departmentName
           };
 
           setDocument('users', uid, profile);
 
           if (profile.role === 'student') {
+            const regNo = (u.rollNo || u.roll_no || u.register_no || u.registerNo || '').trim();
             db.prepare(`
-              INSERT INTO students (user_id, roll_no, department_id, college_id, class, year, section, academic_year)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+              INSERT INTO students (user_id, roll_no, department_id, college_id, class, year, section, semester, academic_year, gender, date_of_birth, batch, admission_year, status)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
               ON CONFLICT(user_id) DO UPDATE SET
                 roll_no=excluded.roll_no, department_id=excluded.department_id, college_id=excluded.college_id,
-                class=excluded.class, year=excluded.year, section=excluded.section, academic_year=excluded.academic_year
+                class=excluded.class, year=excluded.year, section=excluded.section, semester=excluded.semester, academic_year=excluded.academic_year,
+                gender=excluded.gender, date_of_birth=excluded.date_of_birth, batch=excluded.batch, admission_year=excluded.admission_year, status=excluded.status
             `).run(
-              uid, profile.rollNo, departmentId, collegeId, 
-              profile.class, profile.year, u.section || null, profile.academicYear
+              uid, regNo || null, departmentId, collegeId, 
+              profile.class, profile.year, u.section || null, profile.semester, profile.academicYear,
+              finalGender, finalDateOfBirth, finalBatch, finalAdmissionYear
             );
             calculateResumeScore(uid);
           }
@@ -705,7 +759,10 @@ export function setupAdmin(app: express.Express) {
       let {
         email, password, name, role, collegeId, departmentId,
         rollNo, class: className, year, section, phone, phoneNumber,
-        academicYear, assignedAcademicYear
+        semester, academicYear, assignedAcademicYear,
+        employeeId, employee_id, designation, joiningDate, joining_date,
+        subjectSpecialization, subject_specialization, gender, dateOfBirth, date_of_birth,
+        batch, admissionYear, admission_year, collegeCode, college_code
       } = req.body;
 
       const roleWeights: any = { super_admin: 100, admin: 80, hod: 60, staff: 40, student: 20 };
@@ -731,8 +788,61 @@ export function setupAdmin(app: express.Express) {
         }
       }
 
+      // Resolve organizational names and code
+      const resolvedNames = resolveOrganizationNames(db, collegeId, departmentId);
+      const collegeName = req.body.collegeName || req.body.college_name || resolvedNames.collegeName;
+      const departmentName = req.body.departmentName || req.body.department_name || resolvedNames.departmentName;
+
+      // Centralized validation check
+      const validationData = {
+        ...req.body,
+        college_id: collegeId,
+        department_id: departmentId,
+        collegeName,
+        departmentName
+      };
+      const validation = validateUserHierarchy(role, validationData);
+      if (!validation.valid) {
+        return res.status(400).json({ error: 'validation-failed', messages: validation.errors });
+      }
+
       const existing = queryDocuments('users', [{ field: 'email', operator: '==', value: email }]);
       if (existing.length > 0) return res.status(400).json({ error: 'Email already in use' });
+
+      // Verify College exists
+      const collegeCheck = db.prepare('SELECT id FROM colleges WHERE id = ?').get(collegeId);
+      if (!collegeCheck) {
+        return res.status(400).json({ error: 'College not found' });
+      }
+
+      // Verify Department exists
+      if (role !== 'super_admin' && role !== 'admin') {
+        const deptCheck = db.prepare('SELECT id FROM departments WHERE id = ? AND college_id = ?').get(departmentId, collegeId);
+        if (!deptCheck) {
+          return res.status(400).json({ error: 'Department not found in specified college' });
+        }
+      }
+
+      // Verify unique register number for students
+      if (role === 'student') {
+        const regNo = (rollNo || req.body.register_no || req.body.registerNo || '').trim();
+        const dupRegister = db.prepare("SELECT user_id FROM students WHERE roll_no = ? OR register_no = ?").get(regNo, regNo);
+        const dupUser = db.prepare("SELECT uid FROM users WHERE roll_no = ?").get(regNo);
+        if (dupRegister || dupUser) {
+          return res.status(400).json({ error: 'duplicate-register-no', message: 'Register number already exists. Duplicate register numbers are blocked.' });
+        }
+      }
+
+      // Normalize parameters
+      const finalEmployeeId = employeeId || employee_id || null;
+      const finalDesignation = designation || null;
+      const finalJoiningDate = joiningDate || joining_date || null;
+      const finalSubjectSpecialization = subjectSpecialization || subject_specialization || null;
+      const finalGender = gender || null;
+      const finalDateOfBirth = dateOfBirth || date_of_birth || null;
+      const finalBatch = batch || null;
+      const finalAdmissionYear = admissionYear || admission_year || null;
+      const finalCollegeCode = collegeCode || college_code || null;
 
       // Academic Year selection validation and legacy mapping
       let mappedLegacyYear = year || null;
@@ -743,45 +853,48 @@ export function setupAdmin(app: express.Express) {
       const isStaff = role === 'staff';
 
       if (isStudent) {
-        if (!finalAcademicYear) {
-          return res.status(400).json({ error: 'academic-year-required', message: 'Academic Year is required for students' });
-        }
-        const isPG = className ? /^(M\.|M[A-Z]|PG|Master)/i.test(className) : false;
-        const validUGYears = ['I Year', 'II Year', 'III Year', 'IV Year'];
-        const validPGYears = ['I Year PG', 'II Year PG'];
-        
-        if (isPG) {
-          if (!validPGYears.includes(finalAcademicYear)) {
-            return res.status(400).json({ 
-              error: 'invalid-academic-year', 
-              message: `For PG courses, Academic Year must be one of: ${validPGYears.join(', ')}` 
-            });
+        const isBatch = /^\d{4}-\d{4}$/.test(finalAcademicYear);
+        if (!isBatch && finalAcademicYear) {
+          const isPG = className ? /^(M\.|M[A-Z]|PG|Master)/i.test(className) : false;
+          const validUGYears = ['I Year', 'II Year', 'III Year', 'IV Year'];
+          const validPGYears = ['I Year PG', 'II Year PG'];
+          
+          if (isPG) {
+            if (!validPGYears.includes(finalAcademicYear)) {
+              return res.status(400).json({ 
+                error: 'invalid-academic-year', 
+                message: `For PG courses, Academic Year must be one of: ${validPGYears.join(', ')}` 
+              });
+            }
+          } else {
+            if (!validUGYears.includes(finalAcademicYear)) {
+              return res.status(400).json({ 
+                error: 'invalid-academic-year', 
+                message: `For UG courses, Academic Year must be one of: ${validUGYears.join(', ')}` 
+              });
+            }
           }
-        } else {
-          if (!validUGYears.includes(finalAcademicYear)) {
-            return res.status(400).json({ 
-              error: 'invalid-academic-year', 
-              message: `For UG courses, Academic Year must be one of: ${validUGYears.join(', ')}` 
-            });
-          }
+          // Map legacy year
+          if (finalAcademicYear.startsWith('I Year')) mappedLegacyYear = 'I';
+          else if (finalAcademicYear.startsWith('II Year')) mappedLegacyYear = 'II';
+          else if (finalAcademicYear.startsWith('III Year')) mappedLegacyYear = 'III';
+          else if (finalAcademicYear.startsWith('IV Year')) mappedLegacyYear = 'IV';
         }
-        // Map legacy year
-        if (finalAcademicYear.startsWith('I Year')) mappedLegacyYear = 'I';
-        else if (finalAcademicYear.startsWith('II Year')) mappedLegacyYear = 'II';
-        else if (finalAcademicYear.startsWith('III Year')) mappedLegacyYear = 'III';
-        else if (finalAcademicYear.startsWith('IV Year')) mappedLegacyYear = 'IV';
       }
 
       if (isStaff) {
         if (!finalAssignedAcademicYear) {
-          finalAssignedAcademicYear = 'All Years';
+          finalAssignedAcademicYear = finalAcademicYear;
         }
-        const validStaffYears = ['I Year', 'II Year', 'III Year', 'IV Year', 'All Years'];
-        if (!validStaffYears.includes(finalAssignedAcademicYear)) {
-          return res.status(400).json({ 
-            error: 'invalid-assigned-year', 
-            message: `For Staff, Assigned Year must be one of: ${validStaffYears.join(', ')}` 
-          });
+        const isBatch = /^\d{4}-\d{4}$/.test(finalAssignedAcademicYear);
+        if (!isBatch && finalAssignedAcademicYear) {
+          const validStaffYears = ['I Year', 'II Year', 'III Year', 'IV Year', 'All Years'];
+          if (!validStaffYears.includes(finalAssignedAcademicYear)) {
+            return res.status(400).json({ 
+              error: 'invalid-assigned-year', 
+              message: `For Staff, Assigned Year must be one of: ${validStaffYears.join(', ')}` 
+            });
+          }
         }
       }
 
@@ -798,27 +911,42 @@ export function setupAdmin(app: express.Express) {
         class: className || null,
         year: mappedLegacyYear,
         section: section || null,
+        semester: semester ? Number(semester) : null,
         phoneNumber: phoneNumber || phone || null,
         status: 'active',
         isActive: true,
         createdAt: new Date().toISOString(),
         passwordHash,
         academicYear: finalAcademicYear,
-        assignedAcademicYear: finalAssignedAcademicYear
+        assignedAcademicYear: finalAssignedAcademicYear,
+        employeeId: finalEmployeeId,
+        designation: finalDesignation,
+        joiningDate: finalJoiningDate,
+        subjectSpecialization: finalSubjectSpecialization,
+        gender: finalGender,
+        dateOfBirth: finalDateOfBirth,
+        batch: finalBatch,
+        admissionYear: finalAdmissionYear,
+        collegeCode: finalCollegeCode,
+        collegeName,
+        departmentName
       };
 
       setDocument('users', uid, userProfile);
 
       if (role === 'student') {
+        const regNo = (rollNo || req.body.register_no || req.body.registerNo || '').trim();
         db.prepare(`
-          INSERT INTO students (user_id, roll_no, department_id, college_id, class, year, section, academic_year)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO students (user_id, roll_no, department_id, college_id, class, year, section, semester, academic_year, gender, date_of_birth, batch, admission_year, status)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
           ON CONFLICT(user_id) DO UPDATE SET
             roll_no=excluded.roll_no, department_id=excluded.department_id, college_id=excluded.college_id,
-            class=excluded.class, year=excluded.year, section=excluded.section, academic_year=excluded.academic_year
+            class=excluded.class, year=excluded.year, section=excluded.section, semester=excluded.semester, academic_year=excluded.academic_year,
+            gender=excluded.gender, date_of_birth=excluded.date_of_birth, batch=excluded.batch, admission_year=excluded.admission_year, status=excluded.status
         `).run(
-          uid, rollNo || null, departmentId || null, collegeId, 
-          className || null, mappedLegacyYear, section || null, finalAcademicYear
+          uid, regNo || null, departmentId || null, collegeId, 
+          className || null, mappedLegacyYear, section || null, userProfile.semester, finalAcademicYear,
+          finalGender, finalDateOfBirth, finalBatch, finalAdmissionYear
         );
         calculateResumeScore(uid);
       }
@@ -840,7 +968,12 @@ export function setupAdmin(app: express.Express) {
   app.put("/api/admin/users/:uid", authenticate, checkRole(["super_admin", "admin", "hod", "staff"]), async (req: any, res) => {
     try {
       const { uid } = req.params;
-      const { name, email, role, collegeId, department_id, departmentId, rollNo, roll_no, class: className, year, section, phone, phoneNumber, phone_number, city, password, academicYear, assignedAcademicYear } = req.body;
+      const { 
+        name, email, role, collegeId, department_id, departmentId, rollNo, roll_no, class: className, year, section, semester, phone, phoneNumber, phone_number, city, password, academicYear, assignedAcademicYear,
+        employeeId, employee_id, designation, joiningDate, joining_date,
+        subjectSpecialization, subject_specialization, gender, dateOfBirth, date_of_birth,
+        batch, admissionYear, admission_year, collegeCode, college_code
+      } = req.body;
 
       const us = queryDocuments('users', [{ field: 'uid', operator: '==', value: uid }]);
       if (us.length === 0) return res.status(404).json({ error: "User not found" });
@@ -868,54 +1001,91 @@ export function setupAdmin(app: express.Express) {
       }
       
       const finalRole = role || userData.role;
+      const finalCollegeId = collegeId !== undefined ? collegeId : userData.collegeId;
+      const finalDeptId = (departmentId !== undefined ? departmentId : (department_id !== undefined ? department_id : userData.departmentId));
+      
+      // Resolve organizational names and code
+      const resolvedNames = resolveOrganizationNames(db, finalCollegeId, finalDeptId);
+      const collegeName = req.body.collegeName || req.body.college_name || resolvedNames.collegeName || userData.collegeName || userData.college_name;
+      const departmentName = req.body.departmentName || req.body.department_name || resolvedNames.departmentName || userData.departmentName || userData.department_name;
+
+      // Centralized validation check
+      const mergedToValidate = {
+        ...userData,
+        ...req.body,
+        college_id: finalCollegeId,
+        department_id: finalDeptId,
+        collegeName,
+        departmentName
+      };
+      const validation = validateUserHierarchy(finalRole, mergedToValidate);
+      if (!validation.valid) {
+        return res.status(400).json({ error: 'validation-failed', messages: validation.errors });
+      }
+
       const finalClassName = className !== undefined ? className : userData.class;
       const isStudent = finalRole === 'student';
       const isStaff = finalRole === 'staff';
+
+      // Verify unique register number for students on edit
+      if (isStudent) {
+        const regNo = (rollNo || roll_no || req.body.register_no || req.body.registerNo || userData.rollNo || '').trim();
+        if (regNo) {
+          const dupRegister = db.prepare("SELECT user_id FROM students WHERE (roll_no = ? OR register_no = ?) AND user_id != ?").get(regNo, regNo, uid);
+          const dupUser = db.prepare("SELECT uid FROM users WHERE roll_no = ? AND uid != ?").get(regNo, uid);
+          if (dupRegister || dupUser) {
+            return res.status(400).json({ error: 'duplicate-register-no', message: 'Register number already exists. Duplicate register numbers are blocked.' });
+          }
+        }
+      }
 
       let mappedLegacyYear = year !== undefined ? year : userData.year;
       let finalAcademicYear = academicYear !== undefined ? academicYear : userData.academic_year || userData.academicYear;
       let finalAssignedAcademicYear = assignedAcademicYear !== undefined ? assignedAcademicYear : userData.assigned_academic_year || userData.assignedAcademicYear;
 
       if (isStudent && finalAcademicYear !== undefined) {
-        if (!finalAcademicYear) {
-          return res.status(400).json({ error: 'academic-year-required', message: 'Academic Year is required for students' });
-        }
-        const isPG = finalClassName ? /^(M\.|M[A-Z]|PG|Master)/i.test(finalClassName) : false;
-        const validUGYears = ['I Year', 'II Year', 'III Year', 'IV Year'];
-        const validPGYears = ['I Year PG', 'II Year PG'];
-        
-        if (isPG) {
-          if (!validPGYears.includes(finalAcademicYear)) {
-            return res.status(400).json({ 
-              error: 'invalid-academic-year', 
-              message: `For PG courses, Academic Year must be one of: ${validPGYears.join(', ')}` 
-            });
+        const isBatch = /^\d{4}-\d{4}$/.test(finalAcademicYear);
+        if (!isBatch && finalAcademicYear) {
+          const isPG = finalClassName ? /^(M\.|M[A-Z]|PG|Master)/i.test(finalClassName) : false;
+          const validUGYears = ['I Year', 'II Year', 'III Year', 'IV Year'];
+          const validPGYears = ['I Year PG', 'II Year PG'];
+          
+          if (isPG) {
+            if (!validPGYears.includes(finalAcademicYear)) {
+              return res.status(400).json({ 
+                error: 'invalid-academic-year', 
+                message: `For PG courses, Academic Year must be one of: ${validPGYears.join(', ')}` 
+              });
+            }
+          } else {
+            if (!validUGYears.includes(finalAcademicYear)) {
+              return res.status(400).json({ 
+                error: 'invalid-academic-year', 
+                message: `For UG courses, Academic Year must be one of: ${validUGYears.join(', ')}` 
+              });
+            }
           }
-        } else {
-          if (!validUGYears.includes(finalAcademicYear)) {
-            return res.status(400).json({ 
-              error: 'invalid-academic-year', 
-              message: `For UG courses, Academic Year must be one of: ${validUGYears.join(', ')}` 
-            });
-          }
+          // Map legacy year
+          if (finalAcademicYear.startsWith('I Year')) mappedLegacyYear = 'I';
+          else if (finalAcademicYear.startsWith('II Year')) mappedLegacyYear = 'II';
+          else if (finalAcademicYear.startsWith('III Year')) mappedLegacyYear = 'III';
+          else if (finalAcademicYear.startsWith('IV Year')) mappedLegacyYear = 'IV';
         }
-        // Map legacy year
-        if (finalAcademicYear.startsWith('I Year')) mappedLegacyYear = 'I';
-        else if (finalAcademicYear.startsWith('II Year')) mappedLegacyYear = 'II';
-        else if (finalAcademicYear.startsWith('III Year')) mappedLegacyYear = 'III';
-        else if (finalAcademicYear.startsWith('IV Year')) mappedLegacyYear = 'IV';
       }
 
       if (isStaff && finalAssignedAcademicYear !== undefined) {
         if (!finalAssignedAcademicYear) {
           finalAssignedAcademicYear = 'All Years';
         }
-        const validStaffYears = ['I Year', 'II Year', 'III Year', 'IV Year', 'All Years'];
-        if (!validStaffYears.includes(finalAssignedAcademicYear)) {
-          return res.status(400).json({ 
-            error: 'invalid-assigned-year', 
-            message: `For Staff, Assigned Year must be one of: ${validStaffYears.join(', ')}` 
-          });
+        const isBatch = /^\d{4}-\d{4}$/.test(finalAssignedAcademicYear);
+        if (!isBatch && finalAssignedAcademicYear) {
+          const validStaffYears = ['I Year', 'II Year', 'III Year', 'IV Year', 'All Years'];
+          if (!validStaffYears.includes(finalAssignedAcademicYear)) {
+            return res.status(400).json({ 
+              error: 'invalid-assigned-year', 
+              message: `For Staff, Assigned Year must be one of: ${validStaffYears.join(', ')}` 
+            });
+          }
         }
       }
 
@@ -932,8 +1102,21 @@ export function setupAdmin(app: express.Express) {
       if (city !== undefined) updates.city = city;
       if (phoneNumber !== undefined || phone !== undefined || phone_number !== undefined) updates.phoneNumber = phoneNumber || phone || phone_number;
       if (password) updates.passwordHash = await bcrypt.hash(password, 10);
+      if (semester !== undefined) updates.semester = semester ? Number(semester) : null;
       if (finalAcademicYear !== undefined) updates.academicYear = finalAcademicYear;
       if (finalAssignedAcademicYear !== undefined) updates.assignedAcademicYear = finalAssignedAcademicYear;
+
+      if (employeeId !== undefined || employee_id !== undefined) updates.employeeId = employeeId || employee_id;
+      if (designation !== undefined) updates.designation = designation;
+      if (joiningDate !== undefined || joining_date !== undefined) updates.joiningDate = joiningDate || joining_date;
+      if (subjectSpecialization !== undefined || subject_specialization !== undefined) updates.subjectSpecialization = subjectSpecialization || subject_specialization;
+      if (gender !== undefined) updates.gender = gender;
+      if (dateOfBirth !== undefined || date_of_birth !== undefined) updates.dateOfBirth = dateOfBirth || date_of_birth;
+      if (batch !== undefined) updates.batch = batch;
+      if (admissionYear !== undefined || admission_year !== undefined) updates.admissionYear = admissionYear || admission_year;
+      if (collegeCode !== undefined || college_code !== undefined) updates.collegeCode = collegeCode || college_code;
+      if (collegeName !== undefined) updates.collegeName = collegeName;
+      if (departmentName !== undefined) updates.departmentName = departmentName;
 
       // Update updated_at if possible
       updates.updatedAt = new Date().toISOString();
@@ -942,15 +1125,18 @@ export function setupAdmin(app: express.Express) {
 
       const merged = { ...userData, ...updates };
       if (merged.role === 'student') {
+        const regNo = (merged.rollNo || merged.roll_no || merged.register_no || merged.registerNo || '').trim();
         db.prepare(`
-          INSERT INTO students (user_id, roll_no, department_id, college_id, class, year, section, academic_year)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO students (user_id, roll_no, department_id, college_id, class, year, section, semester, academic_year, gender, date_of_birth, batch, admission_year, status)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
           ON CONFLICT(user_id) DO UPDATE SET
             roll_no=excluded.roll_no, department_id=excluded.department_id, college_id=excluded.college_id,
-            class=excluded.class, year=excluded.year, section=excluded.section, academic_year=excluded.academic_year
+            class=excluded.class, year=excluded.year, section=excluded.section, semester=excluded.semester, academic_year=excluded.academic_year,
+            gender=excluded.gender, date_of_birth=excluded.date_of_birth, batch=excluded.batch, admission_year=excluded.admission_year, status=excluded.status
         `).run(
-          uid, merged.rollNo || merged.roll_no || null, merged.departmentId || merged.department_id || null, merged.collegeId || merged.college_id, 
-          merged.class || null, merged.year || null, merged.section || null, merged.academicYear || merged.academic_year || null
+          uid, regNo || null, merged.departmentId || merged.department_id || null, merged.collegeId || merged.college_id, 
+          merged.class || null, merged.year || null, merged.section || null, merged.semester !== undefined && merged.semester !== null ? Number(merged.semester) : null, merged.academicYear || merged.academic_year || null,
+          merged.gender || null, merged.dateOfBirth || merged.date_of_birth || null, merged.batch || null, merged.admissionYear || merged.admission_year || null
         );
 
         // Also update student_academic_profile table if it exists

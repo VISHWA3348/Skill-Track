@@ -25,7 +25,15 @@ const Students: React.FC = () => {
     email: '',
     rollNo: '',
     year: '',
-    section: ''
+    section: '',
+    class: '',
+    academicYear: '',
+    semester: '',
+    phoneNumber: '',
+    gender: '',
+    dateOfBirth: '',
+    batch: '',
+    admissionYear: ''
   });
   const [newStudentPassword, setNewStudentPassword] = useState('');
   const [viewingStudent, setViewingStudent] = useState<UserProfile | null>(null);
@@ -67,15 +75,15 @@ const Students: React.FC = () => {
   const uniqueDepartments = Array.from(new Set(students.map(s => s.departmentId).filter(Boolean)));
 
   const filteredStudents = students.filter(student => {
-    const matchesSearch = 
+    const matchesSearch =
       student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       student.rollNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       student.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       student.uid.toLowerCase().includes(searchTerm.toLowerCase());
-    
+
     const matchesYear = selectedYear === 'all' || student.year === selectedYear;
     const matchesDepartment = selectedDepartment === 'all' || student.departmentId === selectedDepartment;
-    
+
     return matchesSearch && matchesYear && matchesDepartment;
   });
 
@@ -130,7 +138,13 @@ const Students: React.FC = () => {
           rollNo: newStudent.rollNo,
           class: newStudent.class,
           academicYear: newStudent.academicYear,
-          section: newStudent.section
+          semester: newStudent.semester,
+          section: newStudent.section,
+          phoneNumber: newStudent.phoneNumber,
+          gender: newStudent.gender,
+          dateOfBirth: newStudent.dateOfBirth,
+          batch: newStudent.batch,
+          admissionYear: newStudent.admissionYear
         })
       });
 
@@ -154,7 +168,7 @@ const Students: React.FC = () => {
 
       toast.success("Student added successfully.");
       setShowAddModal(false);
-      setNewStudent({ name: '', email: '', rollNo: '', year: '', section: '', class: '', academicYear: '' });
+      setNewStudent({ name: '', email: '', rollNo: '', year: '', section: '', class: '', academicYear: '', semester: '', phoneNumber: '', gender: '', dateOfBirth: '', batch: '', admissionYear: '' });
       setNewStudentPassword('');
       setPhotoFile(null);
       setPhotoPreview(null);
@@ -187,8 +201,13 @@ const Students: React.FC = () => {
         rollNo: editingStudent.rollNo,
         year: editingStudent.year,
         academicYear: editingStudent.academicYear || editingStudent.academic_year,
+        semester: editingStudent.semester,
         section: editingStudent.section,
         phoneNumber: editingStudent.phoneNumber || editingStudent.phone,
+        gender: editingStudent.gender,
+        dateOfBirth: editingStudent.dateOfBirth || editingStudent.date_of_birth,
+        batch: editingStudent.batch,
+        admissionYear: editingStudent.admissionYear || editingStudent.admission_year,
         ...(finalPhotoUrl && { photoUrl: finalPhotoUrl })
       });
       toast.success("Student details updated successfully.");
@@ -206,7 +225,7 @@ const Students: React.FC = () => {
   const handleBulkImport = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile) return;
-    
+
     setBulkErrors([]);
     setIsSubmitting(true);
     try {
@@ -216,19 +235,31 @@ const Students: React.FC = () => {
         setIsSubmitting(false);
         return;
       }
-      
+
       const headers = rows[0].split(',').map(h => h.trim().toLowerCase());
       const emails = new Set();
       const rollNos = new Set();
       const errors: string[] = [];
-      
+
       const studentsToImport = rows.slice(1).map((row, rowIndex) => {
         const values = row.split(',').map(v => v.trim());
         const studentObj: any = {};
         headers.forEach((header, index) => {
-          studentObj[header] = values[index];
+          let key = header;
+          if (header === 'rollno' || header === 'roll_no' || header === 'registerno' || header === 'register_no') {
+            key = 'rollNo';
+          } else if (header === 'academicyear' || header === 'academic_year') {
+            key = 'academicYear';
+          } else if (header === 'admissionyear' || header === 'admission_year') {
+            key = 'admissionYear';
+          } else if (header === 'phonenumber' || header === 'phone_number' || header === 'phone') {
+            key = 'phoneNumber';
+          } else if (header === 'dateofbirth' || header === 'date_of_birth' || header === 'dob') {
+            key = 'dateOfBirth';
+          }
+          studentObj[key] = values[index];
         });
-        
+
         if (!studentObj.email || !studentObj.name) {
           errors.push(`Row ${rowIndex + 2}: Missing required fields (email, name).`);
           return null;
@@ -239,17 +270,27 @@ const Students: React.FC = () => {
         }
         emails.add(studentObj.email);
 
-        if (studentObj.rollNo) {
+        if (!studentObj.rollNo) {
+          errors.push(`Row ${rowIndex + 2}: Missing required field (rollNo).`);
+        } else {
           if (rollNos.has(studentObj.rollNo)) {
             errors.push(`Row ${rowIndex + 2}: Duplicate Roll Number found in CSV (${studentObj.rollNo}).`);
           }
           rollNos.add(studentObj.rollNo);
         }
-        
+
+        if (!studentObj.academicYear) {
+          errors.push(`Row ${rowIndex + 2}: Missing required field (academicYear).`);
+        }
+
+        if (!studentObj.semester) {
+          errors.push(`Row ${rowIndex + 2}: Missing required field (semester).`);
+        }
+
         studentObj.role = 'student';
         studentObj.collegeId = profile.collegeId;
         studentObj.departmentId = profile.departmentId;
-        
+
         return studentObj;
       }).filter(Boolean);
 
@@ -275,11 +316,11 @@ const Students: React.FC = () => {
         setIsSubmitting(false);
         return;
       }
-      
+
       const result = await response.json();
       const successCount = result.results.filter((r: any) => r.status === 'success').length;
       toast.success(`Successfully imported ${successCount} students.`);
-      
+
       setShowBulkModal(false);
       setBulkData('');
     } catch (err: any) {
@@ -299,7 +340,7 @@ const Students: React.FC = () => {
         </div>
         {(profile?.role === 'admin' || profile?.role === 'super_admin') && (
           <div className="flex items-center gap-3">
-            <button 
+            <button
               onClick={() => {
                 setNewStudent({ name: '', email: '', rollNo: '', year: '', section: '', class: '', academicYear: '' });
                 setNewStudentPassword('');
@@ -312,7 +353,7 @@ const Students: React.FC = () => {
               <User className="w-4 h-4" />
               Add Student
             </button>
-            <button 
+            <button
               onClick={() => setShowBulkModal(true)}
               className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-green-700 transition-colors shadow-lg shadow-green-100"
             >
@@ -369,78 +410,78 @@ const Students: React.FC = () => {
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-200">
-            <thead className="bg-gray-50/50 border-b border-gray-100">
-              <tr>
-                <th className="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] italic font-serif">Student</th>
-                <th className="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] italic font-serif">Roll No</th>
-                <th className="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] italic font-serif">Department</th>
-                <th className="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] italic font-serif">Year/Section</th>
-                <th className="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] italic font-serif">Status</th>
-                <th className="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] italic font-serif">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-100">
-              {(paginatedStudents || []).map((student) => (
-                <tr key={student.uid} className="hover:bg-gray-50/50 transition-colors group">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center overflow-hidden shrink-0">
-                        {student.photoUrl ? (
-                          <img src={student.photoUrl} alt={student.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                        ) : (
-                          <User className="w-4 h-4" />
-                        )}
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-semibold text-gray-900">{student.name}</span>
-                        <span className="text-xs text-gray-500">{student.email}</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-sm text-gray-600 font-mono">{student.rollNo || '-'}</span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-sm text-gray-600">{student.departmentId || '-'}</span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-sm text-gray-600">
-                      {student.academicYear || student.academic_year || (student.year ? `Year ${student.year}` : '-')} {student.section ? `| Sec ${student.section}` : ''}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-tight ${student.status === 'suspended' ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-green-50 text-green-600 border border-green-100'}`}>
-                      {student.status === 'suspended' ? 'Suspended' : 'Active'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium flex items-center gap-3">
-                    <button 
-                      onClick={() => setViewingAcademicProfile(student)}
-                      className="text-blue-600 hover:text-blue-900 font-bold text-xs uppercase tracking-widest bg-blue-50 px-3 py-1.5 rounded-xl transition-all"
-                    >
-                      Academic Record
-                    </button>
-                    <button 
-                      onClick={() => window.open(`/resume/${student.uid}`, '_blank')}
-                      className="text-green-600 hover:text-green-900 font-bold text-xs uppercase tracking-widest bg-green-50 px-3 py-1.5 rounded-xl transition-all"
-                    >
-                      View Resume
-                    </button>
-                    <button 
-                      onClick={() => setEditingStudent(student)}
-                      className="text-gray-400 hover:text-indigo-600 transition-colors"
-                      title="Edit Student"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                  </td>
+              <thead className="bg-gray-50/50 border-b border-gray-100">
+                <tr>
+                  <th className="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] italic font-serif">Student</th>
+                  <th className="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] italic font-serif">Roll No</th>
+                  <th className="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] italic font-serif">Department</th>
+                  <th className="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] italic font-serif">Year/Section</th>
+                  <th className="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] italic font-serif">Status</th>
+                  <th className="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] italic font-serif">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          {filteredStudents.length === 0 && (
-            <div className="p-8 text-center text-gray-500">No students found matching your criteria.</div>
-          )}
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-100">
+                {(paginatedStudents || []).map((student) => (
+                  <tr key={student.uid} className="hover:bg-gray-50/50 transition-colors group">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center overflow-hidden shrink-0">
+                          {student.photoUrl ? (
+                            <img src={student.photoUrl} alt={student.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          ) : (
+                            <User className="w-4 h-4" />
+                          )}
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-sm font-semibold text-gray-900">{student.name}</span>
+                          <span className="text-xs text-gray-500">{student.email}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="text-sm text-gray-600 font-mono">{student.rollNo || '-'}</span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="text-sm text-gray-600">{student.departmentId || '-'}</span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="text-sm text-gray-600">
+                        {student.academicYear || student.academic_year || (student.year ? `Year ${student.year}` : '-')} {student.section ? `| Sec ${student.section}` : ''}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-tight ${student.status === 'suspended' ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-green-50 text-green-600 border border-green-100'}`}>
+                        {student.status === 'suspended' ? 'Suspended' : 'Active'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium flex items-center gap-3">
+                      <button
+                        onClick={() => setViewingAcademicProfile(student)}
+                        className="text-blue-600 hover:text-blue-900 font-bold text-xs uppercase tracking-widest bg-blue-50 px-3 py-1.5 rounded-xl transition-all"
+                      >
+                        Academic Record
+                      </button>
+                      <button
+                        onClick={() => window.open(`/resume/${student.uid}`, '_blank')}
+                        className="text-green-600 hover:text-green-900 font-bold text-xs uppercase tracking-widest bg-green-50 px-3 py-1.5 rounded-xl transition-all"
+                      >
+                        View Resume
+                      </button>
+                      <button
+                        onClick={() => setEditingStudent(student)}
+                        className="text-gray-400 hover:text-indigo-600 transition-colors"
+                        title="Edit Student"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {filteredStudents.length === 0 && (
+              <div className="p-8 text-center text-gray-500">No students found matching your criteria.</div>
+            )}
           </div>
           {totalPages > 1 && (
             <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -475,13 +516,13 @@ const Students: React.FC = () => {
 
       {viewingStudent && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden"
           >
             <div className="relative h-32 bg-indigo-600">
-              <button 
+              <button
                 onClick={() => setViewingStudent(null)}
                 className="absolute top-4 right-4 p-2 bg-white/20 hover:bg-white/30 text-white rounded-full transition-colors z-10"
               >
@@ -490,9 +531,9 @@ const Students: React.FC = () => {
               <div className="absolute -bottom-12 left-8 p-1 bg-white rounded-2xl shadow-lg">
                 <div className="w-24 h-24 bg-indigo-50 rounded-xl flex items-center justify-center overflow-hidden">
                   {viewingStudent.photoUrl ? (
-                    <img 
-                      src={viewingStudent.photoUrl} 
-                      alt={viewingStudent.name} 
+                    <img
+                      src={viewingStudent.photoUrl}
+                      alt={viewingStudent.name}
                       className="w-full h-full object-cover"
                       referrerPolicy="no-referrer"
                     />
@@ -596,7 +637,7 @@ const Students: React.FC = () => {
 
       {showAddModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto"
@@ -612,9 +653,9 @@ const Students: React.FC = () => {
               <div className="flex flex-col items-center mb-6">
                 <div className="relative w-24 h-24 rounded-full overflow-hidden bg-gray-100 border-2 border-gray-200 mb-2">
                   {photoPreview ? (
-                    <img 
-                      src={photoPreview} 
-                      alt="Profile Preview" 
+                    <img
+                      src={photoPreview}
+                      alt="Profile Preview"
                       className="w-full h-full object-cover"
                     />
                   ) : (
@@ -624,10 +665,10 @@ const Students: React.FC = () => {
                   )}
                   <label className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity cursor-pointer">
                     <Camera className="w-6 h-6 text-white" />
-                    <input 
-                      type="file" 
-                      accept="image/*" 
-                      className="hidden" 
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
                       onChange={handlePhotoChange}
                     />
                   </label>
@@ -642,7 +683,7 @@ const Students: React.FC = () => {
                   required
                   className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500"
                   value={newStudent.name}
-                  onChange={(e) => setNewStudent({...newStudent, name: e.target.value})}
+                  onChange={(e) => setNewStudent({ ...newStudent, name: e.target.value })}
                 />
               </div>
               <div>
@@ -652,7 +693,7 @@ const Students: React.FC = () => {
                   required
                   className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500"
                   value={newStudent.email}
-                  onChange={(e) => setNewStudent({...newStudent, email: e.target.value})}
+                  onChange={(e) => setNewStudent({ ...newStudent, email: e.target.value })}
                 />
               </div>
               <div>
@@ -667,12 +708,21 @@ const Students: React.FC = () => {
                 />
               </div>
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                <input
+                  type="text"
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                  value={newStudent.phoneNumber || ''}
+                  onChange={(e) => setNewStudent({ ...newStudent, phoneNumber: e.target.value })}
+                />
+              </div>
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Roll Number</label>
                 <input
                   type="text"
                   className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500"
                   value={newStudent.rollNo || ''}
-                  onChange={(e) => setNewStudent({...newStudent, rollNo: e.target.value})}
+                  onChange={(e) => setNewStudent({ ...newStudent, rollNo: e.target.value })}
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -682,7 +732,7 @@ const Students: React.FC = () => {
                     required
                     className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white"
                     value={newStudent.class || ''}
-                    onChange={(e) => setNewStudent({...newStudent, class: e.target.value})}
+                    onChange={(e) => setNewStudent({ ...newStudent, class: e.target.value })}
                   >
                     <option value="">Select Degree</option>
                     <option value="B.E">B.E</option>
@@ -701,7 +751,7 @@ const Students: React.FC = () => {
                     type="text"
                     className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500"
                     value={newStudent.section || ''}
-                    onChange={(e) => setNewStudent({...newStudent, section: e.target.value})}
+                    onChange={(e) => setNewStudent({ ...newStudent, section: e.target.value })}
                   />
                 </div>
               </div>
@@ -711,13 +761,75 @@ const Students: React.FC = () => {
                   required
                   className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white"
                   value={newStudent.academicYear || ''}
-                  onChange={(e) => setNewStudent({...newStudent, academicYear: e.target.value})}
+                  onChange={(e) => setNewStudent({ ...newStudent, academicYear: e.target.value })}
                 >
                   <option value="">Select Academic Year</option>
-                  {(newStudent.class ? (newStudent.class.match(/^(M\.|M[A-Z]|PG|Master)/i) ? ['I Year PG', 'II Year PG'] : ['I Year', 'II Year', 'III Year', 'IV Year']) : ['I Year', 'II Year', 'III Year', 'IV Year']).map((opt) => (
+                  {(newStudent.class ? (newStudent.class.match(/^(M\.|M[A-Z]|PG|Master)/i) ? ['I Year PG', 'II Year PG', '2024-2026', '2025-2027'] : ['I Year', 'II Year', 'III Year', 'IV Year', '2023-2027', '2024-2028', '2025-2029', '2026-2030']) : ['I Year', 'II Year', 'III Year', 'IV Year', '2023-2027', '2024-2028', '2025-2029', '2026-2030']).map((opt) => (
                     <option key={opt} value={opt}>{opt}</option>
                   ))}
                 </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Semester</label>
+                <select
+                  required
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white"
+                  value={newStudent.semester || ''}
+                  onChange={(e) => setNewStudent({ ...newStudent, semester: e.target.value })}
+                >
+                  <option value="">Select Semester</option>
+                  {[1, 2, 3, 4, 5, 6, 7, 8].map((sem) => (
+                    <option key={sem} value={sem}>Semester {sem}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
+                  <select
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white"
+                    value={newStudent.gender || ''}
+                    onChange={(e) => setNewStudent({ ...newStudent, gender: e.target.value })}
+                  >
+                    <option value="">Select Gender</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
+                  <input
+                    type="date"
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    value={newStudent.dateOfBirth || ''}
+                    onChange={(e) => setNewStudent({ ...newStudent, dateOfBirth: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Batch</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 2024-2028"
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    value={newStudent.batch || ''}
+                    onChange={(e) => setNewStudent({ ...newStudent, batch: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Admission Year</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 2024"
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    value={newStudent.admissionYear || ''}
+                    onChange={(e) => setNewStudent({ ...newStudent, admissionYear: e.target.value })}
+                  />
+                </div>
               </div>
 
               <div className="flex gap-3 mt-8">
@@ -748,7 +860,7 @@ const Students: React.FC = () => {
 
       {editingStudent && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6"
@@ -764,9 +876,9 @@ const Students: React.FC = () => {
               <div className="flex flex-col items-center mb-6">
                 <div className="relative w-24 h-24 rounded-full overflow-hidden bg-gray-100 border-2 border-gray-200 mb-2">
                   {photoPreview || editingStudent.photoUrl ? (
-                    <img 
-                      src={photoPreview || editingStudent.photoUrl} 
-                      alt="Profile Preview" 
+                    <img
+                      src={photoPreview || editingStudent.photoUrl}
+                      alt="Profile Preview"
                       className="w-full h-full object-cover"
                       referrerPolicy="no-referrer"
                     />
@@ -777,10 +889,10 @@ const Students: React.FC = () => {
                   )}
                   <label className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity cursor-pointer">
                     <Camera className="w-6 h-6 text-white" />
-                    <input 
-                      type="file" 
-                      accept="image/*" 
-                      className="hidden" 
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
                       onChange={handlePhotoChange}
                     />
                   </label>
@@ -795,7 +907,7 @@ const Students: React.FC = () => {
                   required
                   className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500"
                   value={editingStudent.name}
-                  onChange={(e) => setEditingStudent({...editingStudent, name: e.target.value})}
+                  onChange={(e) => setEditingStudent({ ...editingStudent, name: e.target.value })}
                 />
               </div>
               <div>
@@ -805,7 +917,7 @@ const Students: React.FC = () => {
                   required
                   className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500"
                   value={editingStudent.email}
-                  onChange={(e) => setEditingStudent({...editingStudent, email: e.target.value})}
+                  onChange={(e) => setEditingStudent({ ...editingStudent, email: e.target.value })}
                 />
               </div>
               <div>
@@ -814,7 +926,7 @@ const Students: React.FC = () => {
                   type="text"
                   className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500"
                   value={editingStudent.phoneNumber || editingStudent.phone || ''}
-                  onChange={(e) => setEditingStudent({...editingStudent, phoneNumber: e.target.value, phone: e.target.value})}
+                  onChange={(e) => setEditingStudent({ ...editingStudent, phoneNumber: e.target.value, phone: e.target.value })}
                 />
               </div>
               <div>
@@ -824,10 +936,10 @@ const Students: React.FC = () => {
                   required
                   className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500"
                   value={editingStudent.rollNo || ''}
-                  onChange={(e) => setEditingStudent({...editingStudent, rollNo: e.target.value})}
+                  onChange={(e) => setEditingStudent({ ...editingStudent, rollNo: e.target.value })}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Academic Year</label>
                   <select
@@ -840,8 +952,24 @@ const Students: React.FC = () => {
                     })}
                   >
                     <option value="">Select Academic Year</option>
-                    {(editingStudent.class ? (editingStudent.class.match(/^(M\.|M[A-Z]|PG|Master)/i) ? ['I Year PG', 'II Year PG'] : ['I Year', 'II Year', 'III Year', 'IV Year']) : ['I Year', 'II Year', 'III Year', 'IV Year']).map((opt) => (
+                    {(editingStudent.class ? (editingStudent.class.match(/^(M\.|M[A-Z]|PG|Master)/i) ? ['I Year PG', 'II Year PG', '2024-2026', '2025-2027'] : ['I Year', 'II Year', 'III Year', 'IV Year', '2023-2027', '2024-2028', '2025-2029', '2026-2030']) : ['I Year', 'II Year', 'III Year', 'IV Year', '2023-2027', '2024-2028', '2025-2029', '2026-2030']).map((opt) => (
                       <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Semester</label>
+                  <select
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white"
+                    value={editingStudent.semester || ''}
+                    onChange={(e) => setEditingStudent({
+                      ...editingStudent,
+                      semester: parseInt(e.target.value, 10) || null
+                    })}
+                  >
+                    <option value="">Select Semester</option>
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map((sem) => (
+                      <option key={sem} value={sem}>Semester {sem}</option>
                     ))}
                   </select>
                 </div>
@@ -851,7 +979,55 @@ const Students: React.FC = () => {
                     type="text"
                     className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500"
                     value={editingStudent.section || ''}
-                    onChange={(e) => setEditingStudent({...editingStudent, section: e.target.value})}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, section: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
+                  <select
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white"
+                    value={editingStudent.gender || ''}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, gender: e.target.value })}
+                  >
+                    <option value="">Select Gender</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
+                  <input
+                    type="date"
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    value={editingStudent.dateOfBirth || editingStudent.date_of_birth || ''}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, dateOfBirth: e.target.value, date_of_birth: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Batch</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 2024-2028"
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    value={editingStudent.batch || ''}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, batch: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Admission Year</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 2024"
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    value={editingStudent.admissionYear || editingStudent.admission_year || ''}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, admissionYear: e.target.value, admission_year: e.target.value })}
                   />
                 </div>
               </div>
@@ -884,7 +1060,7 @@ const Students: React.FC = () => {
 
       {showBulkModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             className="bg-white rounded-2xl shadow-xl w-full max-w-2xl p-6"
@@ -895,7 +1071,7 @@ const Students: React.FC = () => {
                 <X className="w-6 h-6" />
               </button>
             </div>
-            
+
             {bulkErrors.length > 0 && (
               <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm rounded-lg border border-red-100 flex flex-col gap-2">
                 <div className="flex items-center gap-2 font-bold">
@@ -914,34 +1090,34 @@ const Students: React.FC = () => {
               <p className="text-sm text-blue-800 font-medium mb-2">Instructions:</p>
               <ul className="text-xs text-blue-700 space-y-1 list-disc list-inside">
                 <li>Paste CSV data below. The first row must be the header.</li>
-                <li>Required columns: <code className="bg-blue-100 px-1 rounded">name</code>, <code className="bg-blue-100 px-1 rounded">email</code></li>
-                <li>Optional columns: <code className="bg-blue-100 px-1 rounded">rollNo</code>, <code className="bg-blue-100 px-1 rounded">year</code>, <code className="bg-blue-100 px-1 rounded">section</code>, <code className="bg-blue-100 px-1 rounded">password</code></li>
+                <li>Required columns: <code className="bg-blue-100 px-1 rounded">name</code>, <code className="bg-blue-100 px-1 rounded">email</code>, <code className="bg-blue-100 px-1 rounded">rollNo</code>, <code className="bg-blue-100 px-1 rounded">academicYear</code>, <code className="bg-blue-100 px-1 rounded">semester</code></li>
+                <li>Optional columns: <code className="bg-blue-100 px-1 rounded">gender</code>, <code className="bg-blue-100 px-1 rounded">dateOfBirth</code>, <code className="bg-blue-100 px-1 rounded">batch</code>, <code className="bg-blue-100 px-1 rounded">admissionYear</code>, <code className="bg-blue-100 px-1 rounded">section</code>, <code className="bg-blue-100 px-1 rounded">class</code>, <code className="bg-blue-100 px-1 rounded">password</code></li>
                 <li>Students will be automatically assigned to your department.</li>
               </ul>
             </div>
 
             <form onSubmit={handleBulkImport} className="space-y-4">
               <div>
-                <textarea 
-                  required 
+                <textarea
+                  required
                   value={bulkData}
                   onChange={(e) => setBulkData(e.target.value)}
-                  className="w-full h-64 p-4 border border-gray-200 rounded-xl font-mono text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" 
+                  className="w-full h-64 p-4 border border-gray-200 rounded-xl font-mono text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                   placeholder="name,email,rollNo,year,section&#10;John Doe,john@example.com,20CS001,3,A&#10;Jane Smith,jane@example.com,20CS002,3,B"
                 />
               </div>
-              
+
               <div className="flex justify-end gap-3 mt-6">
-                <button 
-                  type="button" 
-                  onClick={() => setShowBulkModal(false)} 
+                <button
+                  type="button"
+                  onClick={() => setShowBulkModal(false)}
                   className="px-6 py-2 border border-gray-200 rounded-lg text-gray-600 font-medium hover:bg-gray-50 transition-colors"
                   disabled={isSubmitting}
                 >
                   Cancel
                 </button>
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition-colors disabled:bg-indigo-400 shadow-lg shadow-indigo-100"
                   disabled={isSubmitting}
                 >

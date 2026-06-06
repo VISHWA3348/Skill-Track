@@ -51,6 +51,18 @@ const Users: React.FC = () => {
   const [newPhoneNumber, setNewPhoneNumber] = useState('');
   const [newAcademicYear, setNewAcademicYear] = useState('');
   const [newAssignedAcademicYear, setNewAssignedAcademicYear] = useState('');
+  const [newSemester, setNewSemester] = useState('');
+
+  // New hierarchy-specific fields
+  const [newEmployeeId, setNewEmployeeId] = useState('');
+  const [newDesignation, setNewDesignation] = useState('');
+  const [newSubjectSpecialization, setNewSubjectSpecialization] = useState('');
+  const [newGender, setNewGender] = useState('');
+  const [newDateOfBirth, setNewDateOfBirth] = useState('');
+  const [newBatch, setNewBatch] = useState('');
+  const [newAdmissionYear, setNewAdmissionYear] = useState('');
+  const [newCollegeCode, setNewCollegeCode] = useState('');
+
 
   // Dropdown data
   const [colleges, setColleges] = useState<any[]>([]);
@@ -165,9 +177,20 @@ const Users: React.FC = () => {
       setNewRollNo(user.rollNo || '');
       setNewClass(user.class || '');
       setNewSection(user.section || '');
-      setNewPhoneNumber(user.phoneNumber || '');
+      setNewPhoneNumber(user.phoneNumber || (user as any).phone || (user as any).phone_number || '');
       setNewAcademicYear(user.academicYear || user.academic_year || '');
       setNewAssignedAcademicYear(user.assignedAcademicYear || user.assigned_academic_year || '');
+      setNewSemester((user as any).semester || '');
+      
+      // Load editing user fields
+      setNewEmployeeId(user.employeeId || '');
+      setNewDesignation(user.designation || '');
+      setNewSubjectSpecialization(user.subjectSpecialization || '');
+      setNewGender(user.gender || '');
+      setNewDateOfBirth(user.dateOfBirth ? user.dateOfBirth.split('T')[0] : '');
+      setNewBatch(user.batch || '');
+      setNewAdmissionYear(user.admissionYear || '');
+      setNewCollegeCode(user.collegeCode || '');
     } else {
       setIsEditing(false);
       setEditingUserId(null);
@@ -189,6 +212,17 @@ const Users: React.FC = () => {
       setNewPhoneNumber('');
       setNewAcademicYear('');
       setNewAssignedAcademicYear('');
+      setNewSemester('');
+      
+      // Reset fields
+      setNewEmployeeId('');
+      setNewDesignation('');
+      setNewSubjectSpecialization('');
+      setNewGender('');
+      setNewDateOfBirth('');
+      setNewBatch('');
+      setNewAdmissionYear('');
+      setNewCollegeCode('');
     }
     setError('');
     setShowAddModal(true);
@@ -209,7 +243,16 @@ const Users: React.FC = () => {
       let body: any = {
         name: newName,
         role: newRole,
-        collegeId: newCollegeId || profile.collegeId
+        collegeId: newCollegeId || profile.collegeId,
+        phoneNumber: newPhoneNumber || undefined,
+        employeeId: newEmployeeId || undefined,
+        designation: newDesignation || undefined,
+        subjectSpecialization: newSubjectSpecialization || undefined,
+        gender: newGender || undefined,
+        dateOfBirth: newDateOfBirth || undefined,
+        batch: newBatch || undefined,
+        admissionYear: newAdmissionYear || undefined,
+        collegeCode: newCollegeCode || undefined
       };
       
       if (newRole !== 'super_admin' && newRole !== 'admin') {
@@ -222,10 +265,13 @@ const Users: React.FC = () => {
         body.class = newClass || undefined;
         body.section = newSection || undefined;
         body.academicYear = newAcademicYear || undefined;
+        body.semester = newSemester ? parseInt(newSemester, 10) : undefined;
       }
 
       if (newRole === 'staff') {
-        body.assignedAcademicYear = newAssignedAcademicYear || undefined;
+        body.academicYear = newAcademicYear || undefined;
+        body.semester = newSemester ? parseInt(newSemester, 10) : undefined;
+        body.assignedAcademicYear = newAcademicYear || undefined;
       }
 
       if (!isEditing) {
@@ -258,6 +304,15 @@ const Users: React.FC = () => {
       setNewPhoneNumber('');
       setNewAcademicYear('');
       setNewAssignedAcademicYear('');
+      setNewSemester('');
+      setNewEmployeeId('');
+      setNewDesignation('');
+      setNewSubjectSpecialization('');
+      setNewGender('');
+      setNewDateOfBirth('');
+      setNewBatch('');
+      setNewAdmissionYear('');
+      setNewCollegeCode('');
       setIsEditing(false);
       setEditingUserId(null);
       fetchUsers();
@@ -635,6 +690,15 @@ const Users: React.FC = () => {
                 />
               </div>
               <div>
+                <label className="block text-sm font-medium text-gray-700">Phone Number</label>
+                <input 
+                  type="text" 
+                  value={newPhoneNumber}
+                  onChange={(e) => setNewPhoneNumber(e.target.value)}
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" 
+                />
+              </div>
+              <div>
                 <label className="block text-sm font-medium text-gray-700">Role</label>
                 <select 
                   value={newRole}
@@ -673,112 +737,238 @@ const Users: React.FC = () => {
                   )}
                 </select>
               </div>
-              {newRole === 'staff' && (
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700">Assigned Year Responsibility</label>
-                  <select
-                    value={newAssignedAcademicYear}
-                    onChange={(e) => setNewAssignedAcademicYear(e.target.value)}
+              {/* College Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 font-bold mb-1">College *</label>
+                <select 
+                  required 
+                  value={newCollegeId}
+                  onChange={(e) => {
+                    setNewCollegeId(e.target.value);
+                    setNewDepartmentId('');
+                  }}
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 bg-white"
+                  disabled={!isSuperAdmin}
+                >
+                  <option value="">Select College</option>
+                  {colleges.map(c => (
+                    <option key={c.id} value={c.college_id || c.id}>{c.name || c.college_name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* College Code (For College Admin only) */}
+              {newRole === 'admin' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 font-bold mb-1">College Code</label>
+                  <input 
+                    type="text" 
+                    value={newCollegeCode}
+                    onChange={(e) => setNewCollegeCode(e.target.value)}
+                    placeholder="e.g. CAMPUS-01"
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" 
+                  />
+                </div>
+              )}
+
+              {/* Department Selection (For HOD, Staff, Student) */}
+              {['hod', 'staff', 'student'].includes(newRole) && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 font-bold mb-1">Department *</label>
+                  <select 
+                    required
+                    value={newDepartmentId}
+                    onChange={(e) => setNewDepartmentId(e.target.value)}
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 bg-white"
+                    disabled={!newCollegeId || (profile?.role === 'hod' && !isSuperAdmin && !isAdmin)}
                   >
-                    <option value="All Years">All Years (Default)</option>
-                    <option value="I Year">I Year</option>
-                    <option value="II Year">II Year</option>
-                    <option value="III Year">III Year</option>
-                    <option value="IV Year">IV Year</option>
+                    <option value="">Select Department</option>
+                    {filteredDepts.map(d => (
+                      <option key={d.id} value={d.department_id || d.id}>{d.name || d.department_name}</option>
+                    ))}
                   </select>
                 </div>
               )}
-              {newRole === 'student' && (
-                <>
-                  <div className="grid grid-cols-2 gap-4">
+
+              {/* Employee ID & Designation (For HOD, Staff, and College Admin designation is optional) */}
+              {['admin', 'hod', 'staff'].includes(newRole) && (
+                <div className="grid grid-cols-2 gap-4">
+                  {['hod', 'staff'].includes(newRole) && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Roll Number</label>
+                      <label className="block text-sm font-medium text-gray-700 font-bold mb-1">Employee ID *</label>
                       <input 
                         type="text" 
-                        required={newRole === 'student'}
+                        required
+                        value={newEmployeeId}
+                        onChange={(e) => setNewEmployeeId(e.target.value)}
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" 
+                      />
+                    </div>
+                  )}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 font-bold mb-1">
+                      Designation {['hod', 'staff'].includes(newRole) ? '*' : ''}
+                    </label>
+                    <input 
+                      type="text" 
+                      required={['hod', 'staff'].includes(newRole)}
+                      value={newDesignation}
+                      onChange={(e) => setNewDesignation(e.target.value)}
+                      placeholder={newRole === 'admin' ? 'e.g. Chief Administrator' : 'e.g. Assistant Professor'}
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" 
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Joining Date & Subject Specialization */}
+              {['hod', 'staff'].includes(newRole) && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 font-bold mb-1">Joining Date</label>
+                    <input 
+                      type="date" 
+                      value={newDateOfBirth /* reuse dob for simple mapping or load properly */}
+                      onChange={(e) => setNewDateOfBirth(e.target.value)}
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" 
+                    />
+                  </div>
+                  {newRole === 'staff' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 font-bold mb-1">Subject Specialization</label>
+                      <input 
+                        type="text" 
+                        value={newSubjectSpecialization}
+                        onChange={(e) => setNewSubjectSpecialization(e.target.value)}
+                        placeholder="e.g. Machine Learning"
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" 
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Academic Year & Semester (For Staff and Student) */}
+              {['staff', 'student'].includes(newRole) && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 font-bold mb-1">Academic Year *</label>
+                    <select
+                      required
+                      value={newAcademicYear}
+                      onChange={(e) => setNewAcademicYear(e.target.value)}
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 bg-white"
+                    >
+                      <option value="">Select Academic Year</option>
+                      {['I Year', 'II Year', 'III Year', 'IV Year', '2023-2027', '2024-2028', '2025-2029', '2026-2030'].map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 font-bold mb-1">Semester *</label>
+                    <select
+                      required
+                      value={newSemester}
+                      onChange={(e) => setNewSemester(e.target.value)}
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 bg-white"
+                    >
+                      <option value="">Select Semester</option>
+                      {[1, 2, 3, 4, 5, 6, 7, 8].map((sem) => (
+                        <option key={sem} value={sem}>Semester {sem}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {/* Student Academic Info */}
+              {newRole === 'student' && (
+                <>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 font-bold mb-1">Roll Number *</label>
+                      <input 
+                        type="text" 
+                        required
                         value={newRollNo}
                         onChange={(e) => setNewRollNo(e.target.value)}
                         className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" 
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Degree</label>
+                      <label className="block text-sm font-medium text-gray-700 font-bold mb-1">Degree *</label>
                       <input 
                         type="text" 
-                        required={newRole === 'student'}
+                        required
                         value={newClass}
                         onChange={(e) => setNewClass(e.target.value)}
+                        placeholder="e.g. B.E. CSE"
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 font-bold mb-1">Section *</label>
+                      <input 
+                        type="text" 
+                        required
+                        value={newSection}
+                        onChange={(e) => setNewSection(e.target.value)}
+                        placeholder="e.g. A"
                         className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" 
                       />
                     </div>
                   </div>
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Academic Year</label>
+                      <label className="block text-sm font-medium text-gray-700 font-bold mb-1">Gender</label>
                       <select
-                        required={newRole === 'student'}
-                        value={newAcademicYear}
-                        onChange={(e) => setNewAcademicYear(e.target.value)}
+                        value={newGender}
+                        onChange={(e) => setNewGender(e.target.value)}
                         className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 bg-white"
                       >
-                        <option value="">Select Academic Year</option>
-                        {(newClass ? (newClass.match(/^(M\.|M[A-Z]|PG|Master)/i) ? ['I Year PG', 'II Year PG'] : ['I Year', 'II Year', 'III Year', 'IV Year']) : ['I Year', 'II Year', 'III Year', 'IV Year']).map((opt) => (
-                          <option key={opt} value={opt}>{opt}</option>
-                        ))}
+                        <option value="">Select Gender</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Section</label>
+                      <label className="block text-sm font-medium text-gray-700 font-bold mb-1">Date of Birth</label>
+                      <input 
+                        type="date" 
+                        value={newDateOfBirth}
+                        onChange={(e) => setNewDateOfBirth(e.target.value)}
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 font-bold mb-1">Batch</label>
                       <input 
                         type="text" 
-                        required={newRole === 'student'}
-                        value={newSection}
-                        onChange={(e) => setNewSection(e.target.value)}
+                        value={newBatch}
+                        onChange={(e) => setNewBatch(e.target.value)}
+                        placeholder="e.g. 2024-2028"
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 font-bold mb-1">Admission Year</label>
+                      <input 
+                        type="text" 
+                        value={newAdmissionYear}
+                        onChange={(e) => setNewAdmissionYear(e.target.value)}
+                        placeholder="e.g. 2024"
                         className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" 
                       />
                     </div>
                   </div>
                 </>
               )}
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">College</label>
-                  <select 
-                    required 
-                    value={newCollegeId}
-                    onChange={(e) => {
-                      setNewCollegeId(e.target.value);
-                      setNewDepartmentId('');
-                    }}
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 bg-white"
-                    disabled={!isSuperAdmin}
-                  >
-                    <option value="">Select College</option>
-                    {colleges.map(c => (
-                      <option key={c.id} value={c.college_id}>{c.name || c.college_name}</option>
-                    ))}
-                  </select>
-                </div>
-                {newRole !== 'super_admin' && newRole !== 'admin' && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Department</label>
-                    <select 
-                      required={newRole !== 'super_admin' && newRole !== 'admin'}
-                      value={newDepartmentId}
-                      onChange={(e) => setNewDepartmentId(e.target.value)}
-                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 bg-white"
-                      disabled={!newCollegeId || (profile?.role === 'hod' && !isSuperAdmin && !isAdmin)}
-                    >
-                      <option value="">Select Department</option>
-                      {filteredDepts.map(d => (
-                        <option key={d.id} value={d.department_id}>{d.name || d.department_name}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-              </div>
               <div className="flex justify-end space-x-3 mt-6">
                 <button 
                   type="button" 

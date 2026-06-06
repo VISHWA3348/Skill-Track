@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import os from 'os';
 import crypto from 'crypto';
-import { db, getCollection, getDocument, setDocument, deleteDocument, queryDocuments } from './db';
+import { db, getCollection, getDocument, setDocument, deleteDocument, queryDocuments, syncUserToRoleTable } from './db';
 import { hashPassword, comparePassword, generateToken, verifyToken, validatePassword } from './auth';
 import { authenticate, checkRole, getDataIsolationFilters, rateLimiter } from './middleware';
 import { uploadMediaFile, uploadMediaFileDetailed } from './cloudinary_helper';
@@ -12,6 +12,7 @@ import { cacheService } from './redis_cache';
 import { queueService } from './queue';
 import { sendEmail, initEmailLogsTable } from './services/email.service';
 import { calculateResumeScore } from './resume_features';
+import { validateUserHierarchy, resolveOrganizationNames } from './hierarchy_validator';
 
 // Initialize email-related tables on startup
 initEmailLogsTable();
@@ -93,7 +94,7 @@ export function setupApi(app: express.Express) {
     const { 
       email, password, name, role, collegeId, departmentId, 
       rollNo, class: className, year, section, city, phoneNumber, collegeName, skills, bio,
-      signupCode, inviteCode, academicYear // inviteCode = new CAMP-DEPT-XXXXXX system; signupCode = legacy fallback
+      signupCode, inviteCode, academicYear, semester // inviteCode = new CAMP-DEPT-XXXXXX system; signupCode = legacy fallback
     } = req.body;
     try {
       // 0. Check if registration is enabled
@@ -182,11 +183,58 @@ export function setupApi(app: express.Express) {
       const v = validatePassword(password);
       if (!v.valid) return res.status(400).json({ error: 'auth/weak-password', message: v.message });
 
+      // Resolve organizational names
+      const resolvedNames = resolveOrganizationNames(db, finalCollegeId, finalDeptId);
+      const collegeNameFinal = collegeName || resolvedNames.collegeName;
+      const departmentNameFinal = resolvedNames.departmentName;
+
+      // Validate strict organizational mapping
+      const validationData = {
+        ...req.body,
+        college_id: finalCollegeId,
+        department_id: finalDeptId,
+        collegeName: collegeNameFinal,
+        departmentName: departmentNameFinal
+      };
+      const validation = validateUserHierarchy(finalRole, validationData);
+      if (!validation.valid) {
+        return res.status(400).json({ error: 'auth/validation-failed', messages: validation.errors });
+      }
+
+      // Verify College exists
+      const collegeCheck = db.prepare('SELECT id FROM colleges WHERE id = ?').get(finalCollegeId);
+      if (!collegeCheck) {
+        return res.status(400).json({ error: 'auth/college-not-found', message: 'The specified college does not exist.' });
+      }
+
+      // Verify Department exists
+      if (finalRole !== 'super_admin' && finalRole !== 'admin') {
+        const deptCheck = db.prepare('SELECT id FROM departments WHERE id = ? AND college_id = ?').get(finalDeptId, finalCollegeId);
+        if (!deptCheck) {
+          return res.status(400).json({ error: 'auth/department-not-found', message: 'The specified department does not exist in this college.' });
+        }
+      }
+
+      // Verify unique roll/register number for students
+      if (finalRole === 'student') {
+        const regNo = (rollNo || req.body.register_no || req.body.registerNo || '').trim();
+        const dupRegister = db.prepare("SELECT user_id FROM students WHERE roll_no = ? OR register_no = ?").get(regNo, regNo);
+        const dupUser = db.prepare("SELECT uid FROM users WHERE roll_no = ?").get(regNo);
+        if (dupRegister || dupUser) {
+          return res.status(400).json({ error: 'auth/duplicate-register-no', message: 'Register number already exists. Duplicate register numbers are blocked.' });
+        }
+      }
+
       // Academic Year selection validation
       let mappedLegacyYear = finalYear;
       let finalAcademicYear = inviteRowAcademicYear || academicYear || null;
 
       if (finalRole === 'student') {
+        const semNum = semester ? parseInt(semester, 10) : null;
+        if (!semNum || semNum < 1 || semNum > 8) {
+          return res.status(400).json({ error: 'auth/semester-required', message: 'Semester selection is required and must be between 1 and 8.' });
+        }
+
         if (inviteRowAcademicYear) {
           // If year is locked from invite code, map legacy representation directly
           if (finalAcademicYear.startsWith('I Year')) mappedLegacyYear = 'I';
@@ -201,20 +249,23 @@ export function setupApi(app: express.Express) {
           const isPG = className ? /^(M\.|M[A-Z]|PG|Master)/i.test(className) : false;
           const validUGYears = ['I Year', 'II Year', 'III Year', 'IV Year'];
           const validPGYears = ['I Year PG', 'II Year PG'];
+          const isBatchRange = /^\d{4}-\d{4}$/.test(finalAcademicYear);
           
-          if (isPG) {
-            if (!validPGYears.includes(finalAcademicYear)) {
-              return res.status(400).json({ 
-                error: 'auth/invalid-academic-year', 
-                message: `For PG courses, Academic Year must be one of: ${validPGYears.join(', ')}` 
-              });
-            }
-          } else {
-            if (!validUGYears.includes(finalAcademicYear)) {
-              return res.status(400).json({ 
-                error: 'auth/invalid-academic-year', 
-                message: `For UG courses, Academic Year must be one of: ${validUGYears.join(', ')}` 
-              });
+          if (!isBatchRange) {
+            if (isPG) {
+              if (!validPGYears.includes(finalAcademicYear)) {
+                return res.status(400).json({ 
+                  error: 'auth/invalid-academic-year', 
+                  message: `For PG courses, Academic Year must be one of: ${validPGYears.join(', ')} or a batch range (e.g. 2024-2028)` 
+                });
+              }
+            } else {
+              if (!validUGYears.includes(finalAcademicYear)) {
+                return res.status(400).json({ 
+                  error: 'auth/invalid-academic-year', 
+                  message: `For UG courses, Academic Year must be one of: ${validUGYears.join(', ')} or a batch range (e.g. 2024-2028)` 
+                });
+              }
             }
           }
           
@@ -230,6 +281,15 @@ export function setupApi(app: express.Express) {
       const uid = 'user_' + Date.now() + Math.random().toString(36).substring(2, 9);
       const hashedPassword = await hashPassword(password);
       
+      const finalEmployeeId = req.body.employeeId || req.body.employee_id || null;
+      const finalDesignation = req.body.designation || null;
+      const finalJoiningDate = req.body.joiningDate || req.body.joining_date || null;
+      const finalSubjectSpecialization = req.body.subjectSpecialization || req.body.subject_specialization || null;
+      const finalGender = req.body.gender || null;
+      const finalDateOfBirth = req.body.dateOfBirth || req.body.date_of_birth || null;
+      const finalBatch = req.body.batch || null;
+      const finalAdmissionYear = req.body.admissionYear || req.body.admission_year || null;
+
       const newUser = {
         uid,
         email,
@@ -242,28 +302,41 @@ export function setupApi(app: express.Express) {
         class: className || null,
         year: mappedLegacyYear || finalYear,
         section: section || null,
+        semester: semester ? parseInt(semester, 10) : null,
         city: city || null,
         phone_number: phoneNumber || null,
-        college_name: finalCollegeName || null,
+        college_name: collegeNameFinal || null,
         skills: skills || null,
         bio: bio || null,
         created_at: new Date().toISOString(),
         academic_year: finalAcademicYear,
-        assigned_academic_year: null
+        assigned_academic_year: null,
+        employee_id: finalEmployeeId,
+        designation: finalDesignation,
+        joining_date: finalJoiningDate,
+        subject_specialization: finalSubjectSpecialization,
+        gender: finalGender,
+        date_of_birth: finalDateOfBirth,
+        batch: finalBatch,
+        admission_year: finalAdmissionYear,
+        department_name: departmentNameFinal,
+        current_semester: semester ? parseInt(semester, 10) : null
       };
 
       db.prepare(`
         INSERT INTO users (
           uid, name, email, password_hash, role, 
           college_id, department_id, roll_no, class, year, 
-          section, city, phone_number, college_name, skills, bio, created_at, academic_year, assigned_academic_year
+          section, semester, city, phone_number, college_name, skills, bio, created_at, academic_year, assigned_academic_year,
+          employee_id, designation, joining_date, subject_specialization, gender, date_of_birth, batch, admission_year, department_name, current_semester
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         newUser.uid, newUser.name, newUser.email, newUser.password_hash, newUser.role, 
         newUser.college_id, newUser.department_id, newUser.roll_no, newUser.class, newUser.year, 
-        newUser.section, newUser.city, newUser.phone_number, newUser.college_name, newUser.skills, newUser.bio, newUser.created_at,
-        newUser.academic_year, newUser.assigned_academic_year
+        newUser.section, newUser.semester, newUser.city, newUser.phone_number, newUser.college_name, newUser.skills, newUser.bio, newUser.created_at,
+        newUser.academic_year, newUser.assigned_academic_year,
+        finalEmployeeId, finalDesignation, finalJoiningDate, finalSubjectSpecialization, finalGender, finalDateOfBirth, finalBatch, finalAdmissionYear, departmentNameFinal, newUser.semester
       );
 
       // Increment usage counter on the appropriate code table
@@ -286,14 +359,18 @@ export function setupApi(app: express.Express) {
 
       // If student, add to students table for academic linkage
       if (newUser.role === 'student') {
+        const regNo = (rollNo || req.body.register_no || req.body.registerNo || '').trim();
         db.prepare(`
-          INSERT INTO students (user_id, roll_no, department_id, college_id, class, year, section, academic_year)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO students (user_id, roll_no, department_id, college_id, class, year, section, semester, academic_year, gender, date_of_birth, batch, admission_year, status)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
         `).run(
-          newUser.uid, newUser.roll_no, newUser.department_id, newUser.college_id, 
-          newUser.class, newUser.year, newUser.section, newUser.academic_year
+          newUser.uid, regNo || null, newUser.department_id, newUser.college_id, 
+          newUser.class, newUser.year, newUser.section, newUser.semester, newUser.academic_year,
+          finalGender, finalDateOfBirth, finalBatch, finalAdmissionYear
         );
       }
+
+      syncUserToRoleTable(newUser);
 
       const token = generateToken({ uid, email, role: newUser.role, collegeId: newUser.college_id });
       res.json({ token, user: { uid, email, displayName: newUser.name, role: newUser.role } });

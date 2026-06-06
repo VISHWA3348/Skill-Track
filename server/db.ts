@@ -68,6 +68,168 @@ export function initDb() {
       );
     `);
     
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS academic_records (
+        id VARCHAR(255) PRIMARY KEY,
+        student_id VARCHAR(255),
+        college_id VARCHAR(255),
+        department_id VARCHAR(255),
+        semester INTEGER,
+        academic_year VARCHAR(255),
+        subject_code VARCHAR(255),
+        subject_name VARCHAR(255),
+        internal_mark DOUBLE PRECISION,
+        external_mark DOUBLE PRECISION,
+        total_mark DOUBLE PRECISION,
+        grade VARCHAR(255),
+        credits INTEGER,
+        attendance_percentage DOUBLE PRECISION,
+        status VARCHAR(255) DEFAULT 'pending',
+        uploaded_by VARCHAR(255),
+        approved_by_hod VARCHAR(255),
+        published_by_admin VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS academic_uploads (
+        id VARCHAR(255) PRIMARY KEY,
+        college_id VARCHAR(255),
+        department_id VARCHAR(255),
+        uploaded_by VARCHAR(255),
+        file_name VARCHAR(255),
+        file_type VARCHAR(255),
+        status VARCHAR(255) DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS semester_results (
+        id VARCHAR(255) PRIMARY KEY,
+        student_id VARCHAR(255),
+        semester INTEGER,
+        gpa DOUBLE PRECISION,
+        cgpa DOUBLE PRECISION,
+        total_credits INTEGER,
+        backlogs INTEGER,
+        credits_earned INTEGER,
+        credits_pending INTEGER,
+        published_date TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS attendance_records (
+        id VARCHAR(255) PRIMARY KEY,
+        student_id VARCHAR(255),
+        college_id VARCHAR(255),
+        department_id VARCHAR(255),
+        academic_year VARCHAR(255),
+        semester INTEGER,
+        subject_code VARCHAR(255),
+        subject_name VARCHAR(255),
+        classes_conducted INTEGER,
+        classes_attended INTEGER,
+        attendance_percentage DOUBLE PRECISION,
+        status VARCHAR(255) DEFAULT 'pending',
+        updated_by VARCHAR(255),
+        approved_by_hod VARCHAR(255),
+        published_by_admin VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS academic_calendar (
+        id VARCHAR(255) PRIMARY KEY,
+        college_id VARCHAR(255) NOT NULL,
+        academic_year VARCHAR(50) NOT NULL,
+        semester INTEGER NOT NULL,
+        semester_start_date TIMESTAMP NOT NULL,
+        semester_end_date TIMESTAMP NOT NULL,
+        promotion_date TIMESTAMP,
+        status VARCHAR(50) DEFAULT 'active',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS student_promotions (
+        id VARCHAR(255) PRIMARY KEY,
+        student_id VARCHAR(255) NOT NULL,
+        old_year INTEGER,
+        new_year INTEGER,
+        old_semester INTEGER,
+        new_semester INTEGER,
+        promotion_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        triggered_by VARCHAR(100) NOT NULL
+      );
+    `);
+
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS college_admins (
+        id VARCHAR(255) PRIMARY KEY,
+        name VARCHAR(255),
+        email VARCHAR(255) UNIQUE,
+        phone VARCHAR(255),
+        college_id VARCHAR(255),
+        college_name VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS hods (
+        id VARCHAR(255) PRIMARY KEY,
+        name VARCHAR(255),
+        email VARCHAR(255) UNIQUE,
+        phone VARCHAR(255),
+        college_id VARCHAR(255),
+        college_name VARCHAR(255),
+        department_id VARCHAR(255),
+        department_name VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS staff (
+        id VARCHAR(255) PRIMARY KEY,
+        name VARCHAR(255),
+        email VARCHAR(255) UNIQUE,
+        phone VARCHAR(255),
+        college_id VARCHAR(255),
+        college_name VARCHAR(255),
+        department_id VARCHAR(255),
+        department_name VARCHAR(255),
+        academic_year VARCHAR(255),
+        current_semester INTEGER,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    try {
+      db.exec(`
+        ALTER TABLE students ADD COLUMN IF NOT EXISTS id VARCHAR(255);
+        ALTER TABLE students ADD COLUMN IF NOT EXISTS register_no VARCHAR(255);
+        ALTER TABLE students ADD COLUMN IF NOT EXISTS name VARCHAR(255);
+        ALTER TABLE students ADD COLUMN IF NOT EXISTS email VARCHAR(255);
+        ALTER TABLE students ADD COLUMN IF NOT EXISTS phone VARCHAR(255);
+        ALTER TABLE students ADD COLUMN IF NOT EXISTS college_name VARCHAR(255);
+        ALTER TABLE students ADD COLUMN IF NOT EXISTS department_name VARCHAR(255);
+        ALTER TABLE students ADD COLUMN IF NOT EXISTS current_semester INTEGER;
+        ALTER TABLE students ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+      `);
+    } catch (e) {}
+
+    try {
+      db.exec(`ALTER TABLE students ADD CONSTRAINT unique_register_no UNIQUE (register_no);`);
+    } catch (e) {}
+    
     // Create indexes safely
     try { db.exec("CREATE INDEX IF NOT EXISTS idx_invite_code ON department_invite_codes(code)"); } catch(e){}
     try { db.exec("CREATE INDEX IF NOT EXISTS idx_invite_college ON department_invite_codes(college_id)"); } catch(e){}
@@ -139,10 +301,29 @@ export function initDb() {
       ALTER TABLE users ADD COLUMN IF NOT EXISTS academic_year VARCHAR(20);
       ALTER TABLE users ADD COLUMN IF NOT EXISTS assigned_academic_year VARCHAR(20);
       ALTER TABLE students ADD COLUMN IF NOT EXISTS academic_year VARCHAR(20);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS semester INTEGER;
+      ALTER TABLE students ADD COLUMN IF NOT EXISTS semester INTEGER;
       ALTER TABLE certifications ADD COLUMN IF NOT EXISTS academic_year VARCHAR(20);
       ALTER TABLE career_activities ADD COLUMN IF NOT EXISTS academic_year VARCHAR(20);
       ALTER TABLE student_academic_profile ADD COLUMN IF NOT EXISTS academic_year VARCHAR(20);
       ALTER TABLE department_invite_codes ADD COLUMN IF NOT EXISTS academic_year VARCHAR(20);
+      ALTER TABLE colleges ADD COLUMN IF NOT EXISTS college_duration_years INTEGER;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS current_year INTEGER;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS last_promoted_at TIMESTAMP;
+      ALTER TABLE students ADD COLUMN IF NOT EXISTS current_year INTEGER;
+      ALTER TABLE students ADD COLUMN IF NOT EXISTS last_promoted_at TIMESTAMP;
+    `);
+  } catch(e){}
+
+  try {
+    db.exec(`
+      ALTER TABLE academic_records ADD COLUMN IF NOT EXISTS register_no VARCHAR(255);
+      ALTER TABLE academic_records ADD COLUMN IF NOT EXISTS result VARCHAR(255);
+      ALTER TABLE academic_records ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+      
+      ALTER TABLE semester_results ADD COLUMN IF NOT EXISTS credits_earned INTEGER;
+      ALTER TABLE semester_results ADD COLUMN IF NOT EXISTS credits_pending INTEGER;
+      ALTER TABLE semester_results ADD COLUMN IF NOT EXISTS published_date TIMESTAMP;
     `);
   } catch(e){}
   
@@ -208,6 +389,54 @@ export function initDb() {
       ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS target_college_ids TEXT;
     `);
   } catch(e){}
+
+  try {
+    db.exec(`
+      -- Users table: add hierarchy-enrichment columns
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS employee_id VARCHAR(255);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS designation VARCHAR(255);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS joining_date TIMESTAMP;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS subject_specialization VARCHAR(255);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS gender VARCHAR(20);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS date_of_birth DATE;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS batch VARCHAR(50);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS admission_year VARCHAR(20);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS department_name VARCHAR(255);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS current_semester INTEGER;
+
+      -- Colleges table: add college_code
+      ALTER TABLE colleges ADD COLUMN IF NOT EXISTS college_code VARCHAR(50);
+
+      -- HODs table: add employee_id, designation, joining_date, status
+      ALTER TABLE hods ADD COLUMN IF NOT EXISTS employee_id VARCHAR(255);
+      ALTER TABLE hods ADD COLUMN IF NOT EXISTS designation VARCHAR(255);
+      ALTER TABLE hods ADD COLUMN IF NOT EXISTS joining_date TIMESTAMP;
+      ALTER TABLE hods ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'active';
+
+      -- Staff table: add employee_id, designation, joining_date, subject_specialization, status
+      ALTER TABLE staff ADD COLUMN IF NOT EXISTS employee_id VARCHAR(255);
+      ALTER TABLE staff ADD COLUMN IF NOT EXISTS designation VARCHAR(255);
+      ALTER TABLE staff ADD COLUMN IF NOT EXISTS joining_date TIMESTAMP;
+      ALTER TABLE staff ADD COLUMN IF NOT EXISTS subject_specialization VARCHAR(255);
+      ALTER TABLE staff ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'active';
+
+      -- College Admins table: add status, designation, college_code
+      ALTER TABLE college_admins ADD COLUMN IF NOT EXISTS designation VARCHAR(255);
+      ALTER TABLE college_admins ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'active';
+      ALTER TABLE college_admins ADD COLUMN IF NOT EXISTS college_code VARCHAR(50);
+
+      -- Students table: add gender, dob, batch, admission_year, status
+      ALTER TABLE students ADD COLUMN IF NOT EXISTS gender VARCHAR(20);
+      ALTER TABLE students ADD COLUMN IF NOT EXISTS date_of_birth DATE;
+      ALTER TABLE students ADD COLUMN IF NOT EXISTS batch VARCHAR(50);
+      ALTER TABLE students ADD COLUMN IF NOT EXISTS admission_year VARCHAR(20);
+      ALTER TABLE students ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'active';
+    `);
+  } catch(e){}
+
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_users_college_dept_year ON users(college_id, department_id, academic_year)"); } catch(e){}
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_users_college_dept_sem ON users(college_id, department_id, semester)"); } catch(e){}
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_students_register_no ON students(register_no)"); } catch(e){}
     
     console.log("✅ department_invite_codes table successfully verified in PostgreSQL");
   } catch (err) {
@@ -328,6 +557,155 @@ function seedRelationalData() {
   }
 }
 
+export function syncUserToRoleTable(userData: any) {
+  try {
+    if (!userData || !userData.uid) return;
+
+    const role = userData.role;
+    const uid = userData.uid;
+    const email = userData.email;
+    const name = userData.name || userData.displayName || 'Unknown';
+    const phone = userData.phoneNumber || userData.phone_number || userData.phone || null;
+    const collegeId = userData.collegeId || userData.college_id || null;
+    const departmentId = userData.departmentId || userData.department_id || null;
+    const academicYear = userData.academicYear || userData.academic_year || null;
+    const semester = userData.semester !== undefined && userData.semester !== null ? Number(userData.semester) : null;
+    const registerNo = userData.rollNo || userData.roll_no || userData.register_no || null;
+    const createdAt = userData.createdAt || userData.created_at || new Date().toISOString();
+
+    const employeeId = userData.employeeId || userData.employee_id || null;
+    const designation = userData.designation || null;
+    const joiningDate = userData.joiningDate || userData.joining_date || null;
+    const subjectSpecialization = userData.subjectSpecialization || userData.subject_specialization || null;
+    const gender = userData.gender || null;
+    const dateOfBirth = userData.dateOfBirth || userData.date_of_birth || null;
+    const batch = userData.batch || null;
+    const admissionYear = userData.admissionYear || userData.admission_year || null;
+    const status = userData.status || 'active';
+    const collegeCode = userData.collegeCode || userData.college_code || null;
+    const currentYear = userData.currentYear !== undefined && userData.currentYear !== null ? Number(userData.currentYear) : (userData.current_year !== undefined && userData.current_year !== null ? Number(userData.current_year) : null);
+    const lastPromotedAt = userData.lastPromotedAt || userData.last_promoted_at || null;
+
+    // 1. Lookup college_name if needed
+    let collegeName = userData.collegeName || userData.college_name || null;
+    if (collegeId && !collegeName) {
+      try {
+        const col = db.prepare('SELECT name FROM colleges WHERE id = ?').get(collegeId) as any;
+        if (col) collegeName = col.name;
+      } catch (err) {}
+    }
+
+    // 2. Lookup department_name if needed
+    let departmentName = userData.departmentName || userData.department_name || null;
+    if (departmentId && !departmentName) {
+      try {
+        const dept = db.prepare('SELECT name FROM departments WHERE id = ?').get(departmentId) as any;
+        if (dept) departmentName = dept.name;
+      } catch (err) {}
+    }
+
+    // Delete from other role tables to prevent stale roles if user role changed
+    try {
+      if (role !== 'admin') db.prepare('DELETE FROM college_admins WHERE id = ?').run(uid);
+      if (role !== 'hod') db.prepare('DELETE FROM hods WHERE id = ?').run(uid);
+      if (role !== 'staff') db.prepare('DELETE FROM staff WHERE id = ?').run(uid);
+    } catch (err) {}
+
+    if (role === 'admin') {
+      db.prepare(`
+        INSERT INTO college_admins (id, name, email, phone, college_id, college_name, created_at, designation, status, college_code)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          name=excluded.name, email=excluded.email, phone=excluded.phone,
+          college_id=excluded.college_id, college_name=excluded.college_name,
+          designation=excluded.designation, status=excluded.status, college_code=excluded.college_code
+      `).run(uid, name, email, phone, collegeId, collegeName, createdAt, designation, status, collegeCode);
+    } else if (role === 'hod') {
+      db.prepare(`
+        INSERT INTO hods (id, name, email, phone, college_id, college_name, department_id, department_name, created_at, employee_id, designation, joining_date, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          name=excluded.name, email=excluded.email, phone=excluded.phone,
+          college_id=excluded.college_id, college_name=excluded.college_name,
+          department_id=excluded.department_id, department_name=excluded.department_name,
+          employee_id=excluded.employee_id, designation=excluded.designation,
+          joining_date=excluded.joining_date, status=excluded.status
+      `).run(uid, name, email, phone, collegeId, collegeName, departmentId, departmentName, createdAt, employeeId, designation, joiningDate, status);
+    } else if (role === 'staff') {
+      db.prepare(`
+        INSERT INTO staff (id, name, email, phone, college_id, college_name, department_id, department_name, academic_year, current_semester, created_at, employee_id, designation, joining_date, subject_specialization, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          name=excluded.name, email=excluded.email, phone=excluded.phone,
+          college_id=excluded.college_id, college_name=excluded.college_name,
+          department_id=excluded.department_id, department_name=excluded.department_name,
+          academic_year=excluded.academic_year, current_semester=excluded.current_semester,
+          employee_id=excluded.employee_id, designation=excluded.designation,
+          joining_date=excluded.joining_date, subject_specialization=excluded.subject_specialization,
+          status=excluded.status
+      `).run(uid, name, email, phone, collegeId, collegeName, departmentId, departmentName, academicYear, semester, createdAt, employeeId, designation, joiningDate, subjectSpecialization, status);
+    } else if (role === 'student') {
+      db.prepare(`
+        INSERT INTO students (user_id, roll_no, class, year, section, semester, department_id, college_id, enrollment_date, academic_year, id, register_no, name, email, phone, college_name, department_name, current_semester, created_at, gender, date_of_birth, batch, admission_year, status, current_year, last_promoted_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET
+          roll_no=COALESCE(excluded.roll_no, students.roll_no),
+          class=COALESCE(excluded.class, students.class),
+          year=COALESCE(excluded.year, students.year),
+          section=COALESCE(excluded.section, students.section),
+          semester=COALESCE(excluded.semester, students.semester),
+          department_id=COALESCE(excluded.department_id, students.department_id),
+          college_id=COALESCE(excluded.college_id, students.college_id),
+          academic_year=COALESCE(excluded.academic_year, students.academic_year),
+          id=COALESCE(excluded.id, students.id),
+          register_no=COALESCE(excluded.register_no, students.register_no),
+          name=COALESCE(excluded.name, students.name),
+          email=COALESCE(excluded.email, students.email),
+          phone=COALESCE(excluded.phone, students.phone),
+          college_name=COALESCE(excluded.college_name, students.college_name),
+          department_name=COALESCE(excluded.department_name, students.department_name),
+          current_semester=COALESCE(excluded.current_semester, students.current_semester),
+          gender=COALESCE(excluded.gender, students.gender),
+          date_of_birth=COALESCE(excluded.date_of_birth, students.date_of_birth),
+          batch=COALESCE(excluded.batch, students.batch),
+          admission_year=COALESCE(excluded.admission_year, students.admission_year),
+          status=COALESCE(excluded.status, students.status),
+          current_year=COALESCE(excluded.current_year, students.current_year),
+          last_promoted_at=COALESCE(excluded.last_promoted_at, students.last_promoted_at)
+      `).run(
+        uid,
+        registerNo,
+        userData.class || null,
+        userData.year || null,
+        userData.section || null,
+        semester,
+        departmentId,
+        collegeId,
+        createdAt,
+        academicYear,
+        uid,
+        registerNo,
+        name,
+        email,
+        phone,
+        collegeName,
+        departmentName,
+        semester,
+        createdAt,
+        gender,
+        dateOfBirth,
+        batch,
+        admissionYear,
+        status,
+        currentYear,
+        lastPromotedAt
+      );
+    }
+  } catch (err: any) {
+    console.error("Failed to sync user to role table:", err.message);
+  }
+}
+
 // Generic helpers (for transitional period)
 export function setDocument(collectionName: string, id: string, data: any) {
   const tableMap: Record<string, string> = {
@@ -347,18 +725,27 @@ export function setDocument(collectionName: string, id: string, data: any) {
     const merged = { ...existing, ...data };
     
     db.prepare(`
-      INSERT INTO users (uid, name, email, password_hash, role, college_id, department_id, roll_no, class, year, section, city, phone_number, profile_photo, college_name, status, is_active, last_login, created_at, address, profile_photo_public_id, profile_photo_file_type, profile_photo_file_name, profile_photo_uploaded_at, academic_year, assigned_academic_year)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO users (
+        uid, name, email, password_hash, role, college_id, department_id, roll_no, class, year, section, semester, city, phone_number, profile_photo, college_name, status, is_active, last_login, created_at, address, profile_photo_public_id, profile_photo_file_type, profile_photo_file_name, profile_photo_uploaded_at, academic_year, assigned_academic_year,
+        employee_id, designation, joining_date, subject_specialization, gender, date_of_birth, batch, admission_year, department_name, current_semester, current_year, last_promoted_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(uid) DO UPDATE SET
         name=excluded.name, email=excluded.email, password_hash=COALESCE(excluded.password_hash, users.password_hash),
         role=excluded.role, college_id=excluded.college_id, department_id=excluded.department_id,
-        roll_no=excluded.roll_no, class=excluded.class, year=excluded.year, section=excluded.section,
+        roll_no=excluded.roll_no, class=excluded.class, year=excluded.year, section=excluded.section, semester=excluded.semester,
         city=excluded.city, phone_number=excluded.phone_number, profile_photo=excluded.profile_photo,
         college_name=excluded.college_name, status=excluded.status, is_active=excluded.is_active,
         address=excluded.address, profile_photo_public_id=excluded.profile_photo_public_id,
         profile_photo_file_type=excluded.profile_photo_file_type, profile_photo_file_name=excluded.profile_photo_file_name,
         profile_photo_uploaded_at=excluded.profile_photo_uploaded_at,
-        academic_year=excluded.academic_year, assigned_academic_year=excluded.assigned_academic_year
+        academic_year=excluded.academic_year, assigned_academic_year=excluded.assigned_academic_year,
+        employee_id=excluded.employee_id, designation=excluded.designation,
+        joining_date=excluded.joining_date, subject_specialization=excluded.subject_specialization,
+        gender=excluded.gender, date_of_birth=excluded.date_of_birth,
+        batch=excluded.batch, admission_year=excluded.admission_year,
+        department_name=excluded.department_name, current_semester=excluded.current_semester,
+        current_year=excluded.current_year, last_promoted_at=excluded.last_promoted_at
     `).run(
       id, 
       (merged.name || merged.displayName) ?? null, 
@@ -371,6 +758,7 @@ export function setDocument(collectionName: string, id: string, data: any) {
       merged.class ?? null, 
       merged.year ?? null, 
       merged.section ?? null,
+      merged.semester ?? null,
       merged.city ?? null, 
       (merged.phone_number || merged.phoneNumber) ?? null, 
       (merged.profile_photo || merged.profilePhoto || merged.photo_url || merged.photoUrl) ?? null,
@@ -385,8 +773,22 @@ export function setDocument(collectionName: string, id: string, data: any) {
       merged.profile_photo_file_name ?? null,
       merged.profile_photo_uploaded_at ?? null,
       (merged.academic_year || merged.academicYear) ?? null,
-      (merged.assigned_academic_year || merged.assignedAcademicYear) ?? null
+      (merged.assigned_academic_year || merged.assignedAcademicYear) ?? null,
+      (merged.employee_id || merged.employeeId) ?? null,
+      merged.designation ?? null,
+      (merged.joining_date || merged.joiningDate) ?? null,
+      (merged.subject_specialization || merged.subjectSpecialization) ?? null,
+      merged.gender ?? null,
+      (merged.date_of_birth || merged.dateOfBirth) ?? null,
+      merged.batch ?? null,
+      (merged.admission_year || merged.admissionYear) ?? null,
+      (merged.department_name || merged.departmentName) ?? null,
+      (merged.current_semester || merged.currentSemester || merged.semester) ?? null,
+      (merged.current_year || merged.currentYear) ?? null,
+      (merged.last_promoted_at || merged.lastPromotedAt) ?? null
     );
+
+    syncUserToRoleTable(merged);
   } else if (tableName === 'students') {
     // Synchronize both Users and Students tables
     const studentId = data.roll_no || data.rollNo || data.id;
@@ -397,13 +799,19 @@ export function setDocument(collectionName: string, id: string, data: any) {
     const passHash = data.password_hash || data.passwordHash || existingUser.password_hash || existingUser.passwordHash || null;
 
     db.prepare(`
-      INSERT INTO users (uid, name, email, password_hash, role, college_id, department_id, roll_no, class, year, section, photo_url, status, is_active, created_at, academic_year, assigned_academic_year)
-      VALUES (?, ?, ?, ?, 'student', ?, ?, ?, ?, ?, ?, ?, 'active', 1, ?, ?, ?)
+      INSERT INTO users (
+        uid, name, email, password_hash, role, college_id, department_id, roll_no, class, year, section, semester, photo_url, status, is_active, created_at, academic_year, assigned_academic_year,
+        gender, date_of_birth, batch, admission_year, department_name, current_semester, current_year, last_promoted_at
+      )
+      VALUES (?, ?, ?, ?, 'student', ?, ?, ?, ?, ?, ?, ?, ?, 'active', 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(uid) DO UPDATE SET
         name=excluded.name, email=excluded.email, password_hash=COALESCE(excluded.password_hash, users.password_hash),
         college_id=excluded.college_id, department_id=excluded.department_id, 
-        roll_no=excluded.roll_no, class=excluded.class, year=excluded.year, section=excluded.section, 
-        photo_url=excluded.photo_url, academic_year=excluded.academic_year, assigned_academic_year=excluded.assigned_academic_year
+        roll_no=excluded.roll_no, class=excluded.class, year=excluded.year, section=excluded.section, semester=excluded.semester,
+        photo_url=excluded.photo_url, academic_year=excluded.academic_year, assigned_academic_year=excluded.assigned_academic_year,
+        gender=excluded.gender, date_of_birth=excluded.date_of_birth, batch=excluded.batch, admission_year=excluded.admission_year,
+        department_name=excluded.department_name, current_semester=excluded.current_semester,
+        current_year=excluded.current_year, last_promoted_at=excluded.last_promoted_at
     `).run(
       id, 
       data.name || existingUser.name || 'Student', 
@@ -415,30 +823,56 @@ export function setDocument(collectionName: string, id: string, data: any) {
       data.class,
       data.year,
       data.section,
+      data.semester ?? existingUser.semester ?? null,
       data.photo_url || data.photoUrl || data.photoURL,
       data.created_at || data.createdAt || new Date().toISOString(),
       (data.academic_year || data.academicYear) ?? null,
-      (data.assigned_academic_year || data.assignedAcademicYear) ?? null
+      (data.assigned_academic_year || data.assignedAcademicYear) ?? null,
+      data.gender || existingUser.gender || null,
+      data.date_of_birth || data.dateOfBirth || existingUser.date_of_birth || null,
+      data.batch || existingUser.batch || null,
+      data.admission_year || data.admissionYear || existingUser.admission_year || null,
+      data.department_name || data.departmentName || existingUser.department_name || null,
+      data.semester ?? existingUser.semester ?? null,
+      data.current_year ?? data.currentYear ?? null,
+      data.last_promoted_at ?? data.lastPromotedAt ?? null
     );
 
     // 2. Ensure Student bridge table updated
     db.prepare(`
-      INSERT INTO students (user_id, roll_no, class, year, section, department_id, college_id, enrollment_date, academic_year)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO students (
+        user_id, roll_no, class, year, section, semester, department_id, college_id, enrollment_date, academic_year,
+        gender, date_of_birth, batch, admission_year, status, current_year, last_promoted_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)
       ON CONFLICT(user_id) DO UPDATE SET
-        roll_no=excluded.roll_no, class=excluded.class, year=excluded.year, section=excluded.section,
-        department_id=excluded.department_id, college_id=excluded.college_id, academic_year=excluded.academic_year
+        roll_no=excluded.roll_no, class=excluded.class, year=excluded.year, section=excluded.section, semester=excluded.semester,
+        department_id=excluded.department_id, college_id=excluded.college_id, academic_year=excluded.academic_year,
+        gender=excluded.gender, date_of_birth=excluded.date_of_birth, batch=excluded.batch, admission_year=excluded.admission_year,
+        current_year=excluded.current_year, last_promoted_at=excluded.last_promoted_at
     `).run(
       id,
       studentId,
       data.class,
       data.year,
       data.section,
+      data.semester ?? null,
       departmentId,
       data.college_id || data.collegeId,
       data.created_at || data.createdAt || new Date().toISOString(),
-      (data.academic_year || data.academicYear) ?? null
+      (data.academic_year || data.academicYear) ?? null,
+      data.gender || null,
+      data.date_of_birth || data.dateOfBirth || null,
+      data.batch || null,
+      data.admission_year || data.admissionYear || null,
+      data.current_year ?? data.currentYear ?? null,
+      data.last_promoted_at ?? data.lastPromotedAt ?? null
     );
+
+    const userRow = getDocument('users', id);
+    if (userRow) {
+      syncUserToRoleTable(userRow);
+    }
   } else if (tableName === 'certifications') {
     const existing = getDocument('certifications', id) || {};
     const merged = { ...existing, ...data };
@@ -586,12 +1020,12 @@ export function setDocument(collectionName: string, id: string, data: any) {
     );
   } else if (tableName === 'colleges') {
     db.prepare(`
-      INSERT INTO colleges (id, college_id, name, type, location, city, state, country, pincode, lat, lng, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO colleges (id, college_id, name, type, location, city, state, country, pincode, lat, lng, created_at, college_duration_years)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         college_id=excluded.college_id, name=excluded.name, type=excluded.type, location=excluded.location,
         city=excluded.city, state=excluded.state, country=excluded.country, pincode=excluded.pincode,
-        lat=excluded.lat, lng=excluded.lng
+        lat=excluded.lat, lng=excluded.lng, college_duration_years=excluded.college_duration_years
     `).run(
       id, 
       (data.college_id || data.collegeId || id) ?? null,
@@ -604,7 +1038,8 @@ export function setDocument(collectionName: string, id: string, data: any) {
       data.pincode ?? null, 
       data.lat ?? null, 
       data.lng ?? null, 
-      (data.created_at || data.createdAt || new Date().toISOString()) ?? null
+      (data.created_at || data.createdAt || new Date().toISOString()) ?? null,
+      data.college_duration_years ?? data.collegeDurationYears ?? null
     );
   } else if (tableName === 'departments') {
     const deptId = (data.department_id || data.departmentId || id);
@@ -843,6 +1278,10 @@ export function queryDocuments(collectionName: string, conditions: any[] = [], o
       // Common field normalization
       if (row.created_at) { row.createdAt = row.created_at; }
       if (row.updated_at) { row.updatedAt = row.updated_at; }
+      if (row.current_year !== undefined) { row.currentYear = row.current_year; }
+      if (row.current_semester !== undefined) { row.currentSemester = row.current_semester; }
+      if (row.last_promoted_at !== undefined) { row.lastPromotedAt = row.last_promoted_at; }
+      if (row.college_duration_years !== undefined) { row.collegeDurationYears = row.college_duration_years; }
       
       // Table specific normalization
       if (tableName === 'certifications') {

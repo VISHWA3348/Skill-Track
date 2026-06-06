@@ -11,7 +11,9 @@ export const ROLE_ROUTES: Record<string, string[]> = {
     '/dashboard/opportunities',
     '/dashboard/student',
     '/dashboard/users',
-    '/dashboard/departments'
+    '/dashboard/departments',
+    '/dashboard/academic-records',
+    '/dashboard/academic-calendar'
   ],
   hod: [
     '/dashboard',
@@ -24,7 +26,8 @@ export const ROLE_ROUTES: Record<string, string[]> = {
     '/dashboard/settings',
     '/dashboard/opportunities',
     '/dashboard/student',
-    '/dashboard/users'
+    '/dashboard/users',
+    '/dashboard/academic-records'
   ],
   staff: [
     '/dashboard',
@@ -35,7 +38,8 @@ export const ROLE_ROUTES: Record<string, string[]> = {
     '/dashboard/students',
     '/dashboard/settings',
     '/dashboard/student',
-    '/dashboard/users'
+    '/dashboard/users',
+    '/dashboard/academic-records'
   ],
   student: [
     '/dashboard',
@@ -48,7 +52,8 @@ export const ROLE_ROUTES: Record<string, string[]> = {
     '/dashboard/settings',
     '/dashboard/opportunities',
     '/dashboard/student',
-    '/dashboard/resume-builder'
+    '/dashboard/resume-builder',
+    '/dashboard/academic-records'
   ]
 };
 

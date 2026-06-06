@@ -174,9 +174,11 @@ async function startServer() {
   const { setupCollegeAdminEnhancements } = await import("./server/college_admin_enhancements");
   const { setupSuperAdminApi } = await import("./server/superadmin_api");
   const { setupAcademicFeatures } = await import("./server/academic_features");
+  const { setupAcademicRecords } = await import("./server/academic_records_module");
   const { setupResumeFeatures } = await import("./server/resume_features");
   const { setupAiApi } = await import("./server/ai_api");
   const { setupInviteCodesApi } = await import("./server/invite_codes_api");
+  const { setupAcademicCalendarApi } = await import("./server/academic_calendar_api");
 
   setupApi(app);
   setupAdmin(app);
@@ -185,9 +187,26 @@ async function startServer() {
   setupCollegeAdminEnhancements(app);
   setupSuperAdminApi(app);
   setupAcademicFeatures(app);
+  setupAcademicRecords(app);
   setupResumeFeatures(app);
   setupAiApi(app);
   setupInviteCodesApi(app);
+  setupAcademicCalendarApi(app);
+
+  // Daily scheduled auto semester promotion check (checks every hour, runs at midnight)
+  setInterval(async () => {
+    const now = new Date();
+    if (now.getHours() === 0) {
+      console.log("[SCHEDULER] Running midnight auto promotion engine check...");
+      try {
+        const { runAutoPromotionEngine } = await import("./server/promotion_engine");
+        const result = await runAutoPromotionEngine(undefined, "scheduler_auto");
+        console.log(`[SCHEDULER] Auto promotion run finished. Promoted count: ${result.promotedCount}, errors: ${result.errors.length}`);
+      } catch (err: any) {
+        console.error("[SCHEDULER] Auto promotion engine execution failed:", err.message);
+      }
+    }
+  }, 1000 * 60 * 60); // Check hourly
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {

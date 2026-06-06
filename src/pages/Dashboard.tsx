@@ -404,9 +404,41 @@ const Dashboard: React.FC = () => {
     <StudentDashboardView />
   );
 
+  const renderScopeLabels = () => {
+    if (!profile) return null;
+    
+    const items = [];
+    if (profile.collegeName || profile.collegeId) {
+      items.push(`College: ${profile.collegeName || profile.collegeId}`);
+    }
+    if (profile.departmentName || profile.departmentId) {
+      items.push(`Department: ${profile.departmentName || profile.departmentId}`);
+    }
+    if (profile.role === 'staff' || profile.role === 'student' || profile.role === 'hod') {
+      const year = profile.academicYear || profile.academic_year;
+      const sem = profile.semester || profile.currentSemester || profile.current_semester;
+      if (year) items.push(`Academic Year: ${year}`);
+      if (sem) items.push(`Semester: ${sem}`);
+    }
+
+    if (items.length === 0) return null;
+
+    return (
+      <div className="mb-4 px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg flex flex-wrap gap-x-6 gap-y-1 text-xs font-semibold text-slate-500 shadow-sm items-center">
+        {items.map((item, idx) => (
+          <React.Fragment key={idx}>
+            {idx > 0 && <span className="h-3 w-px bg-slate-200" />}
+            <span>{item}</span>
+          </React.Fragment>
+        ))}
+      </div>
+    );
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <AnnouncementBanner />
+      {renderScopeLabels()}
       {/* Manual refresh button with last-fetched indicator */}
       <div className="flex justify-end mb-2">
         <button

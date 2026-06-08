@@ -288,6 +288,11 @@ export function initDb() {
   try { db.exec("CREATE INDEX IF NOT EXISTS idx_signup_codes_val ON signup_codes(code)"); } catch(e){}
   try { db.exec("CREATE INDEX IF NOT EXISTS idx_signup_codes_active ON signup_codes(is_active)"); } catch(e){}
 
+  // Missing indexes audit hotfix
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_academic_records_student_id ON academic_records(student_id)"); } catch(e){}
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_opportunities_college_id ON opportunities(college_id)"); } catch(e){}
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_college_reports_college_id ON college_reports(college_id)"); } catch(e){}
+
   console.log("✅ Performance indexes verified in PostgreSQL");
 
   // safe alterations for advanced GPS, EXIF, Cloudinary metadata, and audit logs

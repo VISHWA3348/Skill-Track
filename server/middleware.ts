@@ -152,6 +152,12 @@ export const checkRole = (roles: string[]) => {
       if (!userData || !roles.includes(userData.role)) {
         return res.status(403).json({ error: "Forbidden" });
       }
+      if (userData) {
+        userData.collegeId = userData.college_id;
+        userData.departmentId = userData.department_id;
+        userData.id = userData.uid;
+        userData.userId = userData.uid;
+      }
       req.userData = userData;
       next();
     } catch (error) {

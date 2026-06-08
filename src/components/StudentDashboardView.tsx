@@ -78,7 +78,7 @@ export default function StudentDashboardView() {
   }, [profile]);
 
   const NotificationsSection = () => {
-    if (notifications.length === 0) return null;
+    if (!loading && notifications.length === 0) return null;
 
     return (
       <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6">
@@ -87,20 +87,28 @@ export default function StudentDashboardView() {
             <AlertCircle className="w-5 h-5 text-amber-500" />
             Priority Alerts
           </h3>
-          <span className="px-2 py-0.5 bg-amber-50 text-amber-700 text-[10px] font-black rounded-full uppercase">
-            {notifications.length} New
-          </span>
+          {!loading && (
+            <span className="px-2 py-0.5 bg-amber-50 text-amber-700 text-[10px] font-black rounded-full uppercase">
+              {notifications.length} New
+            </span>
+          )}
         </div>
         <div className="space-y-3">
-          {notifications.slice(0, 3).map((n) => (
-            <div key={n.id} className="p-4 rounded-2xl bg-amber-50/30 border border-amber-100">
-              <h4 className="text-sm font-bold text-slate-900">{n.title}</h4>
-              <p className="text-xs text-slate-600 mt-1">{n.message}</p>
-              <span className="text-[10px] text-slate-400 mt-2 block">
-                {new Date(n.created_at).toLocaleDateString()}
-              </span>
+          {loading ? (
+            <div className="flex justify-center py-4">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600" />
             </div>
-          ))}
+          ) : (
+            notifications.slice(0, 3).map((n) => (
+              <div key={n.id} className="p-4 rounded-2xl bg-amber-50/30 border border-amber-100">
+                <h4 className="text-sm font-bold text-slate-900">{n.title}</h4>
+                <p className="text-xs text-slate-600 mt-1">{n.message}</p>
+                <span className="text-[10px] text-slate-400 mt-2 block">
+                  {new Date(n.created_at).toLocaleDateString()}
+                </span>
+              </div>
+            ))
+          )}
         </div>
       </div>
     );
@@ -111,12 +119,6 @@ export default function StudentDashboardView() {
   const gpsVerifiedCount = certificates.filter(c => c.gpsVerified).length;
   const nextRankScore = progressScore + 5; 
   const progressPercentage = Math.min((progressScore / (nextRankScore || 1)) * 100, 100);
-
-  if (loading) return (
-    <div className="flex items-center justify-center min-h-[400px]">
-      <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-    </div>
-  );
 
   return (
     <div className="space-y-8 pb-12">
@@ -188,7 +190,11 @@ export default function StudentDashboardView() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 relative z-10 mb-8">
             <div className="space-y-1">
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Current CGPA</p>
-              <p className="text-3xl font-black text-blue-600">{academicPerformance?.summary?.cgpa?.toFixed(2) || academicProfile?.cgpa || '0.00'}</p>
+              {loading ? (
+                <div className="h-9 w-20 bg-slate-100 rounded-lg animate-pulse" />
+              ) : (
+                <p className="text-3xl font-black text-blue-600">{academicPerformance?.summary?.cgpa?.toFixed(2) || academicProfile?.cgpa || '0.00'}</p>
+              )}
               <div className="flex items-center gap-1 text-[10px] text-emerald-600 font-bold">
                 <TrendingUp className="w-3 h-3" />
                 <span>Good Standing</span>
@@ -196,9 +202,13 @@ export default function StudentDashboardView() {
             </div>
             <div className="space-y-1">
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Attendance</p>
-              <p className="text-3xl font-black text-slate-900">
-                {academicPerformance?.semesters?.[0]?.attendance_avg?.toFixed(1) || academicProfile?.attendance_percentage || '0'}%
-              </p>
+              {loading ? (
+                <div className="h-9 w-20 bg-slate-100 rounded-lg animate-pulse" />
+              ) : (
+                <p className="text-3xl font-black text-slate-900">
+                  {academicPerformance?.semesters?.[0]?.attendance_avg?.toFixed(1) || academicProfile?.attendance_percentage || '0'}%
+                </p>
+              )}
               <div className={`w-full h-1 bg-slate-100 rounded-full mt-2 overflow-hidden`}>
                 <div 
                   className={`h-full rounded-full ${parseFloat(academicPerformance?.semesters?.[0]?.attendance_avg || academicProfile?.attendance_percentage || '0') < 75 ? 'bg-red-500' : 'bg-emerald-500'}`} 
@@ -208,15 +218,23 @@ export default function StudentDashboardView() {
             </div>
             <div className="space-y-1">
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Arrears</p>
-              <p className={`text-3xl font-black ${parseInt(academicPerformance?.summary?.total_arrears || academicProfile?.arrears || '0') > 0 ? 'text-red-500' : 'text-slate-900'}`}>
-                {academicPerformance?.summary?.total_arrears || academicProfile?.arrears || '0'}
-              </p>
+              {loading ? (
+                <div className="h-9 w-20 bg-slate-100 rounded-lg animate-pulse" />
+              ) : (
+                <p className={`text-3xl font-black ${parseInt(academicPerformance?.summary?.total_arrears || academicProfile?.arrears || '0') > 0 ? 'text-red-500' : 'text-slate-900'}`}>
+                  {academicPerformance?.summary?.total_arrears || academicProfile?.arrears || '0'}
+                </p>
+              )}
             </div>
             <div className="space-y-1">
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Credits</p>
-              <p className="text-3xl font-black text-slate-900">
-                {academicPerformance?.records?.reduce((acc: number, r: any) => acc + (r.credits || 0), 0) || '124'}
-              </p>
+              {loading ? (
+                <div className="h-9 w-20 bg-slate-100 rounded-lg animate-pulse" />
+              ) : (
+                <p className="text-3xl font-black text-slate-900">
+                  {academicPerformance?.records?.reduce((acc: number, r: any) => acc + (r.credits || 0), 0) || '124'}
+                </p>
+              )}
             </div>
           </div>
 
@@ -308,18 +326,30 @@ export default function StudentDashboardView() {
             </div>
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Progress Score</span>
           </div>
-          <p className="text-4xl font-black text-slate-900 relative z-10">{progressScore}</p>
+          {loading ? (
+            <div className="h-10 w-20 bg-slate-100 rounded-lg animate-pulse mb-2 relative z-10" />
+          ) : (
+            <p className="text-4xl font-black text-slate-900 relative z-10">{progressScore}</p>
+          )}
           
           <div className="mt-4 relative z-10">
             <div className="flex justify-between text-[10px] font-bold text-slate-400 mb-1">
               <span>Level Progress</span>
-              <span>{progressScore} / {nextRankScore}</span>
+              {loading ? (
+                <div className="h-3.5 w-12 bg-slate-100 rounded animate-pulse" />
+              ) : (
+                <span>{progressScore} / {nextRankScore}</span>
+              )}
             </div>
             <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-blue-500 rounded-full" 
-                style={{ width: `${progressPercentage}%` }}
-              />
+              {loading ? (
+                <div className="h-full bg-slate-200 rounded-full animate-pulse w-1/3" />
+              ) : (
+                <div 
+                  className="h-full bg-blue-500 rounded-full" 
+                  style={{ width: `${progressPercentage}%` }}
+                />
+              )}
             </div>
           </div>
         </motion.div>
@@ -339,13 +369,22 @@ export default function StudentDashboardView() {
             </div>
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Department Rank</span>
           </div>
-          <div className="flex items-baseline gap-1 relative z-10">
-            <p className="text-4xl font-black text-slate-900">#{rank || '--'}</p>
-            <span className="text-sm font-medium text-slate-500">/ {totalStudents}</span>
-          </div>
-          <p className="text-xs font-medium text-emerald-600 mt-2 flex items-center gap-1 relative z-10">
-            <TrendingUp className="w-3 h-3" /> Top {rank && totalStudents ? Math.round((rank/totalStudents)*100) : '--'}%
-          </p>
+          {loading ? (
+            <div className="space-y-2 relative z-10">
+              <div className="h-10 w-24 bg-slate-100 rounded-lg animate-pulse" />
+              <div className="h-4 w-20 bg-slate-100 rounded-lg animate-pulse mt-2" />
+            </div>
+          ) : (
+            <>
+              <div className="flex items-baseline gap-1 relative z-10">
+                <p className="text-4xl font-black text-slate-900">#{rank || '--'}</p>
+                <span className="text-sm font-medium text-slate-500">/ {totalStudents}</span>
+              </div>
+              <p className="text-xs font-medium text-emerald-600 mt-2 flex items-center gap-1 relative z-10">
+                <TrendingUp className="w-3 h-3" /> Top {rank && totalStudents ? Math.round((rank/totalStudents)*100) : '--'}%
+              </p>
+            </>
+          )}
         </motion.div>
 
         <motion.div 
@@ -454,7 +493,11 @@ export default function StudentDashboardView() {
             </div>
             
             <div className="space-y-4">
-              {(() => {
+              {loading ? (
+                <div className="flex justify-center py-6">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600" />
+                </div>
+              ) : (() => {
                 const mySkills = profile?.skills ? profile.skills.split(',').map((s: string) => s.trim().toLowerCase()).filter((s: string) => s) : [];
                 const recommended = (opportunities || []).filter((opp: any) => {
                   if (!opp.required_skills || mySkills.length === 0) return false;

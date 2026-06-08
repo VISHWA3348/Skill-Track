@@ -2444,7 +2444,20 @@ export function setupApi(app: express.Express) {
 
   app.get('/api/student/notifications', authenticate, (req: any, res) => {
     try {
-      const studentId = req.userData.uid;
+      if (!req.user) {
+        return res.status(401).json({
+          success: false,
+          message: "Unauthorized"
+        });
+      }
+      const studentId = req.user.uid || req.user.id || req.user.userId;
+      if (!studentId) {
+        return res.status(401).json({
+          success: false,
+          message: "Invalid user session"
+        });
+      }
+
       const notifications = db.prepare(`
         SELECT * FROM student_notifications 
         WHERE student_id = ? 
@@ -2463,7 +2476,31 @@ export function setupApi(app: express.Express) {
   // Consolidated Student Dashboard Overview endpoint
   app.get('/api/student/dashboard-overview', authenticate, async (req: any, res) => {
     try {
-      const studentId = req.userData.uid;
+      if (!req.user) {
+        return res.status(401).json({
+          success: false,
+          message: "Unauthorized"
+        });
+      }
+      const studentId = req.user.uid || req.user.id || req.user.userId;
+      if (!studentId) {
+        return res.status(401).json({
+          success: false,
+          message: "Invalid user session"
+        });
+      }
+      if (req.user.role !== 'student') {
+        return res.status(403).json({
+          success: false,
+          message: "Forbidden: Student access only"
+        });
+      }
+      if (!req.user.collegeId) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid session: collegeId is required"
+        });
+      }
 
       // Recalculate score and sync to ensure dashboard consistency
       calculateResumeScore(studentId);
@@ -2475,11 +2512,11 @@ export function setupApi(app: express.Express) {
         FROM users u
         LEFT JOIN (
           SELECT user_id, COUNT(*) as cnt FROM certifications
-          WHERE status IN ('verified','approved') AND (is_deleted IS NOT TRUE) GROUP BY user_id
+          WHERE status IN ('verified','approved') AND (COALESCE(is_deleted, 0) = 0) GROUP BY user_id
         ) cert_counts ON cert_counts.user_id = u.uid
         LEFT JOIN (
           SELECT user_id, COUNT(*) as cnt FROM career_activities
-          WHERE status='approved' AND (is_deleted IS NOT TRUE) GROUP BY user_id
+          WHERE status='approved' AND (COALESCE(is_deleted, 0) = 0) GROUP BY user_id
         ) career_counts ON career_counts.user_id = u.uid
         WHERE u.role = 'student'
         ORDER BY score DESC

@@ -182,13 +182,6 @@ export default function CollegeAdminDashboardView() {
     }
   };
 
-  if (loading) return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
-      <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-      <p className="text-slate-500 font-medium animate-pulse">Syncing College Intelligence...</p>
-    </div>
-  );
-
   const COLORS = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
   return (
@@ -272,6 +265,7 @@ export default function CollegeAdminDashboardView() {
                 value={stats.totalStudents}
                 subtext={`Active: ${stats.activeUsers}`}
                 color="indigo"
+                loading={loading}
               />
               <StatCard
                 icon={<Award />}
@@ -279,6 +273,7 @@ export default function CollegeAdminDashboardView() {
                 value={stats.totalCertificates}
                 subtext={`${stats.approvedCertificates} Approved`}
                 color="emerald"
+                loading={loading}
               />
               <StatCard
                 icon={<Activity />}
@@ -286,6 +281,7 @@ export default function CollegeAdminDashboardView() {
                 value={stats.averageCollegeCGPA}
                 subtext="Average Performance"
                 color="blue"
+                loading={loading}
               />
               <StatCard
                 icon={<Briefcase />}
@@ -293,6 +289,7 @@ export default function CollegeAdminDashboardView() {
                 value={stats.placementReadyStudents}
                 subtext="High Potential"
                 color="amber"
+                loading={loading}
               />
             </div>
 
@@ -306,24 +303,28 @@ export default function CollegeAdminDashboardView() {
                   </button>
                 </div>
                 <div className="h-72">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={analytics.monthlyCertificates}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
-                      <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
-                      <Tooltip
-                        contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="count"
-                        stroke="#4f46e5"
-                        strokeWidth={4}
-                        dot={{ r: 6, fill: '#fff', stroke: '#4f46e5', strokeWidth: 3 }}
-                        activeDot={{ r: 8 }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
+                  {loading ? (
+                    <div className="w-full h-full bg-slate-50 rounded-3xl animate-pulse" />
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={analytics.monthlyCertificates || []}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                        <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
+                        <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
+                        <Tooltip
+                          contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="count"
+                          stroke="#4f46e5"
+                          strokeWidth={4}
+                          dot={{ r: 6, fill: '#fff', stroke: '#4f46e5', strokeWidth: 3 }}
+                          activeDot={{ r: 8 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  )}
                 </div>
               </div>
 
@@ -335,17 +336,24 @@ export default function CollegeAdminDashboardView() {
                     At-Risk Students
                   </h3>
                   <div className="space-y-4">
-                    {weakStudents.slice(0, 4).map((s) => (
-                      <div key={s.uid} className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl">
-                        <div>
-                          <p className="font-bold text-slate-900 text-sm">{s.name}</p>
-                          <p className="text-[10px] text-slate-500 font-medium">{s.risk_reason}</p>
-                        </div>
-                        <span className="px-2 py-1 bg-red-100 text-red-600 rounded-lg text-[10px] font-bold">
-                          Risk: High
-                        </span>
+                    {loading ? (
+                      <div className="space-y-3">
+                        <div className="h-12 bg-slate-50 rounded-2xl animate-pulse" />
+                        <div className="h-12 bg-slate-50 rounded-2xl animate-pulse" />
                       </div>
-                    ))}
+                    ) : (
+                      (weakStudents || []).slice(0, 4).map((s) => (
+                        <div key={s.uid} className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl">
+                          <div>
+                            <p className="font-bold text-slate-900 text-sm">{s.name}</p>
+                            <p className="text-[10px] text-slate-500 font-medium">{s.risk_reason}</p>
+                          </div>
+                          <span className="px-2 py-1 bg-red-100 text-red-600 rounded-lg text-[10px] font-bold">
+                            Risk: High
+                          </span>
+                        </div>
+                      ))
+                    )}
                     <button onClick={() => setActiveTab('students')} className="w-full py-3 text-slate-500 text-xs font-bold hover:text-indigo-600 transition-colors">
                       View All Monitoring Data
                     </button>
@@ -407,49 +415,57 @@ export default function CollegeAdminDashboardView() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {students.map((s) => (
-                    <tr key={s.uid} className="hover:bg-slate-50 transition-colors group">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold text-xs">
-                            {s.name.charAt(0)}
-                          </div>
-                          <div>
-                            <p className="font-bold text-slate-900">{s.name}</p>
-                            <p className="text-xs text-slate-500">{s.roll_no}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <p className="font-medium text-slate-700">{s.department_name}</p>
-                        <p className="text-xs text-slate-400">
-                          {s.academic_year || s.academicYear || `${s.year || 'I'} Year`}
-                          {s.section ? ` - ${s.section}` : ''}
-                        </p>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex flex-col gap-1">
-                          <span className="font-bold text-slate-900">GPA: {s.cgpa || 'N/A'}</span>
-                          <div className="w-24 h-1 bg-slate-100 rounded-full overflow-hidden">
-                            <div className="h-full bg-indigo-500" style={{ width: `${(s.cgpa / 10) * 100}%` }} />
-                          </div>
-                          <span className="text-[10px] text-slate-400">Attendance: {s.attendance}%</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${s.readiness > 75 ? 'bg-emerald-100 text-emerald-600' :
-                          s.readiness > 50 ? 'bg-amber-100 text-amber-600' : 'bg-red-100 text-red-600'
-                          }`}>
-                          {s.readiness}% Ready
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <Link to={`/portfolio/${s.uid}`} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg inline-block transition-colors">
-                          <Eye className="w-4 h-4" />
-                        </Link>
+                  {loading ? (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto" />
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    (students || []).map((s) => (
+                      <tr key={s.uid} className="hover:bg-slate-50 transition-colors group">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold text-xs">
+                              {s.name.charAt(0)}
+                            </div>
+                            <div>
+                              <p className="font-bold text-slate-900">{s.name}</p>
+                              <p className="text-xs text-slate-500">{s.roll_no}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <p className="font-medium text-slate-700">{s.department_name}</p>
+                          <p className="text-xs text-slate-400">
+                            {s.academic_year || s.academicYear || `${s.year || 'I'} Year`}
+                            {s.section ? ` - ${s.section}` : ''}
+                          </p>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col gap-1">
+                            <span className="font-bold text-slate-900">GPA: {s.cgpa || 'N/A'}</span>
+                            <div className="w-24 h-1 bg-slate-100 rounded-full overflow-hidden">
+                              <div className="h-full bg-indigo-500" style={{ width: `${(s.cgpa / 10) * 100}%` }} />
+                            </div>
+                            <span className="text-[10px] text-slate-400">Attendance: {s.attendance}%</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${s.readiness > 75 ? 'bg-emerald-100 text-emerald-600' :
+                            s.readiness > 50 ? 'bg-amber-100 text-amber-600' : 'bg-red-100 text-red-600'
+                            }`}>
+                            {s.readiness}% Ready
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <Link to={`/portfolio/${s.uid}`} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg inline-block transition-colors">
+                            <Eye className="w-4 h-4" />
+                          </Link>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -464,64 +480,70 @@ export default function CollegeAdminDashboardView() {
             className="space-y-6"
           >
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {certifications.map((cert) => (
-                <div key={cert.id} className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-md transition-all group">
-                  <div className="relative aspect-video bg-slate-100 overflow-hidden">
-                    {cert.fileUrl ? (
-                      <img src={cert.fileUrl} alt={cert.eventName} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-slate-400">
-                        <Award className="w-12 h-12" />
-                      </div>
-                    )}
-                    <div className="absolute top-4 right-4 flex gap-2">
-                      {cert.fraud_flag ? (
-                        <div className="bg-red-500 text-white p-1.5 rounded-lg shadow-lg">
-                          <AlertTriangle className="w-4 h-4" />
-                        </div>
-                      ) : cert.gps_verified ? (
-                        <div className="bg-emerald-500 text-white p-1.5 rounded-lg shadow-lg">
-                          <ShieldCheck className="w-4 h-4" />
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                  <div className="p-6">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{cert.type || 'Event'}</span>
-                      <span className="text-xs text-slate-400">{new Date(cert.created_at).toLocaleDateString()}</span>
-                    </div>
-                    <h4 className="text-lg font-bold text-slate-900 mb-4 line-clamp-1">{cert.eventName}</h4>
-                    <div className="space-y-3 mb-6">
-                      <div className="flex items-center gap-2 text-sm text-slate-600">
-                        <User className="w-4 h-4" />
-                        <span className="font-medium">{cert.student_name}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-slate-600">
-                        <Building2 className="w-4 h-4" />
-                        <span>{cert.department_name}</span>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setSelectedProof(cert)}
-                        className="flex-1 flex items-center justify-center gap-2 bg-slate-50 text-slate-700 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-100 transition-colors"
-                      >
-                        <Shield className="w-4 h-4" />
-                        Verify Proof
-                      </button>
-                      <a
-                        href={cert.fileUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100 transition-colors"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                      </a>
-                    </div>
-                  </div>
+              {loading ? (
+                <div className="col-span-full flex justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
                 </div>
-              ))}
+              ) : (
+                (certifications || []).map((cert) => (
+                  <div key={cert.id} className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-md transition-all group">
+                    <div className="relative aspect-video bg-slate-100 overflow-hidden">
+                      {cert.fileUrl ? (
+                        <img src={cert.fileUrl} alt={cert.eventName} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-slate-400">
+                          <Award className="w-12 h-12" />
+                        </div>
+                      )}
+                      <div className="absolute top-4 right-4 flex gap-2">
+                        {cert.fraud_flag ? (
+                          <div className="bg-red-500 text-white p-1.5 rounded-lg shadow-lg">
+                            <AlertTriangle className="w-4 h-4" />
+                          </div>
+                        ) : cert.gps_verified ? (
+                          <div className="bg-emerald-500 text-white p-1.5 rounded-lg shadow-lg">
+                            <ShieldCheck className="w-4 h-4" />
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="p-6">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{cert.type || 'Event'}</span>
+                        <span className="text-xs text-slate-400">{new Date(cert.created_at).toLocaleDateString()}</span>
+                      </div>
+                      <h4 className="text-lg font-bold text-slate-900 mb-4 line-clamp-1">{cert.eventName}</h4>
+                      <div className="space-y-3 mb-6">
+                        <div className="flex items-center gap-2 text-sm text-slate-600">
+                          <User className="w-4 h-4" />
+                          <span className="font-medium">{cert.student_name}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-slate-600">
+                          <Building2 className="w-4 h-4" />
+                          <span>{cert.department_name}</span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setSelectedProof(cert)}
+                          className="flex-1 flex items-center justify-center gap-2 bg-slate-50 text-slate-700 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-100 transition-colors"
+                        >
+                          <Shield className="w-4 h-4" />
+                          Verify Proof
+                        </button>
+                        <a
+                          href={cert.fileUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100 transition-colors"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </motion.div>
         )}
@@ -533,42 +555,48 @@ export default function CollegeAdminDashboardView() {
             animate={{ opacity: 1, scale: 1 }}
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
           >
-            {staff.map((s) => (
-              <div key={s.uid} className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 group hover:shadow-md transition-all">
-                <div className="flex items-start justify-between mb-6">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-500 group-hover:bg-indigo-600 group-hover:text-white transition-all">
-                      {s.role === 'hod' ? <Shield className="w-6 h-6" /> : <UserCheck className="w-6 h-6" />}
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-slate-900">{s.name}</h4>
-                      <p className="text-xs font-bold text-indigo-600 uppercase tracking-widest">{s.role}</p>
-                    </div>
-                  </div>
-                  <button className="p-2 text-slate-400 hover:text-slate-900 rounded-xl hover:bg-slate-50 transition-colors">
-                    <Settings className="w-4 h-4" />
-                  </button>
-                </div>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-500">Department</span>
-                    <span className="font-bold text-slate-900">{s.department_name}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-500">Pending Reviews</span>
-                    <span className={`font-bold ${s.pending_reviews > 5 ? 'text-red-500' : 'text-slate-900'}`}>{s.pending_reviews}</span>
-                  </div>
-                  <div className="pt-4 border-t border-slate-50 flex items-center justify-between">
-                    <span className="text-[10px] text-slate-400 flex items-center gap-1">
-                      <Clock className="w-3 h-3" /> Last Active: {s.last_login ? new Date(s.last_login).toLocaleDateString() : 'Never'}
-                    </span>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${s.status === 'active' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
-                      {s.status}
-                    </span>
-                  </div>
-                </div>
+            {loading ? (
+              <div className="col-span-full flex justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
               </div>
-            ))}
+            ) : (
+              (staff || []).map((s) => (
+                <div key={s.uid} className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 group hover:shadow-md transition-all">
+                  <div className="flex items-start justify-between mb-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-500 group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                        {s.role === 'hod' ? <Shield className="w-6 h-6" /> : <UserCheck className="w-6 h-6" />}
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-slate-900">{s.name}</h4>
+                        <p className="text-xs font-bold text-indigo-600 uppercase tracking-widest">{s.role}</p>
+                      </div>
+                    </div>
+                    <button className="p-2 text-slate-400 hover:text-slate-900 rounded-xl hover:bg-slate-50 transition-colors">
+                      <Settings className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-500">Department</span>
+                      <span className="font-bold text-slate-900">{s.department_name}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-500">Pending Reviews</span>
+                      <span className={`font-bold ${s.pending_reviews > 5 ? 'text-red-500' : 'text-slate-900'}`}>{s.pending_reviews}</span>
+                    </div>
+                    <div className="pt-4 border-t border-slate-50 flex items-center justify-between">
+                      <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                        <Clock className="w-3 h-3" /> Last Active: {s.last_login ? new Date(s.last_login).toLocaleDateString() : 'Never'}
+                      </span>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${s.status === 'active' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
+                        {s.status}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </motion.div>
         )}
 
@@ -579,75 +607,81 @@ export default function CollegeAdminDashboardView() {
             animate={{ opacity: 1, y: 0 }}
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
           >
-            {departments.map((d) => (
-              <div key={d.id} className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden group">
-                <div className="p-6 bg-gradient-to-br from-indigo-600 to-indigo-800 text-white">
-                  <div className="flex items-center justify-between mb-4">
-                    <Building2 className="w-6 h-6 text-indigo-100" />
-                    <button
-                      onClick={() => handleRegenerateCode(d.id, d.name)}
-                      title="Regenerate Invite Code"
-                      className="p-2 bg-white/10 rounded-xl hover:bg-white/20 transition-colors"
-                    >
-                      <RefreshCw className="w-4 h-4" />
-                    </button>
-                  </div>
-                  <h4 className="text-xl font-bold">{d.name}</h4>
-                  <p className="text-indigo-100 text-xs mt-1">ID: {d.department_id}</p>
-                </div>
-                <div className="p-6 space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="p-3 bg-slate-50 rounded-2xl text-center">
-                      <p className="text-[10px] font-black text-slate-400 uppercase">Students</p>
-                      <p className="text-lg font-black text-slate-900">{d.student_count}</p>
-                    </div>
-                    <div className="p-3 bg-slate-50 rounded-2xl text-center">
-                      <p className="text-[10px] font-black text-slate-400 uppercase">Staff</p>
-                      <p className="text-lg font-black text-slate-900">{d.staff_count}</p>
-                    </div>
-                  </div>
-                  {/* Invite Code Section */}
-                  <div className="bg-indigo-50 rounded-2xl p-3 border border-indigo-100">
-                    <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2 flex items-center justify-between">
-                      <span className="flex items-center gap-1"><Key className="w-3 h-3" /> Invite Code</span>
-                      <span className="bg-indigo-100 px-1.5 py-0.5 rounded text-indigo-800 text-[9px] font-bold">{d.invite_code_year || 'All Years'}</span>
-                    </p>
-                    {d.invite_code ? (
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-mono font-bold text-indigo-700 text-sm tracking-wider">{d.invite_code}</span>
-                        <button
-                          onClick={() => copyToClipboard(d.invite_code)}
-                          title="Copy invite code"
-                          className="p-1.5 bg-indigo-100 text-indigo-600 rounded-lg hover:bg-indigo-200 transition-colors"
-                        >
-                          <Copy className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ) : (
-                      <p className="text-xs text-slate-400 italic">No active code — click ↻ to generate</p>
-                    )}
-                  </div>
-                  <div className="pt-2 space-y-3">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-500">HOD</span>
-                      <span className="font-bold text-slate-900">{d.hod_name || 'Not Assigned'}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-500">Avg CGPA</span>
-                      <span className="font-bold text-emerald-600">{d.avg_cgpa ? d.avg_cgpa.toFixed(2) : '0.00'}</span>
-                    </div>
-                    {d.invite_code_id && (
-                      <button
-                        onClick={() => handleViewStudentsForCode(d.invite_code_id, d.invite_code, d.name)}
-                        className="w-full mt-2 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5"
-                      >
-                        <Users className="w-3.5 h-3.5" /> View Registered Students
-                      </button>
-                    )}
-                  </div>
-                </div>
+            {loading ? (
+              <div className="col-span-full flex justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
               </div>
-            ))}
+            ) : (
+              (departments || []).map((d) => (
+                <div key={d.id} className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden group">
+                  <div className="p-6 bg-gradient-to-br from-indigo-600 to-indigo-800 text-white">
+                    <div className="flex items-center justify-between mb-4">
+                      <Building2 className="w-6 h-6 text-indigo-100" />
+                      <button
+                        onClick={() => handleRegenerateCode(d.id, d.name)}
+                        title="Regenerate Invite Code"
+                        className="p-2 bg-white/10 rounded-xl hover:bg-white/20 transition-colors"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <h4 className="text-xl font-bold">{d.name}</h4>
+                    <p className="text-indigo-100 text-xs mt-1">ID: {d.department_id}</p>
+                  </div>
+                  <div className="p-6 space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="p-3 bg-slate-50 rounded-2xl text-center">
+                        <p className="text-[10px] font-black text-slate-400 uppercase">Students</p>
+                        <p className="text-lg font-black text-slate-900">{d.student_count}</p>
+                      </div>
+                      <div className="p-3 bg-slate-50 rounded-2xl text-center">
+                        <p className="text-[10px] font-black text-slate-400 uppercase">Staff</p>
+                        <p className="text-lg font-black text-slate-900">{d.staff_count}</p>
+                      </div>
+                    </div>
+                    {/* Invite Code Section */}
+                    <div className="bg-indigo-50 rounded-2xl p-3 border border-indigo-100">
+                      <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2 flex items-center justify-between">
+                        <span className="flex items-center gap-1"><Key className="w-3 h-3" /> Invite Code</span>
+                        <span className="bg-indigo-100 px-1.5 py-0.5 rounded text-indigo-800 text-[9px] font-bold">{d.invite_code_year || 'All Years'}</span>
+                      </p>
+                      {d.invite_code ? (
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-mono font-bold text-indigo-700 text-sm tracking-wider">{d.invite_code}</span>
+                          <button
+                            onClick={() => copyToClipboard(d.invite_code)}
+                            title="Copy invite code"
+                            className="p-1.5 bg-indigo-100 text-indigo-600 rounded-lg hover:bg-indigo-200 transition-colors"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-slate-400 italic">No active code — click ↻ to generate</p>
+                      )}
+                    </div>
+                    <div className="pt-2 space-y-3">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-500">HOD</span>
+                        <span className="font-bold text-slate-900">{d.hod_name || 'Not Assigned'}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-500">Avg CGPA</span>
+                        <span className="font-bold text-emerald-600">{d.avg_cgpa ? d.avg_cgpa.toFixed(2) : '0.00'}</span>
+                      </div>
+                      {d.invite_code_id && (
+                        <button
+                          onClick={() => handleViewStudentsForCode(d.invite_code_id, d.invite_code, d.name)}
+                          className="w-full mt-2 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+                        >
+                          <Users className="w-3.5 h-3.5" /> View Registered Students
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
             <button
               onClick={() => setShowAddDeptModal(true)}
               className="bg-white border-2 border-dashed border-slate-200 rounded-3xl p-8 flex flex-col items-center justify-center gap-3 text-slate-400 hover:border-indigo-600 hover:text-indigo-600 hover:bg-indigo-50/10 transition-all group"
@@ -1136,7 +1170,7 @@ export default function CollegeAdminDashboardView() {
   );
 }
 
-function StatCard({ icon, label, value, subtext, color }: any) {
+function StatCard({ icon, label, value, subtext, color, loading }: any) {
   const colorStyles: any = {
     indigo: 'bg-indigo-50 text-indigo-600',
     emerald: 'bg-emerald-50 text-emerald-600',
@@ -1156,8 +1190,14 @@ function StatCard({ icon, label, value, subtext, color }: any) {
         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</span>
       </div>
       <div>
-        <h3 className="text-4xl font-black text-slate-900">{value || 0}</h3>
-        <p className="text-xs font-bold text-slate-400 mt-1">{subtext}</p>
+        {loading ? (
+          <div className="h-10 w-24 bg-slate-100 rounded-lg animate-pulse mb-2" />
+        ) : (
+          <>
+            <h3 className="text-4xl font-black text-slate-900">{value || 0}</h3>
+            <p className="text-xs font-bold text-slate-400 mt-1">{subtext}</p>
+          </>
+        )}
       </div>
     </motion.div>
   );

@@ -138,13 +138,6 @@ export default function StaffDashboardView() {
     return { label: 'Excellent', color: 'bg-emerald-100 text-emerald-700' };
   };
 
-  if (loading) return (
-    <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
-      <Loader2 className="w-10 h-10 text-blue-500 animate-spin" />
-      <p className="text-slate-400 font-medium">Synchronizing Academic Intelligence...</p>
-    </div>
-  );
-
   if (showMarkEntry) {
     return <MarkEntryView onBack={() => setShowMarkEntry(false)} />;
   }
@@ -191,8 +184,8 @@ export default function StaffDashboardView() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {[
           { label: 'Students', value: stats.totalStudents, icon: Users, color: 'blue', detail: 'Total Enrolled' },
-          { label: 'Avg CGPA', value: (stats.avgCGPA || 0).toFixed(2), icon: GraduationCap, color: 'indigo', detail: 'Class Average' },
-          { label: 'Attendance', value: `${(stats.avgAttendance || 0).toFixed(1)}%`, icon: Calendar, color: 'emerald', detail: 'Monthly Avg' },
+          { label: 'Avg CGPA', value: stats.avgCGPA ? stats.avgCGPA.toFixed(2) : '0.00', icon: GraduationCap, color: 'indigo', detail: 'Class Average' },
+          { label: 'Attendance', value: stats.avgAttendance ? `${stats.avgAttendance.toFixed(1)}%` : '0%', icon: Calendar, color: 'emerald', detail: 'Monthly Avg' },
           { label: 'Arrears', value: stats.studentsWithArrears, icon: ShieldAlert, color: 'red', detail: 'Risk Students' }
         ].map((item, i) => (
           <motion.div 
@@ -211,7 +204,11 @@ export default function StaffDashboardView() {
               </div>
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{item.label}</span>
             </div>
-            <p className="text-4xl font-black text-slate-900 relative z-10">{item.value}</p>
+            {loading ? (
+              <div className="h-10 w-24 bg-slate-100 rounded-lg animate-pulse mb-2 relative z-10" />
+            ) : (
+              <p className="text-4xl font-black text-slate-900 relative z-10">{item.value}</p>
+            )}
             <p className="text-[10px] font-bold text-slate-400 mt-2 uppercase tracking-tight">{item.detail}</p>
           </motion.div>
         ))}
@@ -231,23 +228,27 @@ export default function StaffDashboardView() {
             </div>
           </div>
           <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={analytics.certTrends}>
-                <defs>
-                  <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#94a3b8'}} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#94a3b8'}} />
-                <Tooltip 
-                   contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', padding: '15px' }}
-                />
-                <Area type="monotone" dataKey="count" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorCount)" />
-              </AreaChart>
-            </ResponsiveContainer>
+            {loading ? (
+              <div className="w-full h-full bg-slate-50 rounded-3xl animate-pulse" />
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={analytics.certTrends || []}>
+                  <defs>
+                    <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1}/>
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#94a3b8'}} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#94a3b8'}} />
+                  <Tooltip 
+                     contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', padding: '15px' }}
+                  />
+                  <Area type="monotone" dataKey="count" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorCount)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
 
@@ -257,19 +258,23 @@ export default function StaffDashboardView() {
              CGPA Distribution
           </h3>
           <div className="flex-1 min-h-[300px]">
-             <ResponsiveContainer width="100%" height="100%">
-               <BarChart data={analytics.cgpaDist} layout="vertical">
-                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-                 <XAxis type="number" hide />
-                 <YAxis dataKey="range" type="category" axisLine={false} tickLine={false} tick={{fontSize: 11, fontWeight: 800, fill: '#64748b'}} width={60} />
-                 <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{ borderRadius: '15px', border: 'none' }} />
-                 <Bar dataKey="count" radius={[0, 10, 10, 0]}>
-                   {analytics.cgpaDist.map((entry: any, index: number) => (
-                     <Cell key={`cell-${index}`} fill={['#10b981', '#3b82f6', '#6366f1', '#f59e0b', '#ef4444'][index % 5]} />
-                   ))}
-                 </Bar>
-               </BarChart>
-             </ResponsiveContainer>
+             {loading ? (
+               <div className="w-full h-full bg-slate-50 rounded-3xl animate-pulse" />
+             ) : (
+               <ResponsiveContainer width="100%" height="100%">
+                 <BarChart data={analytics.cgpaDist || []} layout="vertical">
+                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                   <XAxis type="number" hide />
+                   <YAxis dataKey="range" type="category" axisLine={false} tickLine={false} tick={{fontSize: 11, fontWeight: 800, fill: '#64748b'}} width={60} />
+                   <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{ borderRadius: '15px', border: 'none' }} />
+                   <Bar dataKey="count" radius={[0, 10, 10, 0]}>
+                     {(analytics.cgpaDist || []).map((entry: any, index: number) => (
+                       <Cell key={`cell-${index}`} fill={['#10b981', '#3b82f6', '#6366f1', '#f59e0b', '#ef4444'][index % 5]} />
+                     ))}
+                   </Bar>
+                 </BarChart>
+               </ResponsiveContainer>
+             )}
           </div>
         </div>
       </div>
@@ -303,92 +308,100 @@ export default function StaffDashboardView() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {students
-                .filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()) || s.roll_no?.toLowerCase().includes(searchTerm.toLowerCase()))
-                .map(s => {
-                  const status = getStatusBadge(s.cgpa || 0, s.arrears || 0);
-                  return (
-                    <tr key={s.uid} className="hover:bg-blue-50/30 transition-all group">
-                      <td className="px-8 py-6">
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 text-blue-700 flex items-center justify-center font-black text-lg shadow-sm border border-white">
-                            {s.name.charAt(0)}
-                          </div>
-                          <div>
-                            <p className="font-black text-slate-900 text-base">{s.name}</p>
-                            <div className="flex items-center gap-2 mt-0.5">
-                               <span className="text-[10px] font-black text-slate-400 uppercase">{s.roll_no || 'N/A'}</span>
-                               <span className="w-1 h-1 rounded-full bg-slate-300" />
-                               <span className="text-[10px] font-black text-slate-400 uppercase">{s.academicYear || s.academic_year || `${s.year} Year` || 'N/A'}</span>
-                               <span className="w-1 h-1 rounded-full bg-slate-300" />
-                               <span className="text-[10px] font-black text-slate-400 uppercase">{s.class} {s.section}</span>
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="py-8 text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto" />
+                  </td>
+                </tr>
+              ) : (
+                students
+                  .filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()) || s.roll_no?.toLowerCase().includes(searchTerm.toLowerCase()))
+                  .map(s => {
+                    const status = getStatusBadge(s.cgpa || 0, s.arrears || 0);
+                    return (
+                      <tr key={s.uid} className="hover:bg-blue-50/30 transition-all group">
+                        <td className="px-8 py-6">
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 text-blue-700 flex items-center justify-center font-black text-lg shadow-sm border border-white">
+                              {s.name.charAt(0)}
                             </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-6">
-                        <div className="flex flex-col items-center gap-2">
-                           <div className="flex items-baseline gap-1">
-                              <span className="text-xl font-black text-slate-900">{s.cgpa || '0.00'}</span>
-                              <span className="text-[10px] font-bold text-slate-400">CGPA</span>
-                           </div>
-                           <div className="flex items-center gap-4 w-24">
-                              <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                 <div className="h-full bg-blue-500 rounded-full" style={{ width: `${s.attendance_percentage || 0}%` }} />
+                            <div>
+                              <p className="font-black text-slate-900 text-base">{s.name}</p>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                 <span className="text-[10px] font-black text-slate-400 uppercase">{s.roll_no || 'N/A'}</span>
+                                 <span className="w-1 h-1 rounded-full bg-slate-300" />
+                                 <span className="text-[10px] font-black text-slate-400 uppercase">{s.academicYear || s.academic_year || `${s.year} Year` || 'N/A'}</span>
+                                 <span className="w-1 h-1 rounded-full bg-slate-300" />
+                                 <span className="text-[10px] font-black text-slate-400 uppercase">{s.class} {s.section}</span>
                               </div>
-                              <span className="text-[10px] font-black text-slate-700">{s.attendance_percentage || 0}%</span>
-                           </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-6 text-center">
-                        <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-tight ${status.color} border border-white shadow-sm inline-block min-w-[90px]`}>
-                          {status.label}
-                        </span>
-                      </td>
-                      <td className="px-6 py-6">
-                        <div className="flex flex-col items-center gap-1">
-                           <div className="relative w-12 h-12 flex items-center justify-center">
-                              <svg className="w-12 h-12 -rotate-90">
-                                 <circle cx="24" cy="24" r="20" fill="none" stroke="#f1f5f9" strokeWidth="4" />
-                                 <circle cx="24" cy="24" r="20" fill="none" stroke={s.placement_readiness_score > 70 ? '#10b981' : '#3b82f6'} strokeWidth="4" strokeDasharray="125.6" strokeDashoffset={125.6 - (125.6 * (s.placement_readiness_score || 0)) / 100} strokeLinecap="round" />
-                              </svg>
-                              <span className="absolute text-[10px] font-black text-slate-800">{s.placement_readiness_score || 0}%</span>
-                           </div>
-                           <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Readiness</p>
-                        </div>
-                      </td>
-                      <td className="px-6 py-6 text-center">
-                         <div className="flex justify-center gap-4">
-                            <div className="text-center">
-                               <p className="text-base font-black text-slate-900">{s.certCount || 0}</p>
-                               <p className="text-[8px] font-black text-slate-400 uppercase">Certs</p>
                             </div>
-                            <div className="text-center">
-                               <p className="text-base font-black text-slate-900">{s.activityCount || 0}</p>
-                               <p className="text-[8px] font-black text-slate-400 uppercase">Acts</p>
-                            </div>
-                         </div>
-                      </td>
-                      <td className="px-8 py-6 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                           <button 
-                             onClick={() => { setNotificationTarget(s); setShowNotificationModal(true); }}
-                             className="p-2.5 bg-white border border-slate-100 text-slate-400 rounded-2xl hover:bg-blue-50 hover:text-blue-600 transition-all shadow-sm"
-                             title="Send Notification"
-                           >
-                             <Bell className="w-4 h-4" />
-                           </button>
-                           <button 
-                             onClick={() => fetchStudentDetail(s.uid)}
-                             className="px-6 py-2.5 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-lg shadow-slate-200"
-                           >
-                             View Intelligence
-                           </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                          </div>
+                        </td>
+                        <td className="px-6 py-6">
+                          <div className="flex flex-col items-center gap-2">
+                             <div className="flex items-baseline gap-1">
+                                <span className="text-xl font-black text-slate-900">{s.cgpa || '0.00'}</span>
+                                <span className="text-[10px] font-bold text-slate-400">CGPA</span>
+                             </div>
+                             <div className="flex items-center gap-4 w-24">
+                                <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                   <div className="h-full bg-blue-500 rounded-full" style={{ width: `${s.attendance_percentage || 0}%` }} />
+                                </div>
+                                <span className="text-[10px] font-black text-slate-700">{s.attendance_percentage || 0}%</span>
+                             </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-6 text-center">
+                          <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-tight ${status.color} border border-white shadow-sm inline-block min-w-[90px]`}>
+                            {status.label}
+                          </span>
+                        </td>
+                        <td className="px-6 py-6">
+                          <div className="flex flex-col items-center gap-1">
+                             <div className="relative w-12 h-12 flex items-center justify-center">
+                                <svg className="w-12 h-12 -rotate-90">
+                                   <circle cx="24" cy="24" r="20" fill="none" stroke="#f1f5f9" strokeWidth="4" />
+                                   <circle cx="24" cy="24" r="20" fill="none" stroke={s.placement_readiness_score > 70 ? '#10b981' : '#3b82f6'} strokeWidth="4" strokeDasharray="125.6" strokeDashoffset={125.6 - (125.6 * (s.placement_readiness_score || 0)) / 100} strokeLinecap="round" />
+                                </svg>
+                                <span className="absolute text-[10px] font-black text-slate-800">{s.placement_readiness_score || 0}%</span>
+                             </div>
+                             <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Readiness</p>
+                          </div>
+                        </td>
+                        <td className="px-6 py-6 text-center">
+                           <div className="flex justify-center gap-4">
+                              <div className="text-center">
+                                 <p className="text-base font-black text-slate-900">{s.certCount || 0}</p>
+                                 <p className="text-[8px] font-black text-slate-400 uppercase">Certs</p>
+                              </div>
+                              <div className="text-center">
+                                 <p className="text-base font-black text-slate-900">{s.activityCount || 0}</p>
+                                 <p className="text-[8px] font-black text-slate-400 uppercase">Acts</p>
+                              </div>
+                           </div>
+                        </td>
+                        <td className="px-8 py-6 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                             <button 
+                               onClick={() => { setNotificationTarget(s); setShowNotificationModal(true); }}
+                               className="p-2.5 bg-white border border-slate-100 text-slate-400 rounded-2xl hover:bg-blue-50 hover:text-blue-600 transition-all shadow-sm"
+                               title="Send Notification"
+                             >
+                               <Bell className="w-4 h-4" />
+                             </button>
+                             <button 
+                               onClick={() => fetchStudentDetail(s.uid)}
+                               className="px-6 py-2.5 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-lg shadow-slate-200"
+                             >
+                               View Intelligence
+                             </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+              )}
             </tbody>
           </table>
           {students.length === 0 && (

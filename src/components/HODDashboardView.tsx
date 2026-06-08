@@ -125,29 +125,28 @@ export default function HODDashboardView() {
     }
   };
 
-  if (loading) return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-      <p className="text-slate-500 font-medium animate-pulse">Initializing Department Intelligence...</p>
-    </div>
-  );
-
   const readinessData = analytics?.readinessDistribution || [];
 
   const StatCard = ({ icon: Icon, label, value, color, trend }: any) => (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100 flex items-center space-x-4 hover:shadow-md transition-all cursor-default group"
+      className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100 flex items-center space-x-4 hover:shadow-md transition-all cursor-default group animate-all"
     >
       <div className={`p-4 rounded-2xl ${color} transition-transform group-hover:scale-110`}>
         <Icon className="w-6 h-6" />
       </div>
-      <div>
+      <div className="flex-1 min-w-0">
         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</p>
-        <div className="flex items-baseline gap-2">
-          <p className="text-2xl font-black text-slate-900">{value}</p>
-          {trend && <span className="text-[10px] font-bold text-emerald-500">{trend}</span>}
+        <div className="flex items-baseline gap-2 mt-1">
+          {loading ? (
+            <div className="h-6 w-16 bg-slate-100 rounded-lg animate-pulse" />
+          ) : (
+            <>
+              <p className="text-2xl font-black text-slate-900 truncate">{value || 0}</p>
+              {trend && <span className="text-[10px] font-bold text-emerald-500 whitespace-nowrap">{trend}</span>}
+            </>
+          )}
         </div>
       </div>
     </motion.div>
@@ -226,23 +225,27 @@ export default function HODDashboardView() {
                   </h3>
                 </div>
                 <div className="h-[350px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={analytics?.cgpaTrend || []}>
-                      <defs>
-                        <linearGradient id="colorCgpa" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.1}/>
-                          <stop offset="95%" stopColor="#4f46e5" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis dataKey="semester" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} dy={10} />
-                      <YAxis domain={[0, 10]} axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} />
-                      <Tooltip 
-                        contentStyle={{borderRadius: '20px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)'}}
-                      />
-                      <Area type="monotone" dataKey="avg_cgpa" stroke="#4f46e5" strokeWidth={4} fillOpacity={1} fill="url(#colorCgpa)" />
-                    </AreaChart>
-                  </ResponsiveContainer>
+                  {loading ? (
+                    <div className="w-full h-full bg-slate-50 rounded-3xl animate-pulse flex items-center justify-center text-slate-400 font-bold" />
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={analytics?.cgpaTrend || []}>
+                        <defs>
+                          <linearGradient id="colorCgpa" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.1}/>
+                            <stop offset="95%" stopColor="#4f46e5" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                        <XAxis dataKey="semester" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} dy={10} />
+                        <YAxis domain={[0, 10]} axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} />
+                        <Tooltip 
+                          contentStyle={{borderRadius: '20px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)'}}
+                        />
+                        <Area type="monotone" dataKey="avg_cgpa" stroke="#4f46e5" strokeWidth={4} fillOpacity={1} fill="url(#colorCgpa)" />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  )}
                 </div>
               </div>
 
@@ -253,37 +256,50 @@ export default function HODDashboardView() {
                   Readiness Mix
                 </h3>
                 <div className="h-[250px] relative">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RePieChart>
-                      <Pie
-                        data={readinessData}
-                        innerRadius={70}
-                        outerRadius={90}
-                        paddingAngle={10}
-                        dataKey="value"
-                      >
-                        {readinessData.map((entry: any, index: number) => (
-                          <Cell key={`cell-${index}`} fill={index === 0 ? '#10b981' : index === 1 ? '#6366f1' : '#f43f5e'} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </RePieChart>
-                  </ResponsiveContainer>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <span className="text-3xl font-black text-slate-900">{analytics?.averageReadiness || 0}%</span>
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Avg Index</span>
-                  </div>
+                  {loading ? (
+                    <div className="w-full h-full rounded-full bg-slate-50 animate-pulse" />
+                  ) : (
+                    <>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <RePieChart>
+                          <Pie
+                            data={readinessData}
+                            innerRadius={70}
+                            outerRadius={90}
+                            paddingAngle={10}
+                            dataKey="value"
+                          >
+                            {readinessData.map((entry: any, index: number) => (
+                              <Cell key={`cell-${index}`} fill={index === 0 ? '#10b981' : index === 1 ? '#6366f1' : '#f43f5e'} />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                        </RePieChart>
+                      </ResponsiveContainer>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                        <span className="text-3xl font-black text-slate-900">{analytics?.averageReadiness || 0}%</span>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Avg Index</span>
+                      </div>
+                    </>
+                  )}
                 </div>
                 <div className="mt-8 space-y-4">
-                  {readinessData.map((item: any, idx: number) => (
-                    <div key={idx} className="flex items-center justify-between p-3 rounded-2xl bg-slate-50">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-3 h-3 rounded-full ${idx === 0 ? 'bg-emerald-500' : idx === 1 ? 'bg-indigo-500' : 'bg-rose-500'}`}></div>
-                        <span className="text-xs font-bold text-slate-700">{item.name}</span>
-                      </div>
-                      <span className="text-xs font-black text-slate-900">{item.value} Students</span>
+                  {loading ? (
+                    <div className="space-y-3">
+                      <div className="h-10 bg-slate-50 rounded-2xl animate-pulse" />
+                      <div className="h-10 bg-slate-50 rounded-2xl animate-pulse" />
                     </div>
-                  ))}
+                  ) : (
+                    readinessData.map((item: any, idx: number) => (
+                      <div key={idx} className="flex items-center justify-between p-3 rounded-2xl bg-slate-50">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-3 h-3 rounded-full ${idx === 0 ? 'bg-emerald-500' : idx === 1 ? 'bg-indigo-500' : 'bg-rose-500'}`}></div>
+                          <span className="text-xs font-bold text-slate-700">{item.name}</span>
+                        </div>
+                        <span className="text-xs font-black text-slate-900">{item.value} Students</span>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             </div>
@@ -311,44 +327,52 @@ export default function HODDashboardView() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
-                    {students.slice(0, 5).sort((a,b) => b.placementScore - a.placementScore).map((student, idx) => (
-                      <tr key={student.uid} className="group hover:bg-slate-50/50 transition-colors">
-                        <td className="px-8 py-5">
-                          <div className="flex items-center gap-2">
-                             <span className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-xs ${idx === 0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
-                               #{idx + 1}
-                             </span>
-                          </div>
-                        </td>
-                        <td className="px-8 py-5">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center font-black text-sm shadow-md">
-                              {student.name.charAt(0)}
-                            </div>
-                            <div>
-                              <p className="font-bold text-slate-900">{student.name}</p>
-                              <p className="text-[10px] font-bold text-slate-400">{student.roll_no || student.rollNo}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-8 py-5">
-                          <div className="flex items-center gap-3">
-                            <span className="font-black text-slate-900">{(student.placementScore/10).toFixed(2)}</span>
-                            <div className="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                              <div className="h-full bg-indigo-600" style={{width: `${student.placementScore}%`}}></div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-8 py-5">
-                          <span className="px-3 py-1 bg-purple-50 text-purple-600 rounded-lg text-xs font-black">{student.certsCount} Verified</span>
-                        </td>
-                        <td className="px-8 py-5 text-right">
-                          <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${student.placementScore > 80 ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
-                            {student.placementScore > 80 ? 'Elite Ready' : 'Corporate Ready'}
-                          </span>
+                    {loading ? (
+                      <tr>
+                        <td colSpan={5} className="py-8 text-center">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto" />
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      students.slice(0, 5).sort((a,b) => b.placementScore - a.placementScore).map((student, idx) => (
+                        <tr key={student.uid} className="group hover:bg-slate-50/50 transition-colors">
+                          <td className="px-8 py-5">
+                            <div className="flex items-center gap-2">
+                               <span className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-xs ${idx === 0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
+                                 #{idx + 1}
+                               </span>
+                            </div>
+                          </td>
+                          <td className="px-8 py-5">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center font-black text-sm shadow-md">
+                                {student.name.charAt(0)}
+                              </div>
+                              <div>
+                                <p className="font-bold text-slate-900">{student.name}</p>
+                                <p className="text-[10px] font-bold text-slate-400">{student.roll_no || student.rollNo}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-8 py-5">
+                            <div className="flex items-center gap-3">
+                              <span className="font-black text-slate-900">{(student.placementScore/10).toFixed(2)}</span>
+                              <div className="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                <div className="h-full bg-indigo-600" style={{width: `${student.placementScore}%`}}></div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-8 py-5">
+                            <span className="px-3 py-1 bg-purple-50 text-purple-600 rounded-lg text-xs font-black">{student.certsCount} Verified</span>
+                          </td>
+                          <td className="px-8 py-5 text-right">
+                            <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${student.placementScore > 80 ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
+                              {student.placementScore > 80 ? 'Elite Ready' : 'Corporate Ready'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>

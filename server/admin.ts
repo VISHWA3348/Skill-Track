@@ -14,7 +14,8 @@ function getStatsCacheKey(userData: any): string {
 }
 
 export function invalidateStatsCache(): void {
-  cacheService.clearPattern('stats:*').catch(() => { });
+  cacheService.clearPattern('dashboard:*').catch(() => { });
+  cacheService.clearPattern('analytics:*').catch(() => { });
 }
 
 export function setupAdmin(app: express.Express) {
@@ -244,13 +245,13 @@ export function setupAdmin(app: express.Express) {
       const certScope = buildWhere('c');
       const certCountsSql = `
         SELECT
-          COUNT(*) FILTER (WHERE c.is_deleted IS NOT TRUE) as total_certs,
-          COUNT(*) FILTER (WHERE c.status = 'pending' AND c.is_deleted IS NOT TRUE) as pending_certs,
-          COUNT(*) FILTER (WHERE c.status = 'staff_approved' AND c.is_deleted IS NOT TRUE) as staff_approved_certs,
-          COUNT(*) FILTER (WHERE c.status IN ('approved','verified') AND c.is_deleted IS NOT TRUE) as approved_certs,
-          COUNT(*) FILTER (WHERE c.status = 'rejected' AND c.is_deleted IS NOT TRUE) as rejected_certs,
-          COUNT(*) FILTER (WHERE (c.fraud_flag = true OR c.fraud_flag = 1) AND c.is_deleted IS NOT TRUE) as fraud_certs,
-          COUNT(*) FILTER (WHERE (c.gps_verified = true OR c.gps_verified = 1) AND c.is_deleted IS NOT TRUE) as gps_certs
+          COUNT(*) FILTER (WHERE COALESCE(c.is_deleted,0)=0) as total_certs,
+          COUNT(*) FILTER (WHERE c.status = 'pending' AND COALESCE(c.is_deleted,0)=0) as pending_certs,
+          COUNT(*) FILTER (WHERE c.status = 'staff_approved' AND COALESCE(c.is_deleted,0)=0) as staff_approved_certs,
+          COUNT(*) FILTER (WHERE c.status IN ('approved','verified') AND COALESCE(c.is_deleted,0)=0) as approved_certs,
+          COUNT(*) FILTER (WHERE c.status = 'rejected' AND COALESCE(c.is_deleted,0)=0) as rejected_certs,
+          COUNT(*) FILTER (WHERE COALESCE(c.fraud_flag,0)=1 AND COALESCE(c.is_deleted,0)=0) as fraud_certs,
+          COUNT(*) FILTER (WHERE COALESCE(c.gps_verified,0)=1 AND COALESCE(c.is_deleted,0)=0) as gps_certs
         FROM certifications c
         WHERE 1=1 ${certScope.clause}
       `;
@@ -260,9 +261,9 @@ export function setupAdmin(app: express.Express) {
       const careerScope = buildWhere('ca');
       const careerCountsSql = `
         SELECT
-          COUNT(*) FILTER (WHERE ca.is_deleted IS NOT TRUE) as total_activities,
-          COUNT(*) FILTER (WHERE ca.status = 'pending' AND ca.is_deleted IS NOT TRUE) as pending_activities,
-          COUNT(*) FILTER (WHERE ca.status = 'approved' AND ca.is_deleted IS NOT TRUE) as approved_activities
+          COUNT(*) FILTER (WHERE COALESCE(ca.is_deleted,0)=0) as total_activities,
+          COUNT(*) FILTER (WHERE ca.status = 'pending' AND COALESCE(ca.is_deleted,0)=0) as pending_activities,
+          COUNT(*) FILTER (WHERE ca.status = 'approved' AND COALESCE(ca.is_deleted,0)=0) as approved_activities
         FROM career_activities ca
         WHERE 1=1 ${careerScope.clause}
       `;
@@ -286,12 +287,12 @@ export function setupAdmin(app: express.Express) {
         FROM users u
         LEFT JOIN (
           SELECT user_id, COUNT(*) as cnt FROM certifications
-          WHERE status IN ('verified','approved') AND (is_deleted IS NOT TRUE)
+          WHERE status IN ('verified','approved') AND (COALESCE(is_deleted,0)=0)
           GROUP BY user_id
         ) cert_counts ON cert_counts.user_id = u.uid
         LEFT JOIN (
           SELECT user_id, COUNT(*) as cnt FROM career_activities
-          WHERE status = 'approved' AND (is_deleted IS NOT TRUE)
+          WHERE status = 'approved' AND (COALESCE(is_deleted,0)=0)
           GROUP BY user_id
         ) career_counts ON career_counts.user_id = u.uid
         WHERE u.role = 'student' ${tpWhere}
@@ -310,11 +311,11 @@ export function setupAdmin(app: express.Express) {
           FROM users u
           LEFT JOIN (
             SELECT user_id, COUNT(*) as cnt FROM certifications
-            WHERE status IN ('verified','approved') AND (is_deleted IS NOT TRUE) GROUP BY user_id
+            WHERE status IN ('verified','approved') AND (COALESCE(is_deleted,0)=0) GROUP BY user_id
           ) cert_counts ON cert_counts.user_id = u.uid
           LEFT JOIN (
             SELECT user_id, COUNT(*) as cnt FROM career_activities
-            WHERE status='approved' AND (is_deleted IS NOT TRUE) GROUP BY user_id
+            WHERE status='approved' AND (COALESCE(is_deleted,0)=0) GROUP BY user_id
           ) career_counts ON career_counts.user_id = u.uid
           WHERE u.role = 'student'
           ORDER BY score DESC
@@ -341,7 +342,7 @@ export function setupAdmin(app: express.Express) {
       const certMonthlyRows = db.prepare(`
         SELECT TO_CHAR(created_at, 'Mon') as month, EXTRACT(MONTH FROM created_at) as month_num, COUNT(*) as certs
         FROM certifications c
-        WHERE is_deleted IS NOT TRUE ${certScope.clause.replace(/c\./g, '')}
+        WHERE COALESCE(is_deleted,0)=0 ${certScope.clause.replace(/c\./g, '')}
         GROUP BY month, month_num ORDER BY month_num
       `).all(...certScope.params) as any[];
 
@@ -359,7 +360,7 @@ export function setupAdmin(app: express.Express) {
           COUNT(*) FILTER (WHERE c.status IN ('verified','approved')) as certs,
           0 as activities
         FROM certifications c
-        WHERE c.is_deleted IS NOT TRUE ${certScope.clause}
+        WHERE COALESCE(c.is_deleted,0)=0 ${certScope.clause}
         GROUP BY c.department_id
       `).all(...certScope.params) as any[];
       const deptAchievements = deptAchievementsRows.map((r: any) => ({
@@ -370,7 +371,7 @@ export function setupAdmin(app: express.Express) {
       const actDistRows = db.prepare(`
         SELECT type as name, COUNT(*) as value
         FROM career_activities ca
-        WHERE ca.is_deleted IS NOT TRUE AND type IS NOT NULL ${careerScope.clause}
+        WHERE COALESCE(ca.is_deleted,0)=0 AND type IS NOT NULL ${careerScope.clause}
         GROUP BY type
       `).all(...careerScope.params) as any[];
       const activityDistribution = actDistRows.map((r: any) => ({ name: r.name, value: Number(r.value) }));
@@ -386,13 +387,13 @@ export function setupAdmin(app: express.Express) {
       // ── Recent Pending Lists ──────────────────────────────────────────────
       const pendingCertificatesList = db.prepare(`
         SELECT * FROM certifications c
-        WHERE c.status = 'pending' AND c.is_deleted IS NOT TRUE ${certScope.clause}
+        WHERE c.status = 'pending' AND COALESCE(c.is_deleted,0)=0 ${certScope.clause}
         ORDER BY created_at DESC LIMIT 5
       `).all(...certScope.params) as any[];
 
       const pendingActivitiesList = db.prepare(`
         SELECT * FROM career_activities ca
-        WHERE ca.status = 'pending' AND ca.is_deleted IS NOT TRUE ${careerScope.clause}
+        WHERE ca.status = 'pending' AND COALESCE(ca.is_deleted,0)=0 ${careerScope.clause}
         ORDER BY created_at DESC LIMIT 5
       `).all(...careerScope.params) as any[];
 

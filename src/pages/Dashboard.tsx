@@ -67,42 +67,29 @@ const DashboardViewLoader: React.FC = () => (
 const Dashboard: React.FC = () => {
   const { profile } = useAuth();
   const [stats, setStats] = useState<any>({});
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [recentLogs, setRecentLogs] = useState<AuditLog[]>([]);
-  const [lastFetched, setLastFetched] = useState<Date | null>(null);
+  const [lastFetched, setLastFetched] = useState<Date | null>(new Date());
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  // Phase 8: Removed 5-second polling. Stats are fetched once and refreshed manually.
-  const fetchStats = useCallback(async () => {
-    try {
-      setLoading(true);
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/api/admin/stats`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      if (response.ok) {
-        const result = await response.json();
-        const data = result.success ? result.data : result;
-        setStats(data || {});
-        if (data && data.recentLogs) {
-          setRecentLogs(data.recentLogs);
-        }
-        setLastFetched(new Date());
-      }
-    } catch (error) {
-      console.error("Failed to fetch stats", error);
-    } finally {
-      setLoading(false);
-    }
+  // Stats no longer fetched on mount or polling to prevent duplicate loads.
+  // Refresh increments refreshKey to reload lazy-loaded views.
+  const fetchStats = useCallback(() => {
+    setLoading(true);
+    setRefreshKey(prev => prev + 1);
+    setLastFetched(new Date());
+    const timer = setTimeout(() => setLoading(false), 300);
+    return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
-    fetchStats();
-    // Auto-refresh every 5 minutes (not 5 seconds) — stats change infrequently
-    const interval = setInterval(fetchStats, 5 * 60 * 1000);
+    // Auto-refresh subviews every 5 minutes by incrementing refreshKey
+    const interval = setInterval(() => {
+      setRefreshKey(prev => prev + 1);
+      setLastFetched(new Date());
+    }, 5 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [profile, fetchStats]);
+  }, []);
 
   useEffect(() => {
     if (profile?.role === 'super_admin') {
@@ -452,11 +439,11 @@ const Dashboard: React.FC = () => {
         </button>
       </div>
       <Suspense fallback={<DashboardViewLoader />}>
-        {profile?.role === 'super_admin' && <SuperAdminDashboardView />}
-        {profile?.role === 'admin' && <CollegeAdminDashboardView />}
-        {profile?.role === 'hod' && <HODDashboardView />}
-        {profile?.role === 'staff' && <StaffDashboardView />}
-        {profile?.role === 'student' && renderStudentDashboard()}
+        {profile?.role === 'super_admin' && <SuperAdminDashboardView key={refreshKey} />}
+        {profile?.role === 'admin' && <CollegeAdminDashboardView key={refreshKey} />}
+        {profile?.role === 'hod' && <HODDashboardView key={refreshKey} />}
+        {profile?.role === 'staff' && <StaffDashboardView key={refreshKey} />}
+        {profile?.role === 'student' && <StudentDashboardView key={refreshKey} />}
       </Suspense>
     </div>
   );

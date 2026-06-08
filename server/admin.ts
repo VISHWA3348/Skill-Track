@@ -16,6 +16,8 @@ function getStatsCacheKey(userData: any): string {
 export function invalidateStatsCache(): void {
   cacheService.clearPattern('dashboard:*').catch(() => { });
   cacheService.clearPattern('analytics:*').catch(() => { });
+  cacheService.clearPattern('reports:*').catch(() => { });
+  cacheService.clearPattern('notifications:*').catch(() => { });
 }
 
 export function setupAdmin(app: express.Express) {

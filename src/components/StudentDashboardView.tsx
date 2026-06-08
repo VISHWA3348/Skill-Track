@@ -1,5 +1,5 @@
 import { API_BASE_URL } from '@/config/api';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../api/localApi';
 import { collection, query, where, onSnapshot } from '../api/localApi';
 import { Award, Briefcase, Trophy, User, Clock, Plus, ArrowRight, TrendingUp, CheckCircle2, AlertCircle, MapPin, Star, Github, Linkedin, ExternalLink, Sparkles, Target, Calculator } from 'lucide-react';
@@ -13,6 +13,121 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer 
 } from 'recharts';
 import AICareerInsights from './student/AICareerInsights';
+
+interface NotificationsSectionProps {
+  loading: boolean;
+  notifications: any[];
+}
+
+const NotificationsSection = React.memo(function NotificationsSection({ loading, notifications }: NotificationsSectionProps) {
+  if (!loading && notifications.length === 0) return null;
+
+  return (
+    <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+          <AlertCircle className="w-5 h-5 text-amber-500" />
+          Priority Alerts
+        </h3>
+        {!loading && (
+          <span className="px-2 py-0.5 bg-amber-50 text-amber-700 text-[10px] font-black rounded-full uppercase">
+            {notifications.length} New
+          </span>
+        )}
+      </div>
+      <div className="space-y-3">
+        {loading ? (
+          <div className="flex justify-center py-4">
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600" />
+          </div>
+        ) : (
+          notifications.slice(0, 3).map((n) => (
+            <div key={n.id} className="p-4 rounded-2xl bg-amber-50/30 border border-amber-100">
+              <h4 className="text-sm font-bold text-slate-900">{n.title}</h4>
+              <p className="text-xs text-slate-600 mt-1">{n.message}</p>
+              <span className="text-[10px] text-slate-400 mt-2 block">
+                {new Date(n.created_at).toLocaleDateString()}
+              </span>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+});
+
+interface PerformanceTrendChartProps {
+  semesters: any[];
+}
+
+const PerformanceTrendChart = React.memo(function PerformanceTrendChart({ semesters }: PerformanceTrendChartProps) {
+  return (
+    <div className="h-48 w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={semesters}>
+          <defs>
+            <linearGradient id="colorGpa" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1}/>
+              <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+          <XAxis dataKey="semester" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#94a3b8'}} tickFormatter={(val) => `Sem ${val}`} />
+          <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#94a3b8'}} domain={[0, 10]} />
+          <Tooltip 
+             contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', padding: '15px' }}
+          />
+          <Area type="monotone" dataKey="semester_gpa" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorGpa)" />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+});
+
+interface SubjectWisePerformanceProps {
+  records: any[];
+}
+
+const SubjectWisePerformance = React.memo(function SubjectWisePerformance({ records }: SubjectWisePerformanceProps) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-left text-xs">
+        <thead>
+          <tr className="text-slate-400 font-bold border-b border-slate-50">
+            <th className="pb-3">Subject Name</th>
+            <th className="pb-3 text-center">Semester</th>
+            <th className="pb-3 text-center">Grade</th>
+            <th className="pb-3 text-right">Status</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-50">
+          {records.slice(0, 5).map((r: any, i: number) => (
+            <tr key={i} className="group">
+              <td className="py-3">
+                <p className="font-bold text-slate-900">{r.subject_name}</p>
+                <p className="text-[10px] text-slate-400 uppercase">{r.subject_code}</p>
+              </td>
+              <td className="py-3 text-center font-medium text-slate-600">Sem {r.semester}</td>
+              <td className="py-3 text-center">
+                <span className={`px-2 py-0.5 rounded-lg font-black ${
+                  r.grade === 'O' ? 'bg-emerald-50 text-emerald-600' : 
+                  r.grade === 'A+' ? 'bg-blue-50 text-blue-600' : 'bg-slate-50 text-slate-600'
+                }`}>
+                  {r.grade}
+                </span>
+              </td>
+              <td className="py-3 text-right">
+                <span className={`text-[10px] font-bold uppercase ${r.result_status === 'Pass' ? 'text-emerald-500' : 'text-red-500'}`}>
+                  {r.result_status}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+});
 
 export default function StudentDashboardView() {
   const { profile } = useAuth();
@@ -77,43 +192,15 @@ export default function StudentDashboardView() {
     };
   }, [profile]);
 
-  const NotificationsSection = () => {
-    if (!loading && notifications.length === 0) return null;
-
-    return (
-      <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-            <AlertCircle className="w-5 h-5 text-amber-500" />
-            Priority Alerts
-          </h3>
-          {!loading && (
-            <span className="px-2 py-0.5 bg-amber-50 text-amber-700 text-[10px] font-black rounded-full uppercase">
-              {notifications.length} New
-            </span>
-          )}
-        </div>
-        <div className="space-y-3">
-          {loading ? (
-            <div className="flex justify-center py-4">
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600" />
-            </div>
-          ) : (
-            notifications.slice(0, 3).map((n) => (
-              <div key={n.id} className="p-4 rounded-2xl bg-amber-50/30 border border-amber-100">
-                <h4 className="text-sm font-bold text-slate-900">{n.title}</h4>
-                <p className="text-xs text-slate-600 mt-1">{n.message}</p>
-                <span className="text-[10px] text-slate-400 mt-2 block">
-                  {new Date(n.created_at).toLocaleDateString()}
-                </span>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-    );
-  };
-
+  const sortedSubmissions = useMemo(() => {
+    return ([...(certificates || []), ...(activities || [])])
+      .sort((a, b) => {
+        const dateA = new Date((a as any).createdAt || (a as any).timestamp || (a as any).created_at || 0).getTime();
+        const dateB = new Date((b as any).createdAt || (b as any).timestamp || (b as any).created_at || 0).getTime();
+        return dateB - dateA;
+      })
+      .slice(0, 5);
+  }, [certificates, activities]);
 
   const progressScore = stats?.studentScore || 0;
   const gpsVerifiedCount = certificates.filter(c => c.gpsVerified).length;
@@ -242,25 +329,7 @@ export default function StudentDashboardView() {
           {academicPerformance?.semesters?.length > 1 && (
             <div className="mt-8 pt-8 border-t border-slate-50 relative z-10">
               <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">GPA Progress Trend</h3>
-              <div className="h-48 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={academicPerformance.semesters}>
-                    <defs>
-                      <linearGradient id="colorGpa" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1}/>
-                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="semester" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#94a3b8'}} tickFormatter={(val) => `Sem ${val}`} />
-                    <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#94a3b8'}} domain={[0, 10]} />
-                    <Tooltip 
-                       contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', padding: '15px' }}
-                    />
-                    <Area type="monotone" dataKey="semester_gpa" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorGpa)" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
+              <PerformanceTrendChart semesters={academicPerformance.semesters} />
             </div>
           )}
 
@@ -268,42 +337,7 @@ export default function StudentDashboardView() {
           {academicPerformance?.records?.length > 0 && (
             <div className="mt-8 pt-8 border-t border-slate-50 relative z-10">
               <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Subject-wise Performance</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="text-slate-400 font-bold border-b border-slate-50">
-                      <th className="pb-3">Subject Name</th>
-                      <th className="pb-3 text-center">Semester</th>
-                      <th className="pb-3 text-center">Grade</th>
-                      <th className="pb-3 text-right">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {academicPerformance.records.slice(0, 5).map((r: any, i: number) => (
-                      <tr key={i} className="group">
-                        <td className="py-3">
-                          <p className="font-bold text-slate-900">{r.subject_name}</p>
-                          <p className="text-[10px] text-slate-400 uppercase">{r.subject_code}</p>
-                        </td>
-                        <td className="py-3 text-center font-medium text-slate-600">Sem {r.semester}</td>
-                        <td className="py-3 text-center">
-                          <span className={`px-2 py-0.5 rounded-lg font-black ${
-                            r.grade === 'O' ? 'bg-emerald-50 text-emerald-600' : 
-                            r.grade === 'A+' ? 'bg-blue-50 text-blue-600' : 'bg-slate-50 text-slate-600'
-                          }`}>
-                            {r.grade}
-                          </span>
-                        </td>
-                        <td className="py-3 text-right">
-                          <span className={`text-[10px] font-bold uppercase ${r.result_status === 'Pass' ? 'text-emerald-500' : 'text-red-500'}`}>
-                            {r.result_status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <SubjectWisePerformance records={academicPerformance.records} />
             </div>
           )}
         </motion.div>
@@ -476,7 +510,7 @@ export default function StudentDashboardView() {
             </div>
           </div>
 
-          <NotificationsSection />
+          <NotificationsSection loading={loading} notifications={notifications} />
         </section>
 
         {/* Recommended Opportunities */}
@@ -637,44 +671,37 @@ export default function StudentDashboardView() {
             </div>
 
             <div className="space-y-4">
-              {([...(certificates || []), ...(activities || [])])
-                .sort((a, b) => {
-                  const dateA = new Date((a as any).createdAt || (a as any).timestamp || (a as any).created_at || 0).getTime();
-                  const dateB = new Date((b as any).createdAt || (b as any).timestamp || (b as any).created_at || 0).getTime();
-                  return dateB - dateA;
-                })
-                .slice(0, 5)
-                .map((item, idx) => {
-                  const isCert = 'eventName' in item;
-                  const status = item.status;
-                  return (
-                    <div key={idx} className="flex items-center justify-between p-4 rounded-2xl border border-slate-50 bg-slate-50/30 hover:bg-slate-50 transition-colors">
-                      <div className="flex items-center gap-4">
-                        <div className={`p-2 rounded-xl ${isCert ? 'bg-purple-50 text-purple-600' : 'bg-emerald-50 text-emerald-600'}`}>
-                          {isCert ? <Award className="w-5 h-5" /> : <Briefcase className="w-5 h-5" />}
-                        </div>
-                        <div>
-                          <p className="font-bold text-slate-900">{isCert ? (item as Certificate).eventName : (item as CareerActivity).organization}</p>
-                          <p className="text-xs text-slate-500">{isCert ? 'Certificate' : (item as CareerActivity).type}</p>
-                        </div>
+              {sortedSubmissions.map((item, idx) => {
+                const isCert = 'eventName' in item;
+                const status = item.status;
+                return (
+                  <div key={idx} className="flex items-center justify-between p-4 rounded-2xl border border-slate-50 bg-slate-50/30 hover:bg-slate-50 transition-colors">
+                    <div className="flex items-center gap-4">
+                      <div className={`p-2 rounded-xl ${isCert ? 'bg-purple-50 text-purple-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                        {isCert ? <Award className="w-5 h-5" /> : <Briefcase className="w-5 h-5" />}
                       </div>
-                      <div className="flex items-center gap-3">
-                        <span className={`flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                          status === 'verified' || status === 'approved' 
-                            ? 'bg-green-100 text-green-700' 
-                            : status === 'staff_approved'
-                              ? 'bg-blue-100 text-blue-700'
-                              : status === 'rejected' 
-                                ? 'bg-red-100 text-red-700' 
-                                : 'bg-amber-100 text-amber-700'
-                        }`}>
-                          {status === 'verified' || status === 'approved' ? <CheckCircle2 className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
-                          {(status || 'pending').replace('_', ' ')}
-                        </span>
+                      <div>
+                        <p className="font-bold text-slate-900">{isCert ? (item as Certificate).eventName : (item as CareerActivity).organization}</p>
+                        <p className="text-xs text-slate-500">{isCert ? 'Certificate' : (item as CareerActivity).type}</p>
                       </div>
                     </div>
-                  );
-                })}
+                    <div className="flex items-center gap-3">
+                      <span className={`flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                        status === 'verified' || status === 'approved' 
+                          ? 'bg-green-100 text-green-700' 
+                          : status === 'staff_approved'
+                            ? 'bg-blue-100 text-blue-700'
+                            : status === 'rejected' 
+                              ? 'bg-red-100 text-red-700' 
+                              : 'bg-amber-100 text-amber-700'
+                      }`}>
+                        {status === 'verified' || status === 'approved' ? <CheckCircle2 className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+                        {(status || 'pending').replace('_', ' ')}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
               
               {certificates.length === 0 && activities.length === 0 && (
                 <div className="text-center py-12">

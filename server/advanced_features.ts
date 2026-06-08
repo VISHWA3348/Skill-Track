@@ -7,6 +7,7 @@ import * as xlsx from 'xlsx';
 import QRCode from 'qrcode';
 import { queueService } from './queue';
 import { calculateResumeScore } from './resume_features';
+import { cacheService } from './redis_cache';
 
 export function setupAdvancedFeatures(app: express.Express) {
 
@@ -60,7 +61,7 @@ export function setupAdvancedFeatures(app: express.Express) {
     return score;
   };
 
-  app.get("/api/reports/ranking", authenticate, (req: any, res) => {
+  app.get("/api/reports/ranking", authenticate, async (req: any, res) => {
     try {
       const uid = req.user.uid;
       const userData = db.prepare('SELECT role, college_id, department_id FROM users WHERE uid = ?').get(uid) as any;
@@ -69,6 +70,12 @@ export function setupAdvancedFeatures(app: express.Express) {
       }
 
       const { role, college_id: userCollegeId, department_id: userDeptId } = userData;
+
+      const cacheKey = `reports:${uid}:${role}`;
+      const cached = await cacheService.get(cacheKey);
+      if (cached) {
+        return res.json({ success: true, data: cached, _cached: true });
+      }
 
       // Extract client query parameters
       const filterDept = req.query.department_id;
@@ -227,6 +234,7 @@ export function setupAdvancedFeatures(app: express.Express) {
         };
       });
 
+      await cacheService.set(cacheKey, finalRanked, 60);
       res.json({ success: true, data: finalRanked });
     } catch (error: any) {
       console.error("Ranking generation error:", error);

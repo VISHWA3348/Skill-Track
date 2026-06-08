@@ -2156,7 +2156,7 @@ export function setupApi(app: express.Express) {
       const { role, college_id, department_id, uid } = req.userData;
       const assignedYear = req.userData.assigned_academic_year || req.userData.assignedAcademicYear;
       
-      const cacheKey = `staff:dashboard-stats:${college_id || 'any'}:${department_id || 'any'}:${uid}:${assignedYear || 'any'}`;
+      const cacheKey = `dashboard:${uid}:${role || 'staff'}`;
       const cached = await cacheService.get(cacheKey);
       if (cached) {
         return res.json({ success: true, data: cached, _cached: true });
@@ -2277,7 +2277,7 @@ export function setupApi(app: express.Express) {
       const { role, college_id, department_id, uid } = req.userData;
       const assignedYear = req.userData.assigned_academic_year || req.userData.assignedAcademicYear;
       
-      const cacheKey = `staff:analytics:${college_id || 'any'}:${department_id || 'any'}:${uid}:${assignedYear || 'any'}`;
+      const cacheKey = `analytics:${uid}:${role || 'staff'}`;
       const cached = await cacheService.get(cacheKey);
       if (cached) {
         return res.json({ success: true, data: cached, _cached: true });
@@ -2442,7 +2442,7 @@ export function setupApi(app: express.Express) {
     }
   });
 
-  app.get('/api/student/notifications', authenticate, (req: any, res) => {
+  app.get('/api/student/notifications', authenticate, async (req: any, res) => {
     try {
       if (!req.user) {
         return res.status(401).json({
@@ -2458,11 +2458,19 @@ export function setupApi(app: express.Express) {
         });
       }
 
+      const cacheKey = `notifications:${studentId}`;
+      const cached = await cacheService.get(cacheKey);
+      if (cached) {
+        return res.json({ success: true, data: cached, _cached: true });
+      }
+
       const notifications = db.prepare(`
         SELECT * FROM student_notifications 
         WHERE student_id = ? 
         ORDER BY created_at DESC
       `).all(studentId);
+      
+      await cacheService.set(cacheKey, notifications, 30);
       res.json({ success: true, data: notifications });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -2502,74 +2510,77 @@ export function setupApi(app: express.Express) {
         });
       }
 
+      const cacheKey = `dashboard:${studentId}:student`;
+      const cached = await cacheService.get(cacheKey);
+      if (cached) {
+        return res.json({ success: true, data: cached, _cached: true });
+      }
+
       // Recalculate score and sync to ensure dashboard consistency
       calculateResumeScore(studentId);
 
-      // 1. Get stats (score, rank, totalStudents)
-      const rankRows = db.prepare(`
-        SELECT uid,
-          (COALESCE(cert_counts.cnt,0)*10 + COALESCE(career_counts.cnt,0)*5) as score
-        FROM users u
-        LEFT JOIN (
-          SELECT user_id, COUNT(*) as cnt FROM certifications
-          WHERE status IN ('verified','approved') AND (COALESCE(is_deleted, 0) = 0) GROUP BY user_id
-        ) cert_counts ON cert_counts.user_id = u.uid
-        LEFT JOIN (
-          SELECT user_id, COUNT(*) as cnt FROM career_activities
-          WHERE status='approved' AND (COALESCE(is_deleted, 0) = 0) GROUP BY user_id
-        ) career_counts ON career_counts.user_id = u.uid
-        WHERE u.role = 'student'
-        ORDER BY score DESC
-      `).all() as any[];
+      // Execute queries in parallel
+      const [rankRows, opportunities, academicProfile, notifications, semesters, cgpaSummary, records] = await Promise.all([
+        Promise.resolve().then(() => db.prepare(`
+          SELECT uid,
+            (COALESCE(cert_counts.cnt,0)*10 + COALESCE(career_counts.cnt,0)*5) as score
+          FROM users u
+          LEFT JOIN (
+            SELECT user_id, COUNT(*) as cnt FROM certifications
+            WHERE status IN ('verified','approved') AND (COALESCE(is_deleted, 0) = 0) GROUP BY user_id
+          ) cert_counts ON cert_counts.user_id = u.uid
+          LEFT JOIN (
+            SELECT user_id, COUNT(*) as cnt FROM career_activities
+            WHERE status='approved' AND (COALESCE(is_deleted, 0) = 0) GROUP BY user_id
+          ) career_counts ON career_counts.user_id = u.uid
+          WHERE u.role = 'student'
+          ORDER BY score DESC
+        `).all() as any[]),
+        Promise.resolve().then(() => db.prepare("SELECT * FROM opportunities WHERE status = 'open' ORDER BY created_at DESC LIMIT 50").all()),
+        Promise.resolve().then(() => db.prepare('SELECT * FROM student_academic_profile WHERE student_id = ?').get(studentId) as any),
+        Promise.resolve().then(() => db.prepare(`
+          SELECT * FROM student_notifications 
+          WHERE student_id = ? 
+          ORDER BY created_at DESC LIMIT 20
+        `).all(studentId)),
+        Promise.resolve().then(() => db.prepare("SELECT * FROM student_semester_summary WHERE student_id = ? ORDER BY semester ASC").all(studentId)),
+        Promise.resolve().then(() => db.prepare("SELECT * FROM student_cgpa_summary WHERE student_id = ?").get(studentId)),
+        Promise.resolve().then(() => db.prepare(`
+          SELECT r.*, s.subject_name, s.subject_code, s.credits
+          FROM student_academic_records r
+          JOIN academic_subjects s ON r.subject_id = s.id
+          WHERE r.student_id = ?
+          ORDER BY r.semester DESC, s.subject_name ASC
+        `).all(studentId))
+      ]);
 
       const rankIdx = rankRows.findIndex((r: any) => r.uid === studentId);
       const studentRank = rankIdx !== -1 ? rankIdx + 1 : null;
       const studentScore = rankIdx !== -1 ? rankRows[rankIdx].score : 0;
       const totalStudents = rankRows.length;
 
-      // 2. Get opportunities
-      const opportunities = db.prepare("SELECT * FROM opportunities WHERE status = 'open' ORDER BY created_at DESC LIMIT 50").all();
+      const responseData = {
+        stats: {
+          studentRank,
+          studentScore,
+          totalStudents,
+          systemHealth: "Operational",
+          timestamp: new Date().toISOString()
+        },
+        opportunities,
+        academicProfile: academicProfile || { student_id: studentId, cgpa: 0, arrears: 0, placement_readiness_score: 0 },
+        notifications,
+        academicPerformance: {
+          semesters,
+          summary: cgpaSummary || { cgpa: 0, total_arrears: 0, total_semesters: 0 },
+          records
+        }
+      };
 
-      // 3. Get academic profile
-      const academicProfile = db.prepare('SELECT * FROM student_academic_profile WHERE student_id = ?').get(studentId) as any;
-
-      // 4. Get notifications (from student_notifications table)
-      const notifications = db.prepare(`
-        SELECT * FROM student_notifications 
-        WHERE student_id = ? 
-        ORDER BY created_at DESC LIMIT 20
-      `).all(studentId);
-
-      // 5. Get academic performance (semesters, summary, records)
-      const semesters = db.prepare("SELECT * FROM student_semester_summary WHERE student_id = ? ORDER BY semester ASC").all(studentId);
-      const cgpaSummary = db.prepare("SELECT * FROM student_cgpa_summary WHERE student_id = ?").get(studentId);
-      const records = db.prepare(`
-        SELECT r.*, s.subject_name, s.subject_code, s.credits
-        FROM student_academic_records r
-        JOIN academic_subjects s ON r.subject_id = s.id
-        WHERE r.student_id = ?
-        ORDER BY r.semester DESC, s.subject_name ASC
-      `).all(studentId);
-
+      await cacheService.set(cacheKey, responseData, 30);
       res.json({
         success: true,
-        data: {
-          stats: {
-            studentRank,
-            studentScore,
-            totalStudents,
-            systemHealth: "Operational",
-            timestamp: new Date().toISOString()
-          },
-          opportunities,
-          academicProfile: academicProfile || { student_id: studentId, cgpa: 0, arrears: 0, placement_readiness_score: 0 },
-          notifications,
-          academicPerformance: {
-            semesters,
-            summary: cgpaSummary || { cgpa: 0, total_arrears: 0, total_semesters: 0 },
-            records
-          }
-        }
+        data: responseData
       });
     } catch (error: any) {
       console.error("Consolidated student dashboard fetch failed:", error);
@@ -2580,8 +2591,8 @@ export function setupApi(app: express.Express) {
   // Consolidated Staff Dashboard Overview endpoint
   app.get('/api/staff/dashboard-overview', authenticate, checkRole(['staff', 'hod', 'admin']), async (req: any, res) => {
     try {
-      const { college_id, department_id, uid } = req.userData;
-      const cacheKey = `staff:dashboard-overview:${college_id || 'any'}:${department_id || 'any'}:${uid}`;
+      const { college_id, department_id, uid, role } = req.userData;
+      const cacheKey = `dashboard:${uid}:${role || 'staff'}`;
       
       const cached = await cacheService.get(cacheKey);
       if (cached) {

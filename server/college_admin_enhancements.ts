@@ -143,7 +143,7 @@ export function setupCollegeAdminEnhancements(app: express.Express) {
     try {
       const collegeId = req.userData.collegeId || req.userData.college_id;
 
-      const cacheKey = `college:${collegeId || 'super'}:analytics`;
+      const cacheKey = `analytics:${req.userData.uid}:${req.userData.role}`;
       const cached = await cacheService.get(cacheKey);
       if (cached) {
         return res.json({ success: true, data: cached, _cached: true });
@@ -478,10 +478,18 @@ export function setupCollegeAdminEnhancements(app: express.Express) {
   // 7. REPORTS SYSTEM
   // ============================================
 
-  app.get("/api/admin/reports", authenticate, checkRole(["admin", "super_admin"]), (req: any, res) => {
+  app.get("/api/admin/reports", authenticate, checkRole(["admin", "super_admin"]), async (req: any, res) => {
     try {
+      const cacheKey = `reports:${req.userData.uid}:${req.userData.role}`;
+      const cached = await cacheService.get(cacheKey);
+      if (cached) {
+        return res.json({ success: true, data: cached, _cached: true });
+      }
+
       const collegeId = req.userData.collegeId || req.userData.college_id;
       const reports = db.prepare("SELECT * FROM college_reports WHERE (college_id = ? OR ? = 'super_admin') ORDER BY created_at DESC").all(collegeId, req.userData.role);
+      
+      await cacheService.set(cacheKey, reports, 60);
       res.json({ success: true, data: reports });
     } catch (error: any) {
       res.status(500).json({ error: error.message });

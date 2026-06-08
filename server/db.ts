@@ -271,6 +271,7 @@ export function initDb() {
   // students table
   try { db.exec("CREATE INDEX IF NOT EXISTS idx_students_dept_id ON students(department_id)"); } catch(e){}
   try { db.exec("CREATE INDEX IF NOT EXISTS idx_students_college_id ON students(college_id)"); } catch(e){}
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_students_user_id ON students(user_id)"); } catch(e){}
 
   // career_activities student_id index
   try { db.exec("CREATE INDEX IF NOT EXISTS idx_careers_student_id ON career_activities(student_id)"); } catch(e){}
@@ -1118,6 +1119,9 @@ export function setDocument(collectionName: string, id: string, data: any) {
     db.prepare(`INSERT INTO documents (collectionName, id, data, updatedAt) VALUES (?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(collectionName, id) DO UPDATE SET data = excluded.data`).run(collectionName, id, JSON.stringify(merged));
     return merged;
   }
+  if (['users', 'students', 'certifications', 'careerActivities', 'career_activities', 'notifications', 'student_notifications'].includes(collectionName)) {
+    import('./admin').then(m => m.invalidateStatsCache()).catch(() => {});
+  }
   return data;
 }
 
@@ -1170,6 +1174,9 @@ export function deleteDocument(collectionName: string, id: string) {
     }
   } else {
     db.prepare(`DELETE FROM documents WHERE collectionName = ? AND id = ?`).run(collectionName, id);
+  }
+  if (['users', 'students', 'certifications', 'careerActivities', 'career_activities', 'notifications', 'student_notifications'].includes(collectionName)) {
+    import('./admin').then(m => m.invalidateStatsCache()).catch(() => {});
   }
 }
 

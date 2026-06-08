@@ -91,15 +91,9 @@ export const authenticate = async (req: any, res: any, next: any) => {
     
     const uid = decoded.uid || decoded.id;
     
-    // Get fresh user from cache/db to construct request-scoped identity
-    let userData = await cacheService.get(`user:${uid}`);
-    if (!userData) {
-      const stmt = db.prepare('SELECT uid, email, role, college_id, department_id, academic_year, semester, department_name, college_name, employee_id FROM users WHERE uid = ?');
-      userData = stmt.get(uid) as any;
-      if (userData) {
-        await cacheService.set(`user:${uid}`, userData, 60); // Cache user for 60 seconds
-      }
-    }
+    // Get fresh user directly from DB to construct request-scoped identity (no session caching in Redis)
+    const stmt = db.prepare('SELECT uid, email, role, college_id, department_id, academic_year, semester, department_name, college_name, employee_id FROM users WHERE uid = ?');
+    const userData = stmt.get(uid) as any;
     
     if (!userData) {
       return res.status(401).json({ success: false, error: 'Unauthorized', message: 'Unauthorized' });
@@ -129,7 +123,7 @@ export const authenticate = async (req: any, res: any, next: any) => {
 
 /** Invalidate a specific user from cache (call after role/status updates) */
 export function invalidateUserCache(uid: string): void {
-  cacheService.del(`user:${uid}`).catch(() => {});
+  // User session cache not stored in Redis
 }
 
 export const checkRole = (roles: string[]) => {
@@ -139,15 +133,9 @@ export const checkRole = (roles: string[]) => {
     }
     const uid = req.user.id;
     try {
-      // Try cache first to avoid a DB query on every authenticated request
-      let userData = await cacheService.get(`user:${uid}`);
-      if (!userData) {
-        const stmt = db.prepare('SELECT * FROM users WHERE uid = ?');
-        userData = stmt.get(uid) as any;
-        if (userData) {
-          await cacheService.set(`user:${uid}`, userData, 60); // Cache user for 60 seconds
-        }
-      }
+      // Get user details directly from DB (no session caching in Redis)
+      const stmt = db.prepare('SELECT * FROM users WHERE uid = ?');
+      const userData = stmt.get(uid) as any;
 
       if (!userData || !roles.includes(userData.role)) {
         return res.status(403).json({ error: "Forbidden" });
